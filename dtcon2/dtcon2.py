@@ -31,7 +31,7 @@ def ClearDB(dbcon):
 
 def GetFileChecksum(path):
 	checksum = hashlib.sha256()
-	buffersize = 2**20;
+	buffersize = 2**20
 	f = open(path,'rb')
 	while True:
 		data = f.read(buffersize)
@@ -57,28 +57,36 @@ def CheckDirChecksum(path, checksum):
 		LogPrint(1, 'Checksum error for directory ' + path)
 
 def Check(dbcon, rowid, path, isdir, checksum):
+	print('checking ' + path + ' ...')
 	if isdir:
-		if os.path.isdir(path):
-			CheckDirChecksum(path, checksum)
-			childnodes = dbcon.cursor()
-			childnodes.execute('select rowid,path,isdir,checksum from nodes where parent=?', (rowid,))
-			for row in childnodes:
-				Check(dbcon, row[0], os.path.join(path,row[1]), row[2], row[3])
-			childnodes.close()
-		else:
+		if not os.path.isdir(path):
 			LogPrint(1, 'There is no directory ' + path + ', so we are ignoring it')
+			return
+		CheckDirChecksum(path, checksum)
+		childnodes = dbcon.cursor()
+		childnodes.execute('select rowid,path,isdir,checksum from nodes where parent=?', (rowid,))
+		for row in childnodes:
+			Check(dbcon, row[0], os.path.join(path,row[1]), row[2], row[3])
+		childnodes.close()
 	else:
-		if os.path.isfile(path):
-			CheckFileChecksum(path, checksum)
-		else:
+		if not os.path.isfile(path):
 			LogPrint(1, 'There is no file ' + path + ', so we are ignoring it')
+			return
+		CheckFileChecksum(path, checksum)
+
+def DoWithOneRoot(dbcon, path, func):
+	cur = dbcon.cursor()
+	cur.execute('select rowid,path,isdir,checksum from nodes where parent is null and path=?', (path,))
+	row = cur.fetchone()
+	func(dbcon, row[0], row[1], row[2], row[3])
+	cur.close()
 	
 def DoWithAllRoots(dbcon, func):
-	rootnodes = dbcon.cursor()
-	rootnodes.execute('select rowid,path,isdir,checksum from nodes where parent is null')
-	for row in rootnodes:
+	cur = dbcon.cursor()
+	cur.execute('select rowid,path,isdir,checksum from nodes where parent is null')
+	for row in cur:
 		func(dbcon, row[0], row[1], row[2], row[3])
-	rootnodes.close()
+	cur.close()
 
 
 
