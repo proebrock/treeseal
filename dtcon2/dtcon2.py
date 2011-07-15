@@ -1,7 +1,16 @@
 import sqlite3
 import sys
+import shlex
+import subprocess
 import os
 import hashlib
+
+def ExecuteShell(cmdline):
+	args = shlex.split(cmdline)
+	fnull = open(os.devnull, 'w')
+	proc = subprocess.Popen(args, stdin=fnull, stdout=fnull, stderr=fnull)
+	fnull.close()
+	proc.communicate()
 
 def LogPrint(lvl, message):
 	if (lvl == 0):
@@ -91,7 +100,7 @@ def ImportRecurse(dbcon, rowid, path):
 			LogPrint(2, 'Unknown directory entry.')
 	cur.close()
 
-def ExecuteOnAllNodes(dbcon, path, rootfunc, innernodefunc):
+def ExecuteOnAllNodes(dbcon, path, rootfunc, innernodefunc, param):
 	cur = dbcon.cursor()
 	if path == None:
 		cur.execute('select rowid,path,isdir,checksum from nodes where parent is null')
@@ -102,53 +111,84 @@ def ExecuteOnAllNodes(dbcon, path, rootfunc, innernodefunc):
 			if not os.path.isdir(row[1]):
 				LogPrint(1, 'There is no directory ' + row[1] + ', so we are ignoring it')
 				return
-			rootfunc(dbcon, row[0], None, row[1], row[1], row[2], row[3])
-			ExecuteOnAllRecurse(dbcon, row[0], row[1], innernodefunc)
+			rootfunc(dbcon, row[0], None, row[1], row[1], row[2], row[3], param)
+			ExecuteOnAllRecurse(dbcon, row[0], row[1], innernodefunc, param)
 		else:
 			if not os.path.isfile(row[1]):
 				LogPrint(1, 'There is no file ' + row[1] + ', so we are ignoring it')
 				return
-			rootfunc(dbcon, row[0], None, row[1], row[1], row[2], row[3])
+			rootfunc(dbcon, row[0], None, row[1], row[1], row[2], row[3], param)
 	cur.close()
 
-def ExecuteOnAllRecurse(dbcon, rowid, path, innernodefunc):
+def ExecuteOnAllRecurse(dbcon, rowid, path, innernodefunc, param):
 	cur = dbcon.cursor()
 	cur.execute('select rowid,path,isdir,checksum from nodes where parent=?', (rowid,))
 	for row in cur:
-		fullpath = os.path.join(path, row[1]);
+		fullpath = os.path.join(path, row[1])
 		if row[2]:
 			if not os.path.isdir(fullpath):
 				LogPrint(1, 'There is no directory ' + fullpath + ', so we are ignoring it')
 				return
-			innernodefunc(dbcon, rowid, row[0], row[1], fullpath, row[2], row[3])
-			ExecuteOnAllRecurse(dbcon, row[0], fullpath, innernodefunc)
+			innernodefunc(dbcon, row[0], rowid, row[1], fullpath, row[2], row[3], param)
+			ExecuteOnAllRecurse(dbcon, row[0], fullpath, innernodefunc, param)
 		else:
 			if not os.path.isfile(fullpath):
 				LogPrint(1, 'There is no file ' + fullpath + ', so we are ignoring it')
 				return
-			innernodefunc(dbcon, rowid, row[0], row[1], fullpath, row[2], row[3])
+			innernodefunc(dbcon, row[0], rowid, row[1], fullpath, row[2], row[3], param)
 	cur.close()
 
-def PrintRoot(dbcon, rowid, parent, path, fullpath, isdir, checksum):
+def PrintRoot(dbcon, rowid, parent, path, fullpath, isdir, checksum, param):
 	print('### root node (id {0:d}): {1:s}'.format(rowid, fullpath))
 
-def PrintInnerNode(dbcon, rowid, parent, path, fullpath, isdir, checksum):
+def PrintInnerNode(dbcon, rowid, parent, path, fullpath, isdir, checksum, param):
 	print('node (id {0:d}, parent {1:d}, isdir {2:b}): {3:s}'.format(rowid, parent, isdir, fullpath))
 
-def CheckNode(dbcon, rowid, parent, path, fullpath, isdir, checksum):
-	print('checking ' + fullpath + ' ...');
+def ExportRoot(dbcon, rowid, parent, path, fullpath, isdir, checksum, param):
+	if isdir:
+		shape = 'box'
+	else:
+		shape = 'ellipse'
+	param.write('\t{0:d} [ style=bold, shape={1:s}, label="{2:s}\\n{3:s}..." ];\n'\
+		.format(rowid, shape, fullpath.replace('\\', '\\\\'), checksum[0:15]))
+
+def ExportInnerNode(dbcon, rowid, parent, path, fullpath, isdir, checksum, param):
+	if isdir:
+		shape = 'box'
+	else:
+		shape = 'ellipse'
+	param.write('\t{0:d} [ shape={1:s}, label="{2:s}\\n{3:s}..." ];\n'\
+		.format(rowid, shape, path, checksum[0:15]))
+	param.write('\t{0:d} -> {1:d};\n'.format(parent, rowid))
+
+def CheckNode(dbcon, rowid, parent, path, fullpath, isdir, checksum, param):
+	print('checking ' + fullpath + ' ...')
 	if isdir:
 		CheckDirChecksum(fullpath, checksum)
 	else:
 		CheckFileChecksum(fullpath, checksum)
 
+def PrintNodes(dbcon, path):
+	ExecuteOnAllNodes(dbcon, path, PrintRoot, PrintInnerNode, None)
 
+def ExportNodeToDot(dbcon, path, filename):
+	f = open(filename + '.dot', 'w')
+	f.write('digraph G\n{\n')
+	ExecuteOnAllNodes(dbcon, path, ExportRoot, ExportInnerNode, f)
+	f.write('}\n')
+	f.close()
+	ExecuteShell('dot -Tpng -o' + filename + '.png ' + filename + '.dot')
+	os.remove(filename + '.dot')
+	
+def CheckNodes(dbcon, path):
+	ExecuteOnAllNodes(dbcon, path, CheckNode, CheckNode, None)
 
 dbcon = sqlite3.connect(':memory:')
 CreateTables(dbcon)
-Import(dbcon, "C:\\Projects\\src\\Mathlib")
-Import(dbcon, "C:\\Projects\\Others\\dtcon2\\checkformat.py")
-#ExecuteOnAllNodes(dbcon, None, PrintRoot, PrintInnerNode)
-ExecuteOnAllNodes(dbcon, None, CheckNode, CheckNode)
+Import(dbcon, 'C:\\Projects\\Others\dtcon2\\test')
+Import(dbcon, 'C:\\Projects\\Others\\dtcon2\\checkformat.py')
+PrintNodes(dbcon, None)
+#CheckNodes(dbcon, None)
+#ExportNodeToDot(dbcon, None, 'test')
 dbcon.close()
 
