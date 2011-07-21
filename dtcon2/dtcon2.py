@@ -34,13 +34,6 @@ def CreateTables(dbcon):
 def DropTables(dbcon):
 	dbcon.execute('drop table nodes')
 
-def ClearDB(dbcon):
-	# TODO: accept name here
-	# delete all nodes except the root nodes
-	dbcon.execute('delete from nodes where parent not null')
-	# clear all existing checksums for root nodes
-	dbcon.execute('update nodes set checksum=null where parent is null')
-
 def GetFileChecksum(path):
 	checksum = hashlib.sha256()
 	buffersize = 2**20
@@ -98,6 +91,29 @@ def ImportRecurse(dbcon, rowid, path):
 				(rowid, e, False, GetFileChecksum(fullpath)))
 		else:
 			LogPrint(2, 'Unknown directory entry.')
+	cur.close()
+
+def Delete(dbcon, path):
+	if path == None:
+		dbcon.execute('delete from nodes where parent not null')
+		dbcon.execute('update nodes set checksum=null where parent is null')
+	else:
+		cur = dbcon.cursor()
+		cur.execute('select rowid,isdir from nodes where parent is null and path=?', (path,))
+		row = cur.FetchOne();
+		if row[1]:
+			DeleteRecurse(dbcon, row[0])
+		cur.execute('delete from nodes where parent=?', (row[0],))
+		cur.execute('update nodes set checksum=null where parent=?', (row[0],))
+		cur.close()
+
+def DeleteRecurse(dbcon, rowid):
+	cur = dbcon.cursor()
+	cur.execute('select rowid,isdir from nodes where parent=?', (rowid,))
+	for row in cur:
+		if row[1]:
+			DeleteRecurse(dbcon, row[0])
+	cur.execute('delete from nodes where parent=?', (rowid,))
 	cur.close()
 
 def ExecuteOnAllNodes(dbcon, path, rootfunc, innernodefunc, param):
@@ -187,6 +203,8 @@ dbcon = sqlite3.connect(':memory:')
 CreateTables(dbcon)
 Import(dbcon, 'C:\\Projects\\Others\dtcon2\\test')
 Import(dbcon, 'C:\\Projects\\Others\\dtcon2\\checkformat.py')
+PrintNodes(dbcon, None)
+Delete(dbcon, None)
 PrintNodes(dbcon, None)
 #CheckNodes(dbcon, None)
 #ExportNodeToDot(dbcon, None, 'test')
