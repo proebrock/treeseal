@@ -63,8 +63,10 @@ def CheckDirChecksum(path, checksum):
 
 def Import(dbcon, path):
 	print('importing ' + path + ' ...')
-	# TODO: check if path already exists as a root node
 	cur = dbcon.cursor()
+	cur.execute('select rowid from nodes where parent is null and path=?', (path,))
+	if not cur.fetchone() == None:
+		LogPrint(2, 'Path ' + path + ' already exists.')
 	if os.path.isdir(path):
 		cur.execute('insert into nodes (parent, path, isdir, checksum) values(null,?,?,?)', \
 			(path, True, GetDirChecksum(path)))
@@ -100,7 +102,7 @@ def Delete(dbcon, path):
 	else:
 		cur = dbcon.cursor()
 		cur.execute('select rowid,isdir from nodes where parent is null and path=?', (path,))
-		row = cur.FetchOne();
+		row = cur.fetchone()
 		if row[1]:
 			DeleteRecurse(dbcon, row[0])
 		cur.execute('delete from nodes where parent=?', (row[0],))
