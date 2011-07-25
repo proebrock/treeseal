@@ -136,14 +136,14 @@ def ExecuteOnAllNodes(dbcon, path, nodefunc, param):
 		if row[2]:
 			if not os.path.isdir(row[1]):
 				LogPrint(2, 'There is no directory ' + row[1] + ', so we are ignoring it')
-				return
-			nodefunc(dbcon, row[0], None, row[1], row[1], row[2], row[3], param, 0)
-			ExecuteOnAllRecurse(dbcon, row[0], row[1], nodefunc, param, 1)
+			else:
+				nodefunc(dbcon, row[0], None, row[1], row[1], row[2], row[3], param, 0)
+				ExecuteOnAllRecurse(dbcon, row[0], row[1], nodefunc, param, 1)
 		else:
 			if not os.path.isfile(row[1]):
 				LogPrint(2, 'There is no file ' + row[1] + ', so we are ignoring it')
-				return
-			nodefunc(dbcon, row[0], None, row[1], row[1], row[2], row[3], param, 0)
+			else:
+				nodefunc(dbcon, row[0], None, row[1], row[1], row[2], row[3], param, 0)
 	cur.close()
 
 def ExecuteOnAllRecurse(dbcon, rowid, path, nodefunc, param, depth):
@@ -154,14 +154,14 @@ def ExecuteOnAllRecurse(dbcon, rowid, path, nodefunc, param, depth):
 		if row[2]:
 			if not os.path.isdir(fullpath):
 				LogPrint(2, 'There is no directory ' + fullpath + ', so we are ignoring it')
-				return
-			nodefunc(dbcon, row[0], rowid, row[1], fullpath, row[2], row[3], param, depth)
-			ExecuteOnAllRecurse(dbcon, row[0], fullpath, nodefunc, param, depth + 1)
+			else:
+				nodefunc(dbcon, row[0], rowid, row[1], fullpath, row[2], row[3], param, depth)
+				ExecuteOnAllRecurse(dbcon, row[0], fullpath, nodefunc, param, depth + 1)
 		else:
 			if not os.path.isfile(fullpath):
 				LogPrint(2, 'There is no file ' + fullpath + ', so we are ignoring it')
-				return
-			nodefunc(dbcon, row[0], rowid, row[1], fullpath, row[2], row[3], param, depth)
+			else:
+				nodefunc(dbcon, row[0], rowid, row[1], fullpath, row[2], row[3], param, depth)
 	cur.close()
 
 def PrintNode(dbcon, rowid, parent, path, fullpath, isdir, checksum, param, depth):
@@ -215,7 +215,7 @@ Import(dbcon, 'C:\\Projects\\Others\dtcon2\\test')
 Import(dbcon, 'C:\\Projects\\Others\dtcon2\\test\\test3')
 Import(dbcon, 'C:\\Projects\\Others\\dtcon2\\checkformat.py')
 PrintTree(dbcon, None)
-#ExportTree(dbcon, None, 'test')
+#ExportTree(dbcon, None, 'tree')
 CheckTree(dbcon, None)
 dbcon.close()
 
