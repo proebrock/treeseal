@@ -14,10 +14,12 @@ def ExecuteShell(cmdline):
 
 def LogPrint(lvl, message):
 	if (lvl == 0):
-		print("Warning: " + message)
+		print(message)
 	elif (lvl == 1):
-		print("### Error: " + message)
+		print("Warning: " + message)
 	elif (lvl == 2):
+		print("### Error: " + message)
+	elif (lvl == 3):
 		print("### Fatal Error: " + message)
 		sys.exit()
 	else:
@@ -58,18 +60,18 @@ def CheckChecksum(path, isdir, checksum):
 		if checksum == None:
 			LogPrint(1, 'Checksum not defined for directory ' + path)
 		elif checksum != GetDirChecksum(path):
-			LogPrint(1, 'Checksum error for directory ' + path)
+			LogPrint(2, 'Checksum error for directory ' + path)
 	else:
 		if checksum == None:
 			LogPrint(1, 'Checksum not defined for file ' + path)
 		elif checksum != GetFileChecksum(path):
-			LogPrint(1, 'Checksum error for file ' + path)
+			LogPrint(2, 'Checksum error for file ' + path)
 
 def Import(dbcon, path):
 	cur = dbcon.cursor()
 	cur.execute('select rowid from nodes where parent is null and path=?', (path,))
 	if not cur.fetchone() == None:
-		LogPrint(2, 'Path ' + path + ' already exists.')
+		LogPrint(3, 'Path ' + path + ' already exists.')
 	if os.path.isdir(path):
 		print('importing ' + path + ' ...')
 		cur.execute('insert into nodes (parent, path, isdir, checksum) values (null,?,?,?)', \
@@ -80,7 +82,7 @@ def Import(dbcon, path):
 		cur.execute('insert into nodes (parent, path, isdir, checksum) values (null,?,?,?)', \
 			(path, False, GetFileChecksum(path)))
 	else:
-		LogPrint(2, 'Unknown directory entry ' + path + '.')
+		LogPrint(3, 'Unknown directory entry ' + path + '.')
 	cur.close()
 	print('done\n')
 
@@ -98,10 +100,10 @@ def ImportRecurse(dbcon, rowid, path):
 			cur.execute('insert into nodes (parent, path, isdir, checksum) values (?,?,?,?)', \
 				(rowid, e, False, GetFileChecksum(fullpath)))
 		else:
-			LogPrint(2, 'Unknown directory entry.')
+			LogPrint(3, 'Unknown directory entry.')
 	cur.close()
 
-def Delete(dbcon, path):
+def DeleteTree(dbcon, path):
 	if path == None:
 		dbcon.execute('delete from nodes where parent not null')
 		dbcon.execute('update nodes set checksum=null where parent is null')
@@ -124,7 +126,7 @@ def DeleteRecurse(dbcon, rowid):
 	cur.execute('delete from nodes where parent=?', (rowid,))
 	cur.close()
 
-def ExecuteOnAllNodes(dbcon, path, rootfunc, innernodefunc, param):
+def ExecuteOnAllNodes(dbcon, path, nodefunc, param):
 	cur = dbcon.cursor()
 	if path == None:
 		cur.execute('select rowid,path,isdir,checksum from nodes where parent is null')
@@ -133,42 +135,46 @@ def ExecuteOnAllNodes(dbcon, path, rootfunc, innernodefunc, param):
 	for row in cur:
 		if row[2]:
 			if not os.path.isdir(row[1]):
-				LogPrint(1, 'There is no directory ' + row[1] + ', so we are ignoring it')
+				LogPrint(2, 'There is no directory ' + row[1] + ', so we are ignoring it')
 				return
-			rootfunc(dbcon, row[0], None, row[1], row[1], row[2], row[3], param)
-			ExecuteOnAllRecurse(dbcon, row[0], row[1], innernodefunc, param)
+			nodefunc(dbcon, row[0], None, row[1], row[1], row[2], row[3], param, 0)
+			ExecuteOnAllRecurse(dbcon, row[0], row[1], nodefunc, param, 1)
 		else:
 			if not os.path.isfile(row[1]):
-				LogPrint(1, 'There is no file ' + row[1] + ', so we are ignoring it')
+				LogPrint(2, 'There is no file ' + row[1] + ', so we are ignoring it')
 				return
-			rootfunc(dbcon, row[0], None, row[1], row[1], row[2], row[3], param)
+			nodefunc(dbcon, row[0], None, row[1], row[1], row[2], row[3], param, 0)
 	cur.close()
 
-def ExecuteOnAllRecurse(dbcon, rowid, path, innernodefunc, param):
+def ExecuteOnAllRecurse(dbcon, rowid, path, nodefunc, param, depth):
 	cur = dbcon.cursor()
 	cur.execute('select rowid,path,isdir,checksum from nodes where parent=?', (rowid,))
 	for row in cur:
 		fullpath = os.path.join(path, row[1])
 		if row[2]:
 			if not os.path.isdir(fullpath):
-				LogPrint(1, 'There is no directory ' + fullpath + ', so we are ignoring it')
+				LogPrint(2, 'There is no directory ' + fullpath + ', so we are ignoring it')
 				return
-			innernodefunc(dbcon, row[0], rowid, row[1], fullpath, row[2], row[3], param)
-			ExecuteOnAllRecurse(dbcon, row[0], fullpath, innernodefunc, param)
+			nodefunc(dbcon, row[0], rowid, row[1], fullpath, row[2], row[3], param, depth)
+			ExecuteOnAllRecurse(dbcon, row[0], fullpath, nodefunc, param, depth + 1)
 		else:
 			if not os.path.isfile(fullpath):
-				LogPrint(1, 'There is no file ' + fullpath + ', so we are ignoring it')
+				LogPrint(2, 'There is no file ' + fullpath + ', so we are ignoring it')
 				return
-			innernodefunc(dbcon, row[0], rowid, row[1], fullpath, row[2], row[3], param)
+			nodefunc(dbcon, row[0], rowid, row[1], fullpath, row[2], row[3], param, depth)
 	cur.close()
 
-def PrintRoot(dbcon, rowid, parent, path, fullpath, isdir, checksum, param):
-	print('root (id {0:d}, isdir {1:b}): {2:s}'.format(rowid, isdir, fullpath))
+def PrintNode(dbcon, rowid, parent, path, fullpath, isdir, checksum, param, depth):
+	if depth == 0:
+		print('root (id {0:d}, isdir {1:b}): {2:s}'.format(rowid, isdir, fullpath))
+	else:
+		print('{0:s}node (id {1:d}, parent {2:d}, isdir {3:b}): {4:s}'.format(depth * '  ', rowid, parent, isdir, fullpath))
 
-def PrintInnerNode(dbcon, rowid, parent, path, fullpath, isdir, checksum, param):
-	print('node (id {0:d}, parent {1:d}, isdir {2:b}): {3:s}'.format(rowid, parent, isdir, fullpath))
+def PrintTree(dbcon, path):
+	ExecuteOnAllNodes(dbcon, path, PrintNode, None)
+	print('')
 
-def ExportRoot(dbcon, rowid, parent, path, fullpath, isdir, checksum, param):
+def ExportNode(dbcon, rowid, parent, path, fullpath, isdir, checksum, param, depth):
 	if isdir:
 		shape = 'box'
 	else:
@@ -177,50 +183,39 @@ def ExportRoot(dbcon, rowid, parent, path, fullpath, isdir, checksum, param):
 		csumstr = 'no checksum'
 	else:
 		csumstr = checksum[0:15] + '...';
-	param.write('\t{0:d} [ style=bold, shape={1:s}, label="{0:d}\\n{2:s}\\n{3:s}" ];\n'\
-		.format(rowid, shape, fullpath.replace('\\', '\\\\'), csumstr))
-
-def ExportInnerNode(dbcon, rowid, parent, path, fullpath, isdir, checksum, param):
-	if isdir:
-		shape = 'box'
+	if depth == 0:
+		param.write('\t{0:d} [ style=bold, shape={1:s}, label="{0:d}\\n{2:s}\\n{3:s}" ];\n'\
+			.format(rowid, shape, fullpath.replace('\\', '\\\\'), csumstr))
 	else:
-		shape = 'ellipse'
-	if checksum == None:
-		csumstr = 'no checksum'
-	else:
-		csumstr = checksum[0:15] + '...';
-	param.write('\t{0:d} [ shape={1:s}, label="{0:d}\\n{2:s}\\n{3:s}" ];\n'\
-		.format(rowid, shape, path, csumstr))
-	param.write('\t{0:d} -> {1:d};\n'.format(parent, rowid))
+		param.write('\t{0:d} [ shape={1:s}, label="{0:d}\\n{2:s}\\n{3:s}" ];\n'\
+			.format(rowid, shape, path, csumstr))
+		param.write('\t{0:d} -> {1:d};\n'.format(parent, rowid))
 
-def CheckNode(dbcon, rowid, parent, path, fullpath, isdir, checksum, param):
-	print('checking ' + fullpath + ' ...')
-	CheckChecksum(fullpath, isdir, checksum)
-
-def PrintNodes(dbcon, path):
-	ExecuteOnAllNodes(dbcon, path, PrintRoot, PrintInnerNode, None)
-
-def ExportNodeToDot(dbcon, path, filename):
+def ExportTree(dbcon, path, filename):
 	f = open(filename + '.dot', 'w')
 	f.write('digraph G\n{\n')
-	ExecuteOnAllNodes(dbcon, path, ExportRoot, ExportInnerNode, f)
+	ExecuteOnAllNodes(dbcon, path, ExportNode, f)
 	f.write('}\n')
 	f.close()
 	ExecuteShell('dot -Tpng -o' + filename + '.png ' + filename + '.dot')
 	os.remove(filename + '.dot')
 	
-def CheckNodes(dbcon, path):
-	ExecuteOnAllNodes(dbcon, path, CheckNode, CheckNode, None)
+def CheckNode(dbcon, rowid, parent, path, fullpath, isdir, checksum, param, depth):
+	if isdir or depth == 0:
+		print('checking ' + fullpath + ' ...')
+	CheckChecksum(fullpath, isdir, checksum)
+
+def CheckTree(dbcon, path):
+	ExecuteOnAllNodes(dbcon, path, CheckNode, None)
+	print('done\n')
 
 dbcon = sqlite3.connect(':memory:')
 CreateTables(dbcon)
 Import(dbcon, 'C:\\Projects\\Others\dtcon2\\test')
 Import(dbcon, 'C:\\Projects\\Others\dtcon2\\test\\test3')
 Import(dbcon, 'C:\\Projects\\Others\\dtcon2\\checkformat.py')
-PrintNodes(dbcon, None)
-Delete(dbcon, None)
-PrintNodes(dbcon, None)
-CheckNodes(dbcon, None)
-ExportNodeToDot(dbcon, None, 'test')
+PrintTree(dbcon, None)
+#ExportTree(dbcon, None, 'test')
+CheckTree(dbcon, None)
 dbcon.close()
 
