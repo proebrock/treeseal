@@ -167,16 +167,24 @@ def ExportRoot(dbcon, rowid, parent, path, fullpath, isdir, checksum, param):
 		shape = 'box'
 	else:
 		shape = 'ellipse'
-	param.write('\t{0:d} [ style=bold, shape={1:s}, label="{2:s}\\n{3:s}..." ];\n'\
-		.format(rowid, shape, fullpath.replace('\\', '\\\\'), checksum[0:15]))
+	if checksum == None:
+		csumstr = 'no checksum'
+	else:
+		csumstr = checksum[0:15] + '...';
+	param.write('\t{0:d} [ style=bold, shape={1:s}, label="{0:d}\\n{2:s}\\n{3:s}" ];\n'\
+		.format(rowid, shape, fullpath.replace('\\', '\\\\'), csumstr))
 
 def ExportInnerNode(dbcon, rowid, parent, path, fullpath, isdir, checksum, param):
 	if isdir:
 		shape = 'box'
 	else:
 		shape = 'ellipse'
-	param.write('\t{0:d} [ shape={1:s}, label="{2:s}\\n{3:s}..." ];\n'\
-		.format(rowid, shape, path, checksum[0:15]))
+	if checksum == None:
+		csumstr = 'no checksum'
+	else:
+		csumstr = checksum[0:15] + '...';
+	param.write('\t{0:d} [ shape={1:s}, label="{0:d}\\n{2:s}\\n{3:s}" ];\n'\
+		.format(rowid, shape, path, csumstr))
 	param.write('\t{0:d} -> {1:d};\n'.format(parent, rowid))
 
 def CheckNode(dbcon, rowid, parent, path, fullpath, isdir, checksum, param):
@@ -204,11 +212,12 @@ def CheckNodes(dbcon, path):
 dbcon = sqlite3.connect(':memory:')
 CreateTables(dbcon)
 Import(dbcon, 'C:\\Projects\\Others\dtcon2\\test')
+Import(dbcon, 'C:\\Projects\\Others\dtcon2\\test\\test3')
 Import(dbcon, 'C:\\Projects\\Others\\dtcon2\\checkformat.py')
 PrintNodes(dbcon, None)
 Delete(dbcon, None)
 PrintNodes(dbcon, None)
-#CheckNodes(dbcon, None)
-#ExportNodeToDot(dbcon, None, 'test')
+CheckNodes(dbcon, None)
+ExportNodeToDot(dbcon, None, 'test')
 dbcon.close()
 
