@@ -46,10 +46,6 @@ def GetFileChecksum(path):
 	f.close()
 	return checksum.hexdigest()
 
-def CheckFileChecksum(path, checksum):
-	if checksum != GetFileChecksum(path):
-		LogPrint(1, 'Checksum error for file ' + path)
-
 def GetDirChecksum(path):
 	checksum = hashlib.sha256()
 	entries = os.listdir(path)
@@ -57,39 +53,49 @@ def GetDirChecksum(path):
 		checksum.update(e.encode('utf-8'))
 	return checksum.hexdigest()
 
-def CheckDirChecksum(path, checksum):
-	if checksum != GetDirChecksum(path):
-		LogPrint(1, 'Checksum error for directory ' + path)
+def CheckChecksum(path, isdir, checksum):
+	if isdir:
+		if checksum == None:
+			LogPrint(1, 'Checksum not defined for directory ' + path)
+		elif checksum != GetDirChecksum(path):
+			LogPrint(1, 'Checksum error for directory ' + path)
+	else:
+		if checksum == None:
+			LogPrint(1, 'Checksum not defined for file ' + path)
+		elif checksum != GetFileChecksum(path):
+			LogPrint(1, 'Checksum error for file ' + path)
 
 def Import(dbcon, path):
-	print('importing ' + path + ' ...')
 	cur = dbcon.cursor()
 	cur.execute('select rowid from nodes where parent is null and path=?', (path,))
 	if not cur.fetchone() == None:
 		LogPrint(2, 'Path ' + path + ' already exists.')
 	if os.path.isdir(path):
-		cur.execute('insert into nodes (parent, path, isdir, checksum) values(null,?,?,?)', \
+		print('importing ' + path + ' ...')
+		cur.execute('insert into nodes (parent, path, isdir, checksum) values (null,?,?,?)', \
 			(path, True, GetDirChecksum(path)))
 		ImportRecurse(dbcon, cur.lastrowid, path)
 	elif os.path.isfile(path):
-		cur.execute('insert into nodes (parent, path, isdir, checksum) values(null,?,?,?)', \
+		print('importing ' + path + ' ...')
+		cur.execute('insert into nodes (parent, path, isdir, checksum) values (null,?,?,?)', \
 			(path, False, GetFileChecksum(path)))
 	else:
 		LogPrint(2, 'Unknown directory entry ' + path + '.')
 	cur.close()
+	print('done\n')
 
 def ImportRecurse(dbcon, rowid, path):
-	print('importing ' + path + ' ...')
 	cur = dbcon.cursor()
 	entries = os.listdir(path)
 	for e in entries:
 		fullpath = os.path.join(path, e)
 		if os.path.isdir(fullpath):
-			cur.execute('insert into nodes (parent, path, isdir, checksum) values(?,?,?,?)', \
+			print('importing ' + fullpath + ' ...')
+			cur.execute('insert into nodes (parent, path, isdir, checksum) values (?,?,?,?)', \
 				(rowid, e, True, GetDirChecksum(fullpath)))
 			ImportRecurse(dbcon, cur.lastrowid, fullpath)
 		elif os.path.isfile(fullpath):
-			cur.execute('insert into nodes (parent, path, isdir, checksum) values(?,?,?,?)', \
+			cur.execute('insert into nodes (parent, path, isdir, checksum) values (?,?,?,?)', \
 				(rowid, e, False, GetFileChecksum(fullpath)))
 		else:
 			LogPrint(2, 'Unknown directory entry.')
@@ -157,7 +163,7 @@ def ExecuteOnAllRecurse(dbcon, rowid, path, innernodefunc, param):
 	cur.close()
 
 def PrintRoot(dbcon, rowid, parent, path, fullpath, isdir, checksum, param):
-	print('### root node (id {0:d}): {1:s}'.format(rowid, fullpath))
+	print('root (id {0:d}, isdir {1:b}): {2:s}'.format(rowid, isdir, fullpath))
 
 def PrintInnerNode(dbcon, rowid, parent, path, fullpath, isdir, checksum, param):
 	print('node (id {0:d}, parent {1:d}, isdir {2:b}): {3:s}'.format(rowid, parent, isdir, fullpath))
@@ -189,10 +195,7 @@ def ExportInnerNode(dbcon, rowid, parent, path, fullpath, isdir, checksum, param
 
 def CheckNode(dbcon, rowid, parent, path, fullpath, isdir, checksum, param):
 	print('checking ' + fullpath + ' ...')
-	if isdir:
-		CheckDirChecksum(fullpath, checksum)
-	else:
-		CheckFileChecksum(fullpath, checksum)
+	CheckChecksum(fullpath, isdir, checksum)
 
 def PrintNodes(dbcon, path):
 	ExecuteOnAllNodes(dbcon, path, PrintRoot, PrintInnerNode, None)
