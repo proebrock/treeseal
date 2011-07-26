@@ -30,7 +30,7 @@ def CreateTables(dbcon):
 		'parent int,' + \
 		'path text not null,' + \
 		'isdir boolean not null,' + \
-		'checksum text' + \
+		'checksum blob' + \
 		')')
 
 def DropTables(dbcon):
@@ -46,14 +46,20 @@ def GetFileChecksum(path):
 			break
 		checksum.update(data)
 	f.close()
-	return checksum.hexdigest()
+	return checksum.digest()
 
 def GetDirChecksum(path):
 	checksum = hashlib.sha256()
 	entries = os.listdir(path)
 	for e in entries:
 		checksum.update(e.encode('utf-8'))
-	return checksum.hexdigest()
+	return checksum.digest()
+
+def ChecksumToString(checksum):
+	if checksum == None:
+		return 'no checksum'
+	else:
+		return ''.join('%02x' % byte for byte in checksum[0:7]) + '...'
 
 def CheckChecksum(path, isdir, checksum):
 	if isdir:
@@ -84,6 +90,7 @@ def Import(dbcon, path):
 	else:
 		LogPrint(3, 'Unknown directory entry ' + path + '.')
 	cur.close()
+	dbcon.commit()
 	print('done\n')
 
 def ImportRecurse(dbcon, rowid, path):
@@ -179,16 +186,12 @@ def ExportNode(dbcon, rowid, parent, path, fullpath, isdir, checksum, param, dep
 		shape = 'box'
 	else:
 		shape = 'ellipse'
-	if checksum == None:
-		csumstr = 'no checksum'
-	else:
-		csumstr = checksum[0:15] + '...';
 	if depth == 0:
 		param.write('\t{0:d} [ style=bold, shape={1:s}, label="{0:d}\\n{2:s}\\n{3:s}" ];\n'\
-			.format(rowid, shape, fullpath.replace('\\', '\\\\'), csumstr))
+			.format(rowid, shape, fullpath.replace('\\', '\\\\'), ChecksumToString(checksum)))
 	else:
 		param.write('\t{0:d} [ shape={1:s}, label="{0:d}\\n{2:s}\\n{3:s}" ];\n'\
-			.format(rowid, shape, path, csumstr))
+			.format(rowid, shape, path, ChecksumToString(checksum)))
 		param.write('\t{0:d} -> {1:d};\n'.format(parent, rowid))
 
 def ExportTree(dbcon, path, filename):
@@ -209,7 +212,9 @@ def CheckTree(dbcon, path):
 	ExecuteOnAllNodes(dbcon, path, CheckNode, None)
 	print('done\n')
 
-dbcon = sqlite3.connect(':memory:')
+#dbcon = sqlite3.connect(':memory:')
+dbcon = sqlite3.connect('dbcon.sqlite')
+DropTables(dbcon)
 CreateTables(dbcon)
 Import(dbcon, 'C:\\Projects\\Others\dtcon2\\test')
 Import(dbcon, 'C:\\Projects\\Others\dtcon2\\test\\test3')
