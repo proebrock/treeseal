@@ -121,6 +121,7 @@ def Update(dbcon, path):
 			UpdateRecurse(dbcon, row[0], row[1])
 	cur.close()
 	dbcon.commit()
+	dbcon.execute('vacuum')
 	LogPrint(0, 'done\n')
 
 def UpdateRecurse(dbcon, rowid, path):
