@@ -6,25 +6,65 @@ import shlex
 import subprocess
 import time
 
+class LogFacility:
+	def __init__(self, path):
+		self.starttime = time.clock()
+		self.ResetCounters();
+		if path != None:
+			self.f = open(path, 'w')
+		else:
+			self.f = None;
+	def __del__(self):
+		message = '{0:d} warnings, {1:d} errors'.\
+			format(self.numWarnings, self.numErrors)
+		message += ', elapsed time ' + self.ElapsedTimeStr()
+		print(message)
+		if self.f != None:
+			self.f.write(message + '\n')
+			self.f.close()
+	def ResetCounters(self):
+		self.numNotice = 0
+		self.numWarnings = 0
+		self.numErrors = 0
+		self.numFatalErrors = 0
+	def Print(self, lvl, message):
+		# determine message prefix
+		if lvl == 0:
+			prefix = '';
+		elif lvl == 1:
+			prefix = 'Warning: ';
+		elif lvl == 2:
+			prefix = 'Error: ';
+		elif lvl == 3:
+			prefix = 'Fatal Error: ';
+		else:
+			raise Exception('Unknown log level {0:d}'.format(lvl))
+		# write message to different targets
+		print(prefix + message)
+		if self.f != None:
+			self.f.write(prefix + message + '\n')
+		# if fatal, exit program
+		if lvl == 3:
+			sys.exit()
+	def ElapsedTime(self):
+		return time.clock() - self.starttime
+	def ElapsedTimeStr(self):
+		elapsed = self.ElapsedTime()
+		if elapsed < 60:
+			return '{0:.1f}s'.format(elapsed)
+		elif elapsed < 60*60:
+			return '{0:.1f}min'.format(elapsed/60)
+		else:
+			return '{0:.1f}h'.format(elapsed/60/60)
+
+log = LogFacility('dtcon2.log')
+
 def ExecuteShell(cmdline):
 	args = shlex.split(cmdline)
 	fnull = open(os.devnull, 'w')
 	proc = subprocess.Popen(args, stdin=fnull, stdout=fnull, stderr=fnull)
 	fnull.close()
 	proc.communicate()
-
-def LogPrint(lvl, message):
-	if (lvl == 0):
-		print(message)
-	elif (lvl == 1):
-		print("Warning: " + message)
-	elif (lvl == 2):
-		print("### Error: " + message)
-	elif (lvl == 3):
-		print("### Fatal Error: " + message)
-		sys.exit()
-	else:
-		raise Exception('Unknown log level {0:d}'.format(lvl))
 
 def CreateTables(dbcon):
 	dbcon.execute('create table nodes (' + \
@@ -36,6 +76,10 @@ def CreateTables(dbcon):
 
 def DropTables(dbcon):
 	dbcon.execute('drop table nodes')
+
+def RecreateTables(dbcon):
+	DropTables(dbcon)
+	CreateTables(dbcon)
 
 def GetFileChecksum(path):
 	checksum = hashlib.sha256()
@@ -73,20 +117,20 @@ def GetChecksum(path, isdir):
 		return GetFileChecksum(path)
 
 def CheckChecksum(path, isdir, checksum):
-	LogPrint(0, 'checking ' + path + ' ...')
+	log.Print(0, 'checking ' + path + ' ...')
 	if checksum == None:
-		LogPrint(1, 'No checksum defined for ' + path)
+		log.Print(1, 'No checksum defined for ' + path)
 	elif checksum != GetChecksum(path, isdir):
-		LogPrint(2, 'Checksum error for ' + path)
+		log.Print(2, 'Checksum error for ' + path)
 
 def Import(dbcon, path):
 	cur = dbcon.cursor()
 	# check if path is already in the database
 	cur.execute('select rowid from nodes where parent is null and path=?', (path,))
 	if not cur.fetchone() == None:
-		LogPrint(3, 'Path ' + path + ' already exists.')
+		log.Print(3, 'Path ' + path + ' already exists.')
 	# add entry
-	LogPrint(0, 'importing ' + path + ' ...')
+	log.Print(0, 'importing ' + path + ' ...')
 	isdir = os.path.isdir(path)
 	cur.execute('insert into nodes (parent, path, isdir, checksum) values (null,?,?,?)', \
 		(path, isdir, GetChecksum(path, isdir)))
@@ -94,7 +138,7 @@ def Import(dbcon, path):
 		ImportRecurse(dbcon, cur.lastrowid, path)
 	cur.close()
 	dbcon.commit()
-	LogPrint(0, 'done\n')
+	log.Print(0, 'done\n')
 
 def ImportRecurse(dbcon, rowid, path):
 	cur = dbcon.cursor()
@@ -102,7 +146,7 @@ def ImportRecurse(dbcon, rowid, path):
 	for e in entries:
 		fullpath = os.path.join(path, e)
 		isdir = os.path.isdir(fullpath)
-		LogPrint(0, 'importing ' + fullpath + ' ...')
+		log.Print(0, 'importing ' + fullpath + ' ...')
 		cur.execute('insert into nodes (parent, path, isdir, checksum) values (?,?,?,?)', \
 			(rowid, e, isdir, GetChecksum(fullpath, isdir)))
 		if isdir:
@@ -122,7 +166,7 @@ def Update(dbcon, path):
 	cur.close()
 	dbcon.commit()
 	dbcon.execute('vacuum')
-	LogPrint(0, 'done\n')
+	log.Print(0, 'done\n')
 
 def UpdateRecurse(dbcon, rowid, path):
 	# fetch child nodes and create a map: name -> rowindex
@@ -148,7 +192,7 @@ def UpdateRecurse(dbcon, rowid, path):
 				UpdateRecurse(dbcon, row[0], fullpath)
 		else:
 			# add non-existing entry to list
-			LogPrint(1, 'adding ' + fullpath)
+			log.Print(1, 'adding ' + fullpath)
 			cur.execute('insert into nodes (parent, path, isdir, checksum) values (?,?,?,?)', \
 				(rowid, e, isdir, GetChecksum(fullpath, isdir)))
 			# if directory do the recursion
@@ -157,7 +201,7 @@ def UpdateRecurse(dbcon, rowid, path):
 	# iterate over remaining entries in rowdict, those entries should be removed
 	for i in rowdict.values():
 		row = rows[i]
-		LogPrint(1, 'deleting ' + os.path.join(path, row[1]))
+		log.Print(1, 'deleting ' + os.path.join(path, row[1]))
 		DeleteRecurse(dbcon, row[0])
 		cur.execute('delete from nodes where rowid=?', (row[0],))
 	cur.close()
@@ -208,15 +252,15 @@ def ExecuteOnAllRecurse(dbcon, rowid, path, nodefunc, param, depth):
 
 def PrintNode(dbcon, rowid, parent, path, fullpath, isdir, checksum, param, depth):
 	if depth == 0:
-		LogPrint(0, 'root (id {0:d}, isdir {1:b}): {2:s}'.\
+		log.Print(0, 'root (id {0:d}, isdir {1:b}): {2:s}'.\
 			format(rowid, isdir, fullpath))
 	else:
-		LogPrint(0, '{0:s}node (id {1:d}, parent {2:d}, isdir {3:b}): {4:s}'.\
+		log.Print(0, '{0:s}node (id {1:d}, parent {2:d}, isdir {3:b}): {4:s}'.\
 			format(depth * '  ', rowid, parent, isdir, fullpath))
 
 def PrintTree(dbcon, path):
 	ExecuteOnAllNodes(dbcon, path, PrintNode, None)
-	LogPrint(0, '')
+	log.Print(0, '')
 
 def ExportNode(dbcon, rowid, parent, path, fullpath, isdir, checksum, param, depth):
 	if isdir:
@@ -231,7 +275,7 @@ def ExportNode(dbcon, rowid, parent, path, fullpath, isdir, checksum, param, dep
 			.format(rowid, shape, path, ChecksumToString(checksum)))
 		param.write('\t{0:d} -> {1:d};\n'.format(parent, rowid))
 
-def ExportTree(dbcon, path, filename):
+def Export(dbcon, path, filename):
 	f = open(filename + '.dot', 'w')
 	f.write('digraph G\n{\n')
 	ExecuteOnAllNodes(dbcon, path, ExportNode, f)
@@ -243,29 +287,22 @@ def ExportTree(dbcon, path, filename):
 def CheckNode(dbcon, rowid, parent, path, fullpath, isdir, checksum, param, depth):
 	CheckChecksum(fullpath, isdir, checksum)
 
-def CheckTree(dbcon, path):
+def Check(dbcon, path):
 	ExecuteOnAllNodes(dbcon, path, CheckNode, None)
-	LogPrint('done\n')
+	log.Print(0, 'done\n')
 
 def Main():
 	#dbcon = sqlite3.connect(':memory:')
 	dbcon = sqlite3.connect('dbcon.sqlite')
-	DropTables(dbcon)
-	CreateTables(dbcon)
-	Import(dbcon, 'C:\\Projects\\Others\dtcon2\\test')
-	Import(dbcon, 'C:\\Projects\\Others\dtcon2\\test\\test3')
-	Import(dbcon, 'C:\\Projects\\Others\\dtcon2\\checkformat.py')
-	DeleteTree(dbcon, 'C:\\Projects\\Others\dtcon2\\test')
-	DeleteTree(dbcon, 'C:\\Projects\\Others\dtcon2\\test\\test3')
-	DeleteTree(dbcon, 'C:\\Projects\\Others\\dtcon2\\checkformat.py')
-	#PrintTree(dbcon, None)
-	Update(dbcon, 'C:\\Projects\\Others\dtcon2\\test')
-	#PrintTree(dbcon, None)
-	#CheckTree(dbcon, None)
-	ExportTree(dbcon, None, 'tree')
+
+	#RecreateTables(dbcon)
+	#Import(dbcon, 'C:\\Program Files\\Microsoft Visual Studio 10.0')
+	#Import(dbcon, 'C:\\Projects\\Others\\dtcon2\\test')
+
+	Check(dbcon, 'C:\\Program Files\\Microsoft Visual Studio 10.0')
+
+	#Update(dbcon, 'C:\\Program Files\\Microsoft Visual Studio 10.0')
+
 	dbcon.close()
 
-start = time.clock()
 Main()
-elapsed = (time.clock() - start)
-print('time elapsed {0:.1f}s'.format(elapsed))
