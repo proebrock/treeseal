@@ -53,6 +53,10 @@ def GetDirChecksum(path):
 	checksum = hashlib.sha256()
 	entries = os.listdir(path)
 	for e in entries:
+		if os.path.isdir(e):
+			checksum.update(b'\x01')
+		else:
+			checksum.update(b'\x00')
 		checksum.update(e.encode('utf-8'))
 	return checksum.digest()
 
