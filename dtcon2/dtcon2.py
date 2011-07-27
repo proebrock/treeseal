@@ -1,9 +1,10 @@
 import sqlite3
 import sys
-import shlex
-import subprocess
 import os
 import hashlib
+import shlex
+import subprocess
+import time
 
 def ExecuteShell(cmdline):
 	args = shlex.split(cmdline)
@@ -105,7 +106,18 @@ def ImportRecurse(dbcon, rowid, path):
 	cur.close()
 
 def Update(dbcon, path):
-	pass
+	cur = dbcon.cursor()
+	if path == None:
+		cur.execute('select rowid,path,isdir,checksum from nodes where parent is null')
+	else:
+		cur.execute('select rowid,path,isdir,checksum from nodes where parent is null and path=?', (path,))
+	for row in cur:
+		CheckChecksum(row[1], row[2], row[3])
+		if row[2]:
+			UpdateRecurse(dbcon, row[0], row[1])
+	cur.close()
+	dbcon.commit()
+	LogPrint(0, 'done\n')
 
 def UpdateRecurse(dbcon, rowid, path):
 	# fetch child nodes and create a map: name -> rowindex
@@ -144,7 +156,6 @@ def UpdateRecurse(dbcon, rowid, path):
 		DeleteRecurse(dbcon, row[0])
 		cur.execute('delete from nodes where rowid=?', (row[0],))
 	cur.close()
-	dbcon.commit()
 
 def DeleteTree(dbcon, path):
 	if path == None:
@@ -231,21 +242,25 @@ def CheckTree(dbcon, path):
 	ExecuteOnAllNodes(dbcon, path, CheckNode, None)
 	LogPrint('done\n')
 
-#dbcon = sqlite3.connect(':memory:')
-dbcon = sqlite3.connect('dbcon.sqlite')
-DropTables(dbcon)
-CreateTables(dbcon)
-Import(dbcon, 'C:\\Projects\\Others\dtcon2\\test')
-Import(dbcon, 'C:\\Projects\\Others\dtcon2\\test\\test3')
-Import(dbcon, 'C:\\Projects\\Others\\dtcon2\\checkformat.py')
-DeleteTree(dbcon, 'C:\\Projects\\Others\dtcon2\\test')
-DeleteTree(dbcon, 'C:\\Projects\\Others\dtcon2\\test\\test3')
-DeleteTree(dbcon, 'C:\\Projects\\Others\\dtcon2\\checkformat.py')
+def Main():
+	#dbcon = sqlite3.connect(':memory:')
+	dbcon = sqlite3.connect('dbcon.sqlite')
+	DropTables(dbcon)
+	CreateTables(dbcon)
+	Import(dbcon, 'C:\\Projects\\Others\dtcon2\\test')
+	Import(dbcon, 'C:\\Projects\\Others\dtcon2\\test\\test3')
+	Import(dbcon, 'C:\\Projects\\Others\\dtcon2\\checkformat.py')
+	DeleteTree(dbcon, 'C:\\Projects\\Others\dtcon2\\test')
+	DeleteTree(dbcon, 'C:\\Projects\\Others\dtcon2\\test\\test3')
+	DeleteTree(dbcon, 'C:\\Projects\\Others\\dtcon2\\checkformat.py')
+	#PrintTree(dbcon, None)
+	Update(dbcon, 'C:\\Projects\\Others\dtcon2\\test')
+	#PrintTree(dbcon, None)
+	#CheckTree(dbcon, None)
+	ExportTree(dbcon, None, 'tree')
+	dbcon.close()
 
-PrintTree(dbcon, None)
-UpdateRecurse(dbcon, 1, 'C:\\Projects\\Others\dtcon2\\test')
-PrintTree(dbcon, None)
-#CheckTree(dbcon, None)
-ExportTree(dbcon, None, 'tree')
-dbcon.close()
-
+start = time.clock()
+Main()
+elapsed = (time.clock() - start)
+print('time elapsed {0:.1f}s'.format(elapsed))
