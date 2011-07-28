@@ -36,7 +36,7 @@ class LogFacility:
 		elif lvl == 2:
 			prefix = 'Error: ';
 		elif lvl == 3:
-			prefix = 'Fatal Error: ';
+			prefix = '### Fatal Error: ';
 		else:
 			raise Exception('Unknown log level {0:d}'.format(lvl))
 		# write message to different targets
@@ -65,6 +65,31 @@ def ExecuteShell(cmdline):
 	proc = subprocess.Popen(args, stdin=fnull, stdout=fnull, stderr=fnull)
 	fnull.close()
 	proc.communicate()
+
+def OpenDatabase(path):
+	dbexisted = os.path.exists(path)
+	# get checksum from separate checksum file and check it with database checksum
+	if dbexisted:
+		csumfilename = path + '.sha256'
+		f = open(csumfilename, 'r')
+		csumfile = f.read()
+		f.close()
+		csum = ''.join('%02x' % byte for byte in GetFileChecksum(path))
+		if csum != csumfile:
+			log.Print(3, 'Database file has been corrupted')
+	dbcon = sqlite3.connect(path)
+	if not dbexisted:
+		CreateTables(dbcon)
+	return dbcon
+
+def CloseDatabase(path, dbcon):
+	dbcon.close()
+	# get checksum of database file and store it in an addtional file
+	csum = ''.join('%02x' % byte for byte in GetFileChecksum(path))
+	csumfilename = path + '.sha256'
+	f = open(csumfilename, 'w')
+	f.write(csum)
+	f.close()
 
 def CreateTables(dbcon):
 	dbcon.execute('create table nodes (' + \
@@ -293,16 +318,16 @@ def Check(dbcon, path):
 
 def Main():
 	#dbcon = sqlite3.connect(':memory:')
-	dbcon = sqlite3.connect('dbcon.sqlite')
+	filename = 'dtcon2.sqlite'
+	dbcon = OpenDatabase(filename)
 
-	#RecreateTables(dbcon)
+	#DeleteTree(dbcon, None)
 	#Import(dbcon, 'C:\\Program Files\\Microsoft Visual Studio 10.0')
-	#Import(dbcon, 'C:\\Projects\\Others\\dtcon2\\test')
 
 	Check(dbcon, 'C:\\Program Files\\Microsoft Visual Studio 10.0')
 
 	#Update(dbcon, 'C:\\Program Files\\Microsoft Visual Studio 10.0')
 
-	dbcon.close()
+	CloseDatabase(filename, dbcon)
 
 Main()
