@@ -15,13 +15,15 @@ class LogFacility:
 		else:
 			self.f = None;
 	def __del__(self):
-		message = '{0:d} warnings, {1:d} errors'.\
-			format(self.numWarnings, self.numErrors)
+		message = '{0:d} warnings, {1:d} errors, {2:d} fatal errors'.\
+			format(self.numWarnings, self.numErrors, self.numFatalErrors)
 		message += ', elapsed time ' + self.ElapsedTimeStr()
-		print(message)
+		print(message + '\n')
 		if self.f != None:
 			self.f.write(message + '\n')
 			self.f.close()
+		if (self.numWarnings > 0) or (self.numErrors > 0) or (self.numFatalErrors > 0):
+			input("Press any key...") 
 	def ResetCounters(self):
 		self.numNotice = 0
 		self.numWarnings = 0
@@ -259,6 +261,7 @@ def ExecuteOnAllNodes(dbcon, path, nodefunc, param):
 		cur.execute('select rowid,path,isdir,checksum from nodes where parent is null')
 	else:
 		cur.execute('select rowid,path,isdir,checksum from nodes where parent is null and path=?', (path,))
+	# TODO: check if cur contains no results
 	for row in cur:
 		nodefunc(dbcon, row[0], None, row[1], row[1], row[2], row[3], param, 0)
 		if row[2]:
