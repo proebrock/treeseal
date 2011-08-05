@@ -262,8 +262,14 @@ def Update(dbcon, path):
 	"""
 	cur = dbcon.cursor()
 	if path == None:
+		cur.execute('select count(rowid) from nodes where parent is null')
+		if cur.fetchone()[0] == 0:
+			log.Print(3, 'There are no nodes in the database.')
 		cur.execute('select rowid,path,isdir,checksum from nodes where parent is null')
 	else:
+		cur.execute('select count(rowid) from nodes where parent is null and path=?', (path,))
+		if cur.fetchone()[0] == 0:
+			log.Print(3, 'Path ' + path + ' does not exist in the database.')
 		cur.execute('select rowid,path,isdir,checksum from nodes where parent is null and path=?', (path,))
 	for row in cur:
 		CheckChecksum(row[1], row[2], row[3])
@@ -327,6 +333,9 @@ def Delete(dbcon, path):
 		dbcon.execute('update nodes set checksum=null where parent is null')
 	else:
 		cur = dbcon.cursor()
+		cur.execute('select count(rowid) from nodes where parent is null and path=?', (path,))
+		if cur.fetchone()[0] == 0:
+			log.Print(3, 'Path ' + path + ' does not exist in the database.')
 		cur.execute('select rowid,isdir from nodes where parent is null and path=?', (path,))
 		row = cur.fetchone()
 		if row[1]:
@@ -357,10 +366,15 @@ def ExecuteOnAllNodes(dbcon, path, nodefunc, param):
 	"""
 	cur = dbcon.cursor()
 	if path == None:
+		cur.execute('select count(rowid) from nodes where parent is null')
+		if cur.fetchone()[0] == 0:
+			log.Print(3, 'There are no nodes in the database.')
 		cur.execute('select rowid,path,isdir,checksum from nodes where parent is null')
 	else:
+		cur.execute('select count(rowid) from nodes where parent is null and path=?', (path,))
+		if cur.fetchone()[0] == 0:
+			log.Print(3, 'Path ' + path + ' does not exist in the database.')
 		cur.execute('select rowid,path,isdir,checksum from nodes where parent is null and path=?', (path,))
-	# TODO: check if cur contains no results
 	for row in cur:
 		nodefunc(dbcon, row[0], None, row[1], row[1], row[2], row[3], param, 0)
 		if row[2]:
