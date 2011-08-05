@@ -12,7 +12,7 @@ class LogFacility:
 		Constructor of LogFacility class
 		"""
 		self.starttime = time.clock()
-		self.ResetCounters()
+		self.Reset()
 		if path != None:
 			self.f = open(path, 'w')
 		else:
@@ -21,23 +21,32 @@ class LogFacility:
 		"""
 		Destructor of LogFacility class
 		"""
-		message = '{0:d} warnings, {1:d} errors, {2:d} fatal errors'.\
-			format(self.numWarnings, self.numErrors, self.numFatalErrors)
-		message += ', elapsed time ' + self.ElapsedTimeStr()
-		print(message + '\n')
 		if self.f != None:
-			self.f.write(message + '\n')
 			self.f.close()
-		if (self.numWarnings > 0) or (self.numErrors > 0) or (self.numFatalErrors > 0):
-			input("Press any key...") 
-	def ResetCounters(self):
+		print('elapsed time ' + self.ElapsedTimeStr())
+		if len(self.FatalErrors) > 0:
+			print('\n{0:d} fatal errors:'.format(len(self.FatalErrors)))
+			for f in self.FatalErrors:
+				print(f)
+		if len(self.Errors) > 0:
+			print('\n{0:d} errors:'.format(len(self.Errors)))
+			for e in self.Errors:
+				print(e)
+		if len(self.Warnings) > 0:
+			print('\n{0:d} warnings:'.format(len(self.Warnings)))
+			for w in self.Warnings:
+				print(w)
+		if (len(self.Warnings) == 0) and (len(self.Errors) == 0) and (len(self.FatalErrors) == 0):
+			print('\nno warnings, errors or fatal errors')
+		else:
+			input("\nPress any key ...") 
+	def Reset(self):
 		"""
-		Reset counters counting the number of messages of a certain warning level
+		Reset buffers
 		"""
-		self.numNotice = 0
-		self.numWarnings = 0
-		self.numErrors = 0
-		self.numFatalErrors = 0
+		self.Warnings = []
+		self.Errors = []
+		self.FatalErrors = []
 	def Print(self, lvl, message):
 		"""
 		Print message of certain importance level. Printing is handled by the log facility.
@@ -46,16 +55,15 @@ class LogFacility:
 		# determine message prefix and update counters
 		if lvl == 0:
 			prefix = ''
-			self.numNotice += 1
 		elif lvl == 1:
 			prefix = 'Warning: '
-			self.numWarnings += 1
+			self.Warnings.append(message)
 		elif lvl == 2:
 			prefix = 'Error: '
-			self.numErrors += 1
+			self.Errors.append(message)
 		elif lvl == 3:
 			prefix = '### Fatal Error: '
-			self.numFatalErrors += 1
+			self.FatalErrors.append(message)
 		else:
 			raise Exception('Unknown log level {0:d}'.format(lvl))
 		# write message to different targets
@@ -174,15 +182,16 @@ def GetDirChecksum(path):
 	"""
 	Calculate checksum of a file by reading the directory contents
 	"""
-	checksum = hashlib.sha256()
-	entries = os.listdir(path)
-	for e in entries:
-		if os.path.isdir(e):
-			checksum.update(b'\x01')
-		else:
-			checksum.update(b'\x00')
-		checksum.update(e.encode('utf-8'))
-	return checksum.digest()
+	return b'\x00'
+	#checksum = hashlib.sha256()
+	#entries = os.listdir(path)
+	#for e in entries:
+	#	if os.path.isdir(e):
+	#		checksum.update(b'\x01')
+	#	else:
+	#		checksum.update(b'\x00')
+	#	checksum.update(e.encode('utf-8'))
+	#return checksum.digest()
 
 def GetChecksum(path, isdir):
 	"""
@@ -276,8 +285,8 @@ def Update(dbcon, path):
 		if row[2]:
 			UpdateRecurse(dbcon, row[0], row[1])
 	cur.close()
-	dbcon.commit()
 	dbcon.execute('vacuum')
+	dbcon.commit()
 	log.Print(0, 'done\n')
 
 def UpdateRecurse(dbcon, rowid, path):
@@ -342,6 +351,8 @@ def Delete(dbcon, path):
 			DeleteRecurse(dbcon, row[0])
 		cur.execute('update nodes set checksum=null where parent=?', (row[0],))
 		cur.close()
+	dbcon.commit()
+	log.Print(0, 'done\n')
 
 def DeleteRecurse(dbcon, rowid):
 	"""
@@ -471,15 +482,15 @@ def Main():
 	"""
 	Main entry point of program
 	"""
-	#dbcon = sqlite3.connect(':memory:')
+	dbcon = OpenDatabase(':memory:')
 	filename = 'dtcon2.sqlite'
 	dbcon = OpenDatabase(filename)
 
-	#Delete(dbcon, None)
 	#Import(dbcon, 'C:\\Projects')
 
 	#Check(dbcon, 'C:\\Projects')
 
+	#Delete(dbcon, None)
 	Update(dbcon, 'C:\\Projects')
 
 	#Export(dbcon, None, 'schema')
