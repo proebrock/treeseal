@@ -8,13 +8,19 @@ import time
 
 class LogFacility:
 	def __init__(self, path):
+		"""
+		Constructor of LogFacility class
+		"""
 		self.starttime = time.clock()
-		self.ResetCounters();
+		self.ResetCounters()
 		if path != None:
 			self.f = open(path, 'w')
 		else:
-			self.f = None;
+			self.f = None
 	def __del__(self):
+		"""
+		Destructor of LogFacility class
+		"""
 		message = '{0:d} warnings, {1:d} errors, {2:d} fatal errors'.\
 			format(self.numWarnings, self.numErrors, self.numFatalErrors)
 		message += ', elapsed time ' + self.ElapsedTimeStr()
@@ -25,20 +31,31 @@ class LogFacility:
 		if (self.numWarnings > 0) or (self.numErrors > 0) or (self.numFatalErrors > 0):
 			input("Press any key...") 
 	def ResetCounters(self):
+		"""
+		Reset counters counting the number of messages of a certain warning level
+		"""
 		self.numNotice = 0
 		self.numWarnings = 0
 		self.numErrors = 0
 		self.numFatalErrors = 0
 	def Print(self, lvl, message):
-		# determine message prefix
+		"""
+		Print message of certain importance level. Printing is handled by the log facility.
+		Importance levels are: 0 - Notice, 1 - Warning, 2 - Error, 3 - Fatal Error
+		"""
+		# determine message prefix and update counters
 		if lvl == 0:
-			prefix = '';
+			prefix = ''
+			self.numNotice += 1
 		elif lvl == 1:
-			prefix = 'Warning: ';
+			prefix = 'Warning: '
+			self.numWarnings += 1
 		elif lvl == 2:
-			prefix = 'Error: ';
+			prefix = 'Error: '
+			self.numErrors += 1
 		elif lvl == 3:
-			prefix = '### Fatal Error: ';
+			prefix = '### Fatal Error: '
+			self.numFatalErrors += 1
 		else:
 			raise Exception('Unknown log level {0:d}'.format(lvl))
 		# write message to different targets
@@ -49,8 +66,15 @@ class LogFacility:
 		if lvl == 3:
 			sys.exit()
 	def ElapsedTime(self):
+		"""
+		Determine elapsed time since start of the program.
+		(Or more exactly: since instantiation of an object of this class)
+		"""
 		return time.clock() - self.starttime
 	def ElapsedTimeStr(self):
+		"""
+		Determine elapsed time since start of the program as a string.
+		"""
 		elapsed = self.ElapsedTime()
 		if elapsed < 60:
 			return '{0:.1f}s'.format(elapsed)
@@ -59,9 +83,15 @@ class LogFacility:
 		else:
 			return '{0:.1f}h'.format(elapsed/60/60)
 
+"""
+Central facility for logging purposes used by all functions.
+"""
 log = LogFacility('dtcon2.log')
 
 def ExecuteShell(cmdline):
+	"""
+	Execute specified command line in a shell. Do not get console output.
+	"""
 	args = shlex.split(cmdline)
 	fnull = open(os.devnull, 'w')
 	proc = subprocess.Popen(args, stdin=fnull, stdout=fnull, stderr=fnull)
@@ -69,6 +99,11 @@ def ExecuteShell(cmdline):
 	proc.communicate()
 
 def OpenDatabase(path):
+	"""
+	Open database: first determine checksum of database file and compare it
+	with the one stored in a separate checksum file to check for corruption
+	of the database. If the database file is a newly created, create tables.
+	"""
 	dbexisted = os.path.exists(path)
 	# get checksum from separate checksum file and check it with database checksum
 	if dbexisted:
@@ -85,6 +120,9 @@ def OpenDatabase(path):
 	return dbcon
 
 def CloseDatabase(path, dbcon):
+	"""
+	Close database: close database and then update the separate checksum file 
+	"""
 	dbcon.close()
 	# get checksum of database file and store it in an addtional file
 	csum = ''.join('%02x' % byte for byte in GetFileChecksum(path))
@@ -94,6 +132,9 @@ def CloseDatabase(path, dbcon):
 	f.close()
 
 def CreateTables(dbcon):
+	"""
+	Initialization of empty database: create tables used by dtcon2
+	"""
 	dbcon.execute('create table nodes (' + \
 		'parent int,' + \
 		'path text not null,' + \
@@ -102,13 +143,22 @@ def CreateTables(dbcon):
 		')')
 
 def DropTables(dbcon):
+	"""
+	Remove all tables from the database connected with dtcon2
+	"""
 	dbcon.execute('drop table nodes')
 
 def RecreateTables(dbcon):
+	"""
+	Remove and the create all tables used by dtcon2
+	"""
 	DropTables(dbcon)
 	CreateTables(dbcon)
 
 def GetFileChecksum(path):
+	"""
+	Calculate checksum of a file by blockwise reading and processing the file content
+	"""
 	checksum = hashlib.sha256()
 	buffersize = 2**20
 	f = open(path,'rb')
@@ -121,6 +171,9 @@ def GetFileChecksum(path):
 	return checksum.digest()
 
 def GetDirChecksum(path):
+	"""
+	Calculate checksum of a file by reading the directory contents
+	"""
 	checksum = hashlib.sha256()
 	entries = os.listdir(path)
 	for e in entries:
@@ -131,26 +184,42 @@ def GetDirChecksum(path):
 		checksum.update(e.encode('utf-8'))
 	return checksum.digest()
 
-def ChecksumToString(checksum):
-	if checksum == None:
-		return 'no checksum'
-	else:
-		return ''.join('%02x' % byte for byte in checksum[0:7]) + '...'
-
 def GetChecksum(path, isdir):
+	"""
+	Get checksum of object which can be a file or directory
+	"""
 	if isdir:
 		return GetDirChecksum(path)
 	else:
 		return GetFileChecksum(path)
 
 def CheckChecksum(path, isdir, checksum):
+	"""
+	Determine checksum of object which can be a file or directory and check it with given one
+	"""
 	log.Print(0, 'checking ' + path + ' ...')
 	if checksum == None:
 		log.Print(1, 'No checksum defined for ' + path)
 	elif checksum != GetChecksum(path, isdir):
 		log.Print(2, 'Checksum error for ' + path)
 
+def ChecksumToString(checksum, shorten):
+	"""
+	Calculate checksum of a file by reading the directory contents.
+	Checksum can be shortened in order to have a more compact display.
+	"""
+	if checksum == None:
+		return 'no checksum'
+	else:
+		if shorten:
+			return ''.join('%02x' % byte for byte in checksum[0:7]) + '...'
+		else:
+			return ''.join('%02x' % byte for byte in checksum) + '...'
+
 def Import(dbcon, path):
+	"""
+	Import contents of path recursively into the database
+	"""
 	cur = dbcon.cursor()
 	# check if path is already in the database
 	cur.execute('select rowid from nodes where parent is null and path=?', (path,))
@@ -168,6 +237,9 @@ def Import(dbcon, path):
 	log.Print(0, 'done\n')
 
 def ImportRecurse(dbcon, rowid, path):
+	"""
+	Helper function of import
+	"""
 	cur = dbcon.cursor()
 	entries = os.listdir(path)
 	for e in entries:
@@ -181,6 +253,13 @@ def ImportRecurse(dbcon, rowid, path):
 	cur.close()
 
 def Update(dbcon, path):
+	"""
+	Update contents of database by adding new directory entries,
+	deleting non-existing ones and by checking all the other ones.
+	If path is specified, it must be the root of a directory tree under control
+	of dtcon2 and already existing in the database, if the root is not specified,
+	all existing trees in the database are processed.
+	"""
 	cur = dbcon.cursor()
 	if path == None:
 		cur.execute('select rowid,path,isdir,checksum from nodes where parent is null')
@@ -196,6 +275,9 @@ def Update(dbcon, path):
 	log.Print(0, 'done\n')
 
 def UpdateRecurse(dbcon, rowid, path):
+	"""
+	Helper function of Update
+	"""
 	# fetch child nodes and create a map: name -> rowindex
 	cur = dbcon.cursor()
 	cur.execute('select rowid,path,isdir,checksum from nodes where parent=?', (rowid,))
@@ -233,7 +315,13 @@ def UpdateRecurse(dbcon, rowid, path):
 		cur.execute('delete from nodes where rowid=?', (row[0],))
 	cur.close()
 
-def DeleteTree(dbcon, path):
+def Delete(dbcon, path):
+	"""
+	Delete a path and all its contents recursively from the database.
+	If path is specified, it must be the root of a directory tree under control
+	of dtcon2 and already existing in the database, if the root is not specified,
+	all existing trees in the database are processed.
+	"""
 	if path == None:
 		dbcon.execute('delete from nodes where parent not null')
 		dbcon.execute('update nodes set checksum=null where parent is null')
@@ -247,6 +335,9 @@ def DeleteTree(dbcon, path):
 		cur.close()
 
 def DeleteRecurse(dbcon, rowid):
+	"""
+	Helper function of Delete. Can be used to recursively delete a tree or subtree by rowid
+	"""
 	cur = dbcon.cursor()
 	cur.execute('select rowid,isdir from nodes where parent=?', (rowid,))
 	for row in cur:
@@ -256,6 +347,14 @@ def DeleteRecurse(dbcon, rowid):
 	cur.close()
 
 def ExecuteOnAllNodes(dbcon, path, nodefunc, param):
+	"""
+	Execute nodefunc on every node in the database. Is used by Print, Export and Check.
+	It takes the contents of the database as reference and does not access the
+	contents of the file system, even this can be done using nodefunc.
+	If path is specified, it must be the root of a directory tree under control
+	of dtcon2 and already existing in the database, if the root is not specified,
+	all existing trees in the database are processed.
+	"""
 	cur = dbcon.cursor()
 	if path == None:
 		cur.execute('select rowid,path,isdir,checksum from nodes where parent is null')
@@ -269,6 +368,9 @@ def ExecuteOnAllNodes(dbcon, path, nodefunc, param):
 	cur.close()
 
 def ExecuteOnAllRecurse(dbcon, rowid, path, nodefunc, param, depth):
+	"""
+	Helper function of ExecuteOnAllNodes
+	"""
 	cur = dbcon.cursor()
 	cur.execute('select rowid,path,isdir,checksum from nodes where parent=?', (rowid,))
 	for row in cur:
@@ -279,6 +381,9 @@ def ExecuteOnAllRecurse(dbcon, rowid, path, nodefunc, param, depth):
 	cur.close()
 
 def PrintNode(dbcon, rowid, parent, path, fullpath, isdir, checksum, param, depth):
+	"""
+	Helper function of Print
+	"""
 	if depth == 0:
 		log.Print(0, 'root (id {0:d}, isdir {1:b}): {2:s}'.\
 			format(rowid, isdir, fullpath))
@@ -286,50 +391,84 @@ def PrintNode(dbcon, rowid, parent, path, fullpath, isdir, checksum, param, dept
 		log.Print(0, '{0:s}node (id {1:d}, parent {2:d}, isdir {3:b}): {4:s}'.\
 			format(depth * '  ', rowid, parent, isdir, fullpath))
 
-def PrintTree(dbcon, path):
+def Print(dbcon, path):
+	"""
+	Print tree structure in database to the console.
+	Makes only sense for small directory trees and for debugging.
+	If path is specified, it must be the root of a directory tree under control
+	of dtcon2 and already existing in the database, if the root is not specified,
+	all existing trees in the database are processed.
+	"""
 	ExecuteOnAllNodes(dbcon, path, PrintNode, None)
 	log.Print(0, '')
 
 def ExportNode(dbcon, rowid, parent, path, fullpath, isdir, checksum, param, depth):
+	"""
+	Helper function of Export
+	"""
 	if isdir:
 		shape = 'box'
 	else:
 		shape = 'ellipse'
 	if depth == 0:
 		param.write('\t{0:d} [ style=bold, shape={1:s}, label="{0:d}\\n{2:s}\\n{3:s}" ];\n'\
-			.format(rowid, shape, fullpath.replace('\\', '\\\\'), ChecksumToString(checksum)))
+			.format(rowid, shape, fullpath.replace('\\', '\\\\'), ChecksumToString(checksum, True)))
 	else:
 		param.write('\t{0:d} [ shape={1:s}, label="{0:d}\\n{2:s}\\n{3:s}" ];\n'\
-			.format(rowid, shape, path, ChecksumToString(checksum)))
+			.format(rowid, shape, path, ChecksumToString(checksum, True)))
 		param.write('\t{0:d} -> {1:d};\n'.format(parent, rowid))
 
 def Export(dbcon, path, filename):
+	"""
+	Export tree structure in database to a svg showing a graphical representation of the
+	node tree in the database. Makes only sense for small directory trees and for debugging.
+	If path is specified, it must be the root of a directory tree under control
+	of dtcon2 and already existing in the database, if the root is not specified,
+	all existing trees in the database are processed.
+	"""
 	f = open(filename + '.dot', 'w')
 	f.write('digraph G\n{\n')
 	ExecuteOnAllNodes(dbcon, path, ExportNode, f)
 	f.write('}\n')
 	f.close()
-	ExecuteShell('dot -Tpng -o' + filename + '.png ' + filename + '.dot')
+	ExecuteShell('dot -Tsvg -o' + filename + '.svg ' + filename + '.dot')
 	os.remove(filename + '.dot')
 	
 def CheckNode(dbcon, rowid, parent, path, fullpath, isdir, checksum, param, depth):
+	"""
+	Helper function of Check
+	"""
 	CheckChecksum(fullpath, isdir, checksum)
 
 def Check(dbcon, path):
+	"""
+	For each entry in the database check the checksum
+	(Does not update the database, e.g. if directory structure contains
+	new entries or if database contains no longer existing ones, check
+	Update if you want that functionality)
+	If path is specified, it must be the root of a directory tree under control
+	of dtcon2 and already existing in the database, if the root is not specified,
+	all existing trees in the database are processed.
+	"""
 	ExecuteOnAllNodes(dbcon, path, CheckNode, None)
 	log.Print(0, 'done\n')
 
 def Main():
+	"""
+	Main entry point of program
+	"""
 	#dbcon = sqlite3.connect(':memory:')
 	filename = 'dtcon2.sqlite'
 	dbcon = OpenDatabase(filename)
 
-	#DeleteTree(dbcon, None)
-	#Import(dbcon, 'C:\\Program Files\\Microsoft Visual Studio 10.0')
+	#Delete(dbcon, None)
+	#Import(dbcon, 'C:\\Projects')
 
-	Check(dbcon, 'C:\\Program Files\\Microsoft Visual Studio 10.0')
+	#Check(dbcon, 'C:\\Projects')
 
-	#Update(dbcon, 'C:\\Program Files\\Microsoft Visual Studio 10.0')
+	Update(dbcon, 'C:\\Projects')
+
+	#Export(dbcon, None, 'schema')
 
 	CloseDatabase(filename, dbcon)
 
