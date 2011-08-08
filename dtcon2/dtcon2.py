@@ -11,32 +11,32 @@ class LogFacility:
 		"""
 		Constructor of LogFacility class
 		"""
-		self.starttime = time.clock()
+		self.__starttime = time.clock()
 		self.Reset()
 		if path != None:
-			self.f = open(path, 'w')
+			self.__f = open(path, 'w')
 		else:
-			self.f = None
+			self.__f = None
 	def __del__(self):
 		"""
 		Destructor of LogFacility class
 		"""
-		if self.f != None:
-			self.f.close()
+		if self.__f != None:
+			self.__f.close()
 		print('elapsed time ' + self.ElapsedTimeStr())
-		if len(self.FatalErrors) > 0:
-			print('\n{0:d} fatal errors:'.format(len(self.FatalErrors)))
-			for f in self.FatalErrors:
+		if len(self.__fatalerrors) > 0:
+			print('\n{0:d} fatal errors:'.format(len(self.__fatalerrors)))
+			for f in self.__fatalerrors:
 				print(f)
-		if len(self.Errors) > 0:
-			print('\n{0:d} errors:'.format(len(self.Errors)))
-			for e in self.Errors:
+		if len(self.__errors) > 0:
+			print('\n{0:d} errors:'.format(len(self.__errors)))
+			for e in self.__errors:
 				print(e)
-		if len(self.Warnings) > 0:
-			print('\n{0:d} warnings:'.format(len(self.Warnings)))
-			for w in self.Warnings:
+		if len(self.__warnings) > 0:
+			print('\n{0:d} warnings:'.format(len(self.__warnings)))
+			for w in self.__warnings:
 				print(w)
-		if (len(self.Warnings) == 0) and (len(self.Errors) == 0) and (len(self.FatalErrors) == 0):
+		if (len(self.__warnings) == 0) and (len(self.__errors) == 0) and (len(self.__fatalerrors) == 0):
 			print('\nno warnings, errors or fatal errors')
 		else:
 			input("\nPress any key ...") 
@@ -44,9 +44,9 @@ class LogFacility:
 		"""
 		Reset buffers
 		"""
-		self.Warnings = []
-		self.Errors = []
-		self.FatalErrors = []
+		self.__warnings = []
+		self.__errors = []
+		self.__fatalerrors = []
 	def Print(self, lvl, message):
 		"""
 		Print message of certain importance level. Printing is handled by the log facility.
@@ -57,19 +57,19 @@ class LogFacility:
 			prefix = ''
 		elif lvl == 1:
 			prefix = 'Warning: '
-			self.Warnings.append(message)
+			self.__warnings.append(message)
 		elif lvl == 2:
 			prefix = 'Error: '
-			self.Errors.append(message)
+			self.__errors.append(message)
 		elif lvl == 3:
 			prefix = '### Fatal Error: '
-			self.FatalErrors.append(message)
+			self.__fatalerrors.append(message)
 		else:
 			raise Exception('Unknown log level {0:d}'.format(lvl))
 		# write message to different targets
 		print(prefix + message)
-		if self.f != None:
-			self.f.write(prefix + message + '\n')
+		if self.__f != None:
+			self.__f.write(prefix + message + '\n')
 		# if fatal, exit program
 		if lvl == 3:
 			sys.exit()
@@ -78,7 +78,7 @@ class LogFacility:
 		Determine elapsed time since start of the program.
 		(Or more exactly: since instantiation of an object of this class)
 		"""
-		return time.clock() - self.starttime
+		return time.clock() - self.__starttime
 	def ElapsedTimeStr(self):
 		"""
 		Determine elapsed time since start of the program as a string.
