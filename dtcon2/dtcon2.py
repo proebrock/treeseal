@@ -155,6 +155,7 @@ class Node:
 		else:
 			log.Print(0, '{0:s}parent     <none>'.format(prefix))
 		log.Print(0, '{0:s}name       {1:s}'.format(prefix, self.name))
+		log.Print(0, '{0:s}path       {1:s}'.format(prefix, self.path))
 		log.Print(0, '{0:s}isdir      {1:b}'.format(prefix, self.isdir))
 		if self.size != None:
 			log.Print(0, '{0:s}size       {1:d}'.format(prefix, self.size))
@@ -172,21 +173,23 @@ class Node:
 			if n.isdir:
 				n.Import(dbcon)
 
-	def TraverseDatabase(self, dbcon, depth, func, param):
+	def TraverseDatabase(self, dbcon, path, depth, func, param):
 		cursor = dbcon.cursor()
 		cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent=?', (self.rowid,))
 		for row in cursor:
 			n = Node()
 			n.FetchFromDatabaseRow(row)
+			n.path = os.path.join(path, n.name)
 			func(n, dbcon, depth, param)
 			if n.isdir:
-				n.TraverseDatabase(dbcon, depth + 1, func, param)
+				n.TraverseDatabase(dbcon, n.path, depth + 1, func, param)
 		cursor.close()
 
 	def TraversePrint(self, dbcon, depth, param):
 		self.Print(depth)
 
 	def TraverseExport(self, dbcon, depth, param):
+		log.Print(0, 'exporting ' + self.path + ' ...')
 		if depth == 0:
 			if self.isdir:
 				param.write('\t{0:d} [ style=bold, shape=box, label="{0:d}\\n{1:s}" ];\n'\
@@ -202,6 +205,14 @@ class Node:
 				param.write('\t{0:d} [ shape=ellipse, label="{0:d}\\n{1:s}\\n{2:s}" ];\n'\
 					.format(self.rowid, self.name, ChecksumToString(self.checksum, True)))
 			param.write('\t{0:d} -> {1:d};\n'.format(self.parent, self.rowid))
+	
+	def TraverseCheck(self, dbcon, depth, param):
+		if not self.isdir:
+			log.Print(0, 'checking ' + self.path + ' ...')
+			if self.checksum == None:
+				log.Print(2, 'No checksum defined for ' + path)
+			elif self.checksum != GetChecksum(self.path):
+				log.Print(2, 'Checksum error for ' + path)
 
 
 class NodeDB:
@@ -288,9 +299,10 @@ class NodeDB:
 		for row in cursor:
 			n = Node()
 			n.FetchFromDatabaseRow(row)
+			n.path = path
 			func(n, self.__dbcon, 0, param)
 			if n.isdir:
-				n.TraverseDatabase(self.__dbcon, 1, func, param)
+				n.TraverseDatabase(self.__dbcon, n.name, 1, func, param)
 		cursor.close()
 
 	def Print(self, path):
@@ -304,6 +316,11 @@ class NodeDB:
 		f.close()
 		ExecuteShell('dot -Tsvg -o' + filename + '.svg ' + filename + '.dot')
 		os.remove(filename + '.dot')
+		log.Print(0, 'done\n')
+
+	def Check(self, path):
+		self.TraverseDatabase(path, Node.TraverseCheck, None)
+		log.Print(0, 'done\n')
 
 
 
@@ -356,8 +373,14 @@ def Main():
 
 	ndb.RecreateTables()
 	ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+
 	#ndb.Print(None)
-	ndb.Export(None, 'schema')
+	#ndb.Print('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+
+	#ndb.Export(None, 'schema')
+
+	#ndb.Check(None)
+	#ndb.Check('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
 	ndb.Close()
 
