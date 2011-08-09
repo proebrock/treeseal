@@ -94,7 +94,7 @@ class LogFacility:
 		elapsed = self.ElapsedTime()
 		if elapsed < 60:
 			return '{0:.1f}s'.format(elapsed)
-		elif elapsed < 60*60:
+		elif elapsed < 60 * 60:
 			return '{0:.1f}min'.format(elapsed/60)
 		else:
 			return '{0:.1f}h'.format(elapsed/60/60)
@@ -299,7 +299,7 @@ class NodeDB:
 		for row in cursor:
 			n = Node()
 			n.FetchFromDatabaseRow(row)
-			n.path = path
+			n.path = n.name
 			func(n, self.__dbcon, 0, param)
 			if n.isdir:
 				n.TraverseDatabase(self.__dbcon, n.name, 1, func, param)
@@ -378,6 +378,7 @@ def Main():
 	#ndb.Print('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
 	#ndb.Export(None, 'schema')
+	#ndb.Export('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a', 'schema')
 
 	#ndb.Check(None)
 	#ndb.Check('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
