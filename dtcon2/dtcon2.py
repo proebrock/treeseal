@@ -106,6 +106,8 @@ log = LogFacility('dtcon2.log')
 
 
 
+NodeSelectColumnString = 'rowid, parent, name, isdir, size, checksum'
+
 class Node:
 
 	def __init__(self):
@@ -117,9 +119,6 @@ class Node:
 		self.size = None
 		self.checksum = None
 
-	def DatabaseSelectColumnString():
-		return 'rowid, parent, name, isdir, size, checksum'
-
 	def FetchFromDatabaseRow(self, row):
 		self.rowid = row[0]
 		self.parent = row[1]
@@ -128,7 +127,7 @@ class Node:
 		self.size = row[4]
 		self.checksum = row[5]
 	
-	def FetchFromPath(self, path, name):
+	def FetchFromDirectory(self, path, name):
 		self.name = name
 		if path == None:
 			self.path = name
@@ -145,16 +144,50 @@ class Node:
 			(self.parent, self.name, self.isdir, self.size, self.checksum))
 		self.rowid = cursor.lastrowid
 		cursor.close()
+	
+	def Print(self, numindent):
+		prefix = '  ' * numindent
+		log.Print(0, '{0:s}node'.format(prefix, self.rowid))
+		prefix += '->'
+		log.Print(0, '{0:s}rowid      {1:d}'.format(prefix, self.rowid))
+		if self.parent != None:
+			log.Print(0, '{0:s}parent     {1:d}'.format(prefix, self.parent))
+		else:
+			log.Print(0, '{0:s}parent     <none>'.format(prefix))
+		log.Print(0, '{0:s}name       {1:s}'.format(prefix, self.name))
+		log.Print(0, '{0:s}isdir      {1:b}'.format(prefix, self.isdir))
+		if self.size != None:
+			log.Print(0, '{0:s}size       {1:d}'.format(prefix, self.size))
+		else:
+			log.Print(0, '{0:s}size       <unknown>'.format(prefix))
+		if self.checksum != None:
+			log.Print(0, '{0:s}checksum   {1:s}'.format(prefix, ''.join('%02x' % byte for byte in self.checksum[0:7])))
+		else:
+			log.Print(0, '{0:s}checksum   <none>'.format(prefix))
 
 	def Import(self, dbcon):
 		for e in os.listdir(self.path):
-			log.Print(0, 'importing ' + self.path + ' ...')
 			n = Node()
-			n.FetchFromPath(self.path, e)
+			n.FetchFromDirectory(self.path, e)
+			log.Print(0, 'importing ' + self.path + ' ...')
 			n.parent = self.rowid
 			n.WriteToDatabase(dbcon)
 			if n.isdir:
 				n.Import(dbcon)
+
+	def TraverseDatabase(self, dbcon, depth, func, param):
+		cursor = dbcon.cursor()
+		cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent=?', (self.rowid,))
+		for row in cursor:
+			n = Node()
+			n.FetchFromDatabaseRow(row)
+			func(n, dbcon, depth, param)
+			if n.isdir:
+				n.TraverseDatabase(dbcon, depth + 1, func, param)
+		cursor.close()
+
+	def TraversePrint(self, dbcon, depth, param):
+		self.Print(depth)
 
 
 
@@ -220,12 +253,35 @@ class NodeDB:
 	def Import(self, path):
 		log.Print(0, 'importing ' + path + ' ...')
 		n = Node()
-		n.FetchFromPath(None, path)
+		n.FetchFromDirectory(None, path)
 		n.WriteToDatabase(self.__dbcon)
 		if n.isdir:
 			n.Import(self.__dbcon)
 		self.__dbcon.commit()
 		log.Print(0, 'done\n')
+
+	def TraverseDatabase(self, path, func, param):
+		cursor = self.__dbcon.cursor()
+		if path == None:
+			cursor.execute('select count(rowid) from nodes where parent is null')
+			if cursor.fetchone()[0] == 0:
+				log.Print(3, 'There are no nodes in the database.')
+			cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent is null')
+		else:
+			cursor.execute('select count(rowid) from nodes where parent is null and name=?', (path,))
+			if cursor.fetchone()[0] == 0:
+				log.Print(3, 'Path ' + path + ' does not exist in the database.')
+			cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent is null and name=?', (path,))
+		for row in cursor:
+			n = Node()
+			n.FetchFromDatabaseRow(row)
+			func(n, self.__dbcon, 0, param)
+			if n.isdir:
+				n.TraverseDatabase(self.__dbcon, 1, func, param)
+		cursor.close()
+
+	def Print(self, path):
+		self.TraverseDatabase(path, Node.TraversePrint, None)
 
 
 
@@ -265,6 +321,7 @@ def Main():
 
 	ndb.RecreateTables()
 	ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	ndb.Print(None)
 
 	ndb.Close()
 
