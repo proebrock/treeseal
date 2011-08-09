@@ -9,6 +9,7 @@ import time
 
 
 class LogFacility:
+
 	def __init__(self, path):
 		"""
 		Constructor of LogFacility class
@@ -19,6 +20,7 @@ class LogFacility:
 			self.__f = open(path, 'w')
 		else:
 			self.__f = None
+
 	def __del__(self):
 		"""
 		Destructor of LogFacility class
@@ -42,6 +44,7 @@ class LogFacility:
 			print('\nno warnings, errors or fatal errors')
 		else:
 			input("\nPress any key ...") 
+
 	def Reset(self):
 		"""
 		Reset buffers
@@ -49,6 +52,7 @@ class LogFacility:
 		self.__warnings = []
 		self.__errors = []
 		self.__fatalerrors = []
+
 	def Print(self, lvl, message):
 		"""
 		Print message of certain importance level. Printing is handled by the log facility.
@@ -75,12 +79,14 @@ class LogFacility:
 		# if fatal, exit program
 		if lvl == 3:
 			sys.exit()
+
 	def ElapsedTime(self):
 		"""
 		Determine elapsed time since start of the program.
 		(Or more exactly: since instantiation of an object of this class)
 		"""
 		return time.clock() - self.__starttime
+
 	def ElapsedTimeStr(self):
 		"""
 		Determine elapsed time since start of the program as a string.
@@ -101,6 +107,7 @@ log = LogFacility('dtcon2.log')
 
 
 class Node:
+
 	def __init__(self):
 		self.rowid = None
 		self.parent = None
@@ -144,7 +151,7 @@ class Node:
 			log.Print(0, 'importing ' + self.path + ' ...')
 			n = Node()
 			n.FetchFromPath(self.path, e)
-			n.parent = self.parent
+			n.parent = self.rowid
 			n.WriteToDatabase(dbcon)
 			if n.isdir:
 				n.Import(dbcon)
@@ -152,6 +159,7 @@ class Node:
 
 
 class NodeDB:
+
 	def __init__(self, dbpath):
 		"""
 		Open database: first determine checksum of database file and compare it
