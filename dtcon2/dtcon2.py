@@ -374,7 +374,7 @@ def Main():
 	"""
 	Main entry point of program
 	"""
-	#ndb = NodeDB(':memory:') # TODO: make it work in connection with checksum file...
+	#ndb = NodeDB(':memory:')
 	ndb = NodeDB('dtcon2.sqlite')
 
 	ndb.RecreateTables()
