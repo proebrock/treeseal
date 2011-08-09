@@ -160,10 +160,7 @@ class Node:
 			log.Print(0, '{0:s}size       {1:d}'.format(prefix, self.size))
 		else:
 			log.Print(0, '{0:s}size       <unknown>'.format(prefix))
-		if self.checksum != None:
-			log.Print(0, '{0:s}checksum   {1:s}'.format(prefix, ''.join('%02x' % byte for byte in self.checksum[0:7])))
-		else:
-			log.Print(0, '{0:s}checksum   <none>'.format(prefix))
+		log.Print(0, '{0:s}checksum   {1:s}'.format(prefix, ChecksumToString(self.checksum, False)))
 
 	def Import(self, dbcon):
 		for e in os.listdir(self.path):
@@ -189,6 +186,22 @@ class Node:
 	def TraversePrint(self, dbcon, depth, param):
 		self.Print(depth)
 
+	def TraverseExport(self, dbcon, depth, param):
+		if depth == 0:
+			if self.isdir:
+				param.write('\t{0:d} [ style=bold, shape=box, label="{0:d}\\n{1:s}" ];\n'\
+					.format(self.rowid, self.name.replace('\\', '\\\\')))
+			else:
+				param.write('\t{0:d} [ style=bold, shape=ellipse, label="{0:d}\\n{1:s}\\n{2:s}" ];\n'\
+					.format(self.rowid, self.name.replace('\\', '\\\\'), ChecksumToString(self.checksum, True)))
+		else:
+			if self.isdir:
+				param.write('\t{0:d} [ shape=box, label="{0:d}\\n{1:s}" ];\n'\
+					.format(self.rowid, self.name))
+			else:
+				param.write('\t{0:d} [ shape=ellipse, label="{0:d}\\n{1:s}\\n{2:s}" ];\n'\
+					.format(self.rowid, self.name, ChecksumToString(self.checksum, True)))
+			param.write('\t{0:d} -> {1:d};\n'.format(self.parent, self.rowid))
 
 
 class NodeDB:
@@ -283,6 +296,15 @@ class NodeDB:
 	def Print(self, path):
 		self.TraverseDatabase(path, Node.TraversePrint, None)
 
+	def Export(self, path, filename):
+		f = open(filename + '.dot', 'w')
+		f.write('digraph G\n{\n')
+		self.TraverseDatabase(path, Node.TraverseExport, f)
+		f.write('}\n')
+		f.close()
+		ExecuteShell('dot -Tsvg -o' + filename + '.svg ' + filename + '.dot')
+		os.remove(filename + '.dot')
+
 
 
 def ExecuteShell(cmdline):
@@ -310,6 +332,19 @@ def GetChecksum(path):
 	f.close()
 	return checksum.digest()
 
+def ChecksumToString(checksum, shorten):
+	"""
+	Calculate checksum of a file by reading the directory contents.
+	Checksum can be shortened in order to have a more compact display.
+	"""
+	if checksum == None:
+		return '<none>'
+	else:
+		if shorten:
+			return ''.join('%02x' % byte for byte in checksum[0:7]) + '...'
+		else:
+			return ''.join('%02x' % byte for byte in checksum)
+
 
 
 def Main():
@@ -321,7 +356,8 @@ def Main():
 
 	ndb.RecreateTables()
 	ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
-	ndb.Print(None)
+	#ndb.Print(None)
+	ndb.Export(None, 'schema')
 
 	ndb.Close()
 
