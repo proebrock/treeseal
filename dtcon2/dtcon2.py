@@ -224,16 +224,19 @@ class NodeDB:
 		of the database. If the database file is a newly created, create tables.
 		"""
 		self.__dbpath = dbpath
-		self.__csumpath = self.__dbpath + '.sha256'
-		dbexisted = os.path.exists(self.__dbpath)
-		# get checksum from separate checksum file and check it with database checksum
-		if dbexisted:
-			f = open(self.__csumpath, 'r')
-			csumfile = f.read()
-			f.close()
-			csum = ''.join('%02x' % byte for byte in GetChecksum(self.__dbpath))
-			if csum != csumfile:
-				log.Print(3, 'Database file has been corrupted')
+		if self.__dbpath == ':memory:':
+			dbexisted = False
+		else:
+			self.__csumpath = self.__dbpath + '.sha256'
+			dbexisted = os.path.exists(self.__dbpath)
+			# get checksum from separate checksum file and check it with database checksum
+			if dbexisted:
+				f = open(self.__csumpath, 'r')
+				csumfile = f.read()
+				f.close()
+				csum = ''.join('%02x' % byte for byte in GetChecksum(self.__dbpath))
+				if csum != csumfile:
+					log.Print(3, 'Database file has been corrupted')
 		self.__dbcon = sqlite3.connect(self.__dbpath)
 		if not dbexisted:
 			self.CreateTables()
@@ -243,11 +246,12 @@ class NodeDB:
 		Close database: close database and then update the separate checksum file 
 		"""
 		self.__dbcon.close()
-		# get checksum of database file and store it in an addtional file
-		csum = ''.join('%02x' % byte for byte in GetChecksum(self.__dbpath))
-		f = open(self.__csumpath, 'w')
-		f.write(csum)
-		f.close()
+		if self.__dbpath != ':memory:':
+			# get checksum of database file and store it in an addtional file
+			csum = ''.join('%02x' % byte for byte in GetChecksum(self.__dbpath))
+			f = open(self.__csumpath, 'w')
+			f.write(csum)
+			f.close()
 
 	def CreateTables(self):
 		"""
@@ -275,6 +279,8 @@ class NodeDB:
 		self.CreateTables()
 
 	def Import(self, path):
+		# TODO: check if path exists
+		# TODO: use TraverseDirectory to be reused in Update
 		log.Print(0, 'importing ' + path + ' ...')
 		n = Node()
 		n.FetchFromDirectory(None, path)
