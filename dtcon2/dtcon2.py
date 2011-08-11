@@ -134,11 +134,11 @@ class Node:
 		# self.rowid is set after writing to database
 		# self.parent has to be set while traversing
 		# self.depth has to be set while traversing
-		self.name = name
-		if path == None:
-			self.path = name
+		if name == None:
+			self.name = path
 		else:
-			self.path = os.path.join(path, name)
+			self.name = name
+		self.path = path
 		self.isdir = os.path.isdir(self.path)
 		if not self.isdir:
 			self.size = os.path.getsize(self.path)
@@ -169,15 +169,15 @@ class Node:
 		if self.checksum != None:
 			log.Print(0, '{0:s}checksum   {1:s}'.format(prefix, ChecksumToString(self.checksum, False)))
 
-	def Import(self, dbcon):
+	def Import(self, dbcon, path):
 		for e in os.listdir(self.path):
 			n = Node()
-			n.FetchFromDirectory(self.path, e)
-			log.Print(0, 'importing ' + self.path + ' ...')
+			n.FetchFromDirectory(os.path.join(path, e), e)
+			log.Print(0, 'importing ' + n.path + ' ...')
 			n.parent = self.rowid
 			n.WriteToDatabase(dbcon)
 			if n.isdir:
-				n.Import(dbcon)
+				n.Import(dbcon, n.path)
 
 	def TraverseDatabase(self, dbcon, path, depth, func, param):
 		cursor = dbcon.cursor()
@@ -185,8 +185,8 @@ class Node:
 		for row in cursor:
 			n = Node()
 			n.FetchFromDatabaseRow(row)
-			n.path = os.path.join(path, n.name)
 			n.depth = depth
+			n.path = os.path.join(path, n.name)
 			func(n, dbcon, param)
 			if n.isdir:
 				n.TraverseDatabase(dbcon, n.path, depth + 1, func, param)
@@ -288,12 +288,12 @@ class NodeDB:
 	def Import(self, path):
 		# TODO: check if path exists
 		# TODO: use TraverseDirectory to be reused in Update
-		log.Print(0, 'importing ' + path + ' ...')
 		n = Node()
-		n.FetchFromDirectory(None, path)
+		n.FetchFromDirectory(path, None)
+		log.Print(0, 'importing ' + path + ' ...')
 		n.WriteToDatabase(self.__dbcon)
 		if n.isdir:
-			n.Import(self.__dbcon)
+			n.Import(self.__dbcon, path)
 		self.__dbcon.commit()
 		log.Print(0, 'done\n')
 
