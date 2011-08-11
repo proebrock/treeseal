@@ -187,9 +187,9 @@ class Node:
 			n.FetchFromDatabaseRow(row)
 			n.depth = depth
 			n.path = os.path.join(path, n.name)
-			func(n, dbcon, param)
 			if n.isdir:
 				n.TraverseDatabase(dbcon, n.path, depth + 1, func, param)
+			func(n, dbcon, param)
 		cursor.close()
 
 	def TraversePrint(self, dbcon, param):
@@ -220,6 +220,21 @@ class Node:
 				log.Print(2, 'No checksum defined for ' + path)
 			elif self.checksum != GetChecksum(self.path):
 				log.Print(2, 'Checksum error for ' + path)
+	
+	def TraverseDelete(self, dbcon, param):
+		dbcon.execute('delete from nodes where rowid=?', (self.rowid,))
+
+	def DeleteChildren(self, dbcon):
+		cursor = dbcon.cursor()
+		cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent=?', (self.rowid,))
+		for row in cursor:
+			n = Node()
+			n.FetchFromDatabaseRow(row)
+			if n.isdir:
+				n.DeleteChildren(dbcon)
+		cursor.execute('delete from nodes where parent=?', (self.rowid,))
+		cursor.close()
+
 
 
 class NodeDB:
@@ -337,6 +352,29 @@ class NodeDB:
 		self.TraverseDatabase(path, Node.TraverseCheck, None)
 		log.Print(0, 'done\n')
 
+	def SlowDelete(self, path):
+		self.TraverseDatabase(path, Node.TraverseDelete, None)
+		self.__dbcon.commit()
+		log.Print(0, 'done\n')
+	
+	def Delete(self, path):
+		if path == None:
+			log.Print(0, 'deleting all nodes ...\n')
+			self.__dbcon.execute('delete from nodes')
+		else:
+			cursor = self.__dbcon.cursor()
+			cursor.execute('select count(rowid) from nodes where parent is null and name=?', (path,))
+			if cursor.fetchone()[0] == 0:
+				log.Print(3, 'Path ' + path + ' does not exist in the database.')
+			cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent is null and name=?', (path,))
+			n = Node()
+			n.FetchFromDatabaseRow(cursor.fetchone())
+			n.DeleteChildren(self.__dbcon)
+			cursor.execute('delete from nodes where rowid=?', (n.rowid,))
+			cursor.close()
+		self.__dbcon.commit()
+		log.Print(0, 'done\n')
+
 
 
 def ExecuteShell(cmdline):
@@ -389,10 +427,12 @@ def Main():
 
 	ndb.RecreateTables()
 	ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b')
 
 	#ndb.Print(None)
-	ndb.Print('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	#ndb.Print('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
+	ndb.Delete('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 	ndb.Export(None, 'schema')
 	#ndb.Export('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a', 'schema')
 
