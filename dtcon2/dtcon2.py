@@ -113,6 +113,7 @@ class Node:
 	def __init__(self):
 		self.rowid = None
 		self.parent = None
+		self.depth = None
 		self.name = None
 		self.path = None
 		self.isdir = None
@@ -122,12 +123,17 @@ class Node:
 	def FetchFromDatabaseRow(self, row):
 		self.rowid = row[0]
 		self.parent = row[1]
+		# self.depth has to be set while traversing
 		self.name = row[2]
+		# self.path has to be set while traversing
 		self.isdir = row[3]
 		self.size = row[4]
 		self.checksum = row[5]
 	
 	def FetchFromDirectory(self, path, name):
+		# self.rowid is set after writing to database
+		# self.parent has to be set while traversing
+		# self.depth has to be set while traversing
 		self.name = name
 		if path == None:
 			self.path = name
@@ -154,14 +160,14 @@ class Node:
 			log.Print(0, '{0:s}parent     {1:d}'.format(prefix, self.parent))
 		else:
 			log.Print(0, '{0:s}parent     <none>'.format(prefix))
+		log.Print(0, '{0:s}depth      {1:d}'.format(prefix, self.depth))
 		log.Print(0, '{0:s}name       {1:s}'.format(prefix, self.name))
 		log.Print(0, '{0:s}path       {1:s}'.format(prefix, self.path))
 		log.Print(0, '{0:s}isdir      {1:b}'.format(prefix, self.isdir))
 		if self.size != None:
 			log.Print(0, '{0:s}size       {1:d}'.format(prefix, self.size))
-		else:
-			log.Print(0, '{0:s}size       <unknown>'.format(prefix))
-		log.Print(0, '{0:s}checksum   {1:s}'.format(prefix, ChecksumToString(self.checksum, False)))
+		if self.checksum != None:
+			log.Print(0, '{0:s}checksum   {1:s}'.format(prefix, ChecksumToString(self.checksum, False)))
 
 	def Import(self, dbcon):
 		for e in os.listdir(self.path):
@@ -180,17 +186,18 @@ class Node:
 			n = Node()
 			n.FetchFromDatabaseRow(row)
 			n.path = os.path.join(path, n.name)
-			func(n, dbcon, depth, param)
+			n.depth = depth
+			func(n, dbcon, param)
 			if n.isdir:
 				n.TraverseDatabase(dbcon, n.path, depth + 1, func, param)
 		cursor.close()
 
-	def TraversePrint(self, dbcon, depth, param):
-		self.Print(depth)
+	def TraversePrint(self, dbcon, param):
+		self.Print(self.depth)
 
-	def TraverseExport(self, dbcon, depth, param):
+	def TraverseExport(self, dbcon, param):
 		log.Print(0, 'exporting ' + self.path + ' ...')
-		if depth == 0:
+		if self.depth == 0:
 			if self.isdir:
 				param.write('\t{0:d} [ style=bold, shape=box, label="{0:d}\\n{1:s}" ];\n'\
 					.format(self.rowid, self.name.replace('\\', '\\\\')))
@@ -206,7 +213,7 @@ class Node:
 					.format(self.rowid, self.name, ChecksumToString(self.checksum, True)))
 			param.write('\t{0:d} -> {1:d};\n'.format(self.parent, self.rowid))
 	
-	def TraverseCheck(self, dbcon, depth, param):
+	def TraverseCheck(self, dbcon, param):
 		if not self.isdir:
 			log.Print(0, 'checking ' + self.path + ' ...')
 			if self.checksum == None:
@@ -306,13 +313,15 @@ class NodeDB:
 			n = Node()
 			n.FetchFromDatabaseRow(row)
 			n.path = n.name
-			func(n, self.__dbcon, 0, param)
+			n.depth = 0
+			func(n, self.__dbcon, param)
 			if n.isdir:
 				n.TraverseDatabase(self.__dbcon, n.name, 1, func, param)
 		cursor.close()
 
 	def Print(self, path):
 		self.TraverseDatabase(path, Node.TraversePrint, None)
+		log.Print(0, '')
 
 	def Export(self, path, filename):
 		f = open(filename + '.dot', 'w')
@@ -374,6 +383,7 @@ def Main():
 	"""
 	Main entry point of program
 	"""
+	#TODO: proper command line interface
 	#ndb = NodeDB(':memory:')
 	ndb = NodeDB('dtcon2.sqlite')
 
@@ -381,9 +391,9 @@ def Main():
 	ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
 	#ndb.Print(None)
-	#ndb.Print('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	ndb.Print('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
-	#ndb.Export(None, 'schema')
+	ndb.Export(None, 'schema')
 	#ndb.Export('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a', 'schema')
 
 	#ndb.Check(None)
