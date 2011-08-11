@@ -151,24 +151,6 @@ class Node:
 		self.rowid = cursor.lastrowid
 		cursor.close()
 	
-	def Print(self, numindent):
-		prefix = '  ' * numindent
-		log.Print(0, '{0:s}node'.format(prefix, self.rowid))
-		prefix += '->'
-		log.Print(0, '{0:s}rowid      {1:d}'.format(prefix, self.rowid))
-		if self.parent != None:
-			log.Print(0, '{0:s}parent     {1:d}'.format(prefix, self.parent))
-		else:
-			log.Print(0, '{0:s}parent     <none>'.format(prefix))
-		log.Print(0, '{0:s}depth      {1:d}'.format(prefix, self.depth))
-		log.Print(0, '{0:s}name       {1:s}'.format(prefix, self.name))
-		log.Print(0, '{0:s}path       {1:s}'.format(prefix, self.path))
-		log.Print(0, '{0:s}isdir      {1:b}'.format(prefix, self.isdir))
-		if self.size != None:
-			log.Print(0, '{0:s}size       {1:d}'.format(prefix, self.size))
-		if self.checksum != None:
-			log.Print(0, '{0:s}checksum   {1:s}'.format(prefix, ChecksumToString(self.checksum, False)))
-
 	def Import(self, dbcon, path):
 		for e in os.listdir(self.path):
 			n = Node()
@@ -192,37 +174,64 @@ class Node:
 			func(n, dbcon, param)
 		cursor.close()
 
+	def Print(self, numindent):
+		prefix = '  ' * numindent
+		log.Print(0, '{0:s}node'.format(prefix, self.rowid))
+		prefix += '->'
+		log.Print(0, '{0:s}rowid      {1:d}'.format(prefix, self.rowid))
+		if self.parent != None:
+			log.Print(0, '{0:s}parent     {1:d}'.format(prefix, self.parent))
+		else:
+			log.Print(0, '{0:s}parent     <none>'.format(prefix))
+		log.Print(0, '{0:s}depth      {1:d}'.format(prefix, self.depth))
+		log.Print(0, '{0:s}name       {1:s}'.format(prefix, self.name))
+		log.Print(0, '{0:s}path       {1:s}'.format(prefix, self.path))
+		log.Print(0, '{0:s}isdir      {1:b}'.format(prefix, self.isdir))
+		if self.size != None:
+			log.Print(0, '{0:s}size       {1:d}'.format(prefix, self.size))
+		if self.checksum != None:
+			log.Print(0, '{0:s}checksum   {1:s}'.format(prefix, ChecksumToString(self.checksum, False)))
+
 	def TraversePrint(self, dbcon, param):
 		self.Print(self.depth)
 
-	def TraverseExport(self, dbcon, param):
-		log.Print(0, 'exporting ' + self.path + ' ...')
+	def Export(self, filehandle):
 		if self.depth == 0:
 			if self.isdir:
-				param.write('\t{0:d} [ style=bold, shape=box, label="{0:d}\\n{1:s}" ];\n'\
+				filehandle.write('\t{0:d} [ style=bold, shape=box, label="{0:d}\\n{1:s}" ];\n'\
 					.format(self.rowid, self.name.replace('\\', '\\\\')))
 			else:
-				param.write('\t{0:d} [ style=bold, shape=ellipse, label="{0:d}\\n{1:s}\\n{2:s}" ];\n'\
+				filehandle.write('\t{0:d} [ style=bold, shape=ellipse, label="{0:d}\\n{1:s}\\n{2:s}" ];\n'\
 					.format(self.rowid, self.name.replace('\\', '\\\\'), ChecksumToString(self.checksum, True)))
 		else:
 			if self.isdir:
-				param.write('\t{0:d} [ shape=box, label="{0:d}\\n{1:s}" ];\n'\
+				filehandle.write('\t{0:d} [ shape=box, label="{0:d}\\n{1:s}" ];\n'\
 					.format(self.rowid, self.name))
 			else:
-				param.write('\t{0:d} [ shape=ellipse, label="{0:d}\\n{1:s}\\n{2:s}" ];\n'\
+				filehandle.write('\t{0:d} [ shape=ellipse, label="{0:d}\\n{1:s}\\n{2:s}" ];\n'\
 					.format(self.rowid, self.name, ChecksumToString(self.checksum, True)))
-			param.write('\t{0:d} -> {1:d};\n'.format(self.parent, self.rowid))
+			filehandle.write('\t{0:d} -> {1:d};\n'.format(self.parent, self.rowid))
+
+	def TraverseExport(self, dbcon, param):
+		log.Print(0, 'exporting ' + self.path + ' ...')
+		self.Export(param)
+
+	def Check(self):
+		if self.checksum == None:
+			log.Print(2, 'No checksum defined for ' + path)
+		elif self.checksum != GetChecksum(self.path):
+			log.Print(2, 'Checksum error for ' + path)
 	
 	def TraverseCheck(self, dbcon, param):
 		if not self.isdir:
 			log.Print(0, 'checking ' + self.path + ' ...')
-			if self.checksum == None:
-				log.Print(2, 'No checksum defined for ' + path)
-			elif self.checksum != GetChecksum(self.path):
-				log.Print(2, 'Checksum error for ' + path)
+			self.Check()
+	
+	def Delete(self, dbcon):
+		dbcon.execute('delete from nodes where rowid=?', (self.rowid,))
 	
 	def TraverseDelete(self, dbcon, param):
-		dbcon.execute('delete from nodes where rowid=?', (self.rowid,))
+		self.Delete(dbcon)
 
 	def DeleteChildren(self, dbcon):
 		cursor = dbcon.cursor()
@@ -429,15 +438,14 @@ def Main():
 	ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 	ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b')
 
-	#ndb.Print(None)
-	#ndb.Print('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	ndb.Print(None)
+	ndb.Print('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
-	ndb.Delete('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 	ndb.Export(None, 'schema')
-	#ndb.Export('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a', 'schema')
+	ndb.Export('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a', 'schema')
 
-	#ndb.Check(None)
-	#ndb.Check('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	ndb.Check(None)
+	ndb.Check('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
 	ndb.Close()
 
