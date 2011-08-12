@@ -161,16 +161,16 @@ class Node:
 			if n.isdir:
 				n.Import(dbcon)
 
-	def TraverseDatabase(self, dbcon, path, depth, func, param):
+	def TraverseDatabase(self, dbcon, func, param):
 		cursor = dbcon.cursor()
 		cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent=?', (self.rowid,))
 		for row in cursor:
 			n = Node()
 			n.FetchFromDatabaseRow(row)
-			n.depth = depth
-			n.path = os.path.join(path, n.name)
+			n.depth = self.depth + 1
+			n.path = os.path.join(self.path, n.name)
 			if n.isdir:
-				n.TraverseDatabase(dbcon, n.path, depth + 1, func, param)
+				n.TraverseDatabase(dbcon, func, param)
 			func(n, dbcon, param)
 		cursor.close()
 
@@ -288,7 +288,7 @@ class Node:
 			n.depth = depth
 			n.path = os.path.join(path, n.name)
 			if n.isdir:
-				n.TraverseDatabase(dbcon, n.path, depth + 1, func, param)
+				n.TraverseDatabase(dbcon, depth + 1, func, param)
 			func(n, dbcon, param)
 		cursor.close()
 """
@@ -387,7 +387,7 @@ class NodeDB:
 			n.depth = 0
 			func(n, self.__dbcon, param)
 			if n.isdir:
-				n.TraverseDatabase(self.__dbcon, n.name, 1, func, param)
+				n.TraverseDatabase(self.__dbcon, func, param)
 		cursor.close()
 
 	def Print(self, path):
@@ -483,16 +483,16 @@ def Main():
 	#ndb.RecreateTables()
 
 	ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
-	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b')
+	ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b')
 
-	#ndb.Print(None)
-	#ndb.Print('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	ndb.Print(None)
+	ndb.Print('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
-	#ndb.Export(None, 'schema')
-	#ndb.Export('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a', 'schema')
+	ndb.Export(None, 'schema')
+	ndb.Export('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a', 'schema')
 
-	#ndb.Check(None)
-	#ndb.Check('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	ndb.Check(None)
+	ndb.Check('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
 	ndb.Close()
 
