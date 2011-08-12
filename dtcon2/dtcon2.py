@@ -151,15 +151,15 @@ class Node:
 		self.rowid = cursor.lastrowid
 		cursor.close()
 	
-	def Import(self, dbcon, path):
+	def Import(self, dbcon):
 		for e in os.listdir(self.path):
 			n = Node()
-			n.FetchFromDirectory(os.path.join(path, e), e)
+			n.FetchFromDirectory(os.path.join(self.path, e), e)
 			log.Print(0, 'importing ' + n.path + ' ...')
 			n.parent = self.rowid
 			n.WriteToDatabase(dbcon)
 			if n.isdir:
-				n.Import(dbcon, n.path)
+				n.Import(dbcon)
 
 	def TraverseDatabase(self, dbcon, path, depth, func, param):
 		cursor = dbcon.cursor()
@@ -243,8 +243,55 @@ class Node:
 				n.DeleteChildren(dbcon)
 		cursor.execute('delete from nodes where parent=?', (self.rowid,))
 		cursor.close()
+"""
+	def Update(self)
+		# fetch child nodes and create a map: name -> node
+		cursor = dbcon.cursor()
+		cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent=?', (self.rowid,))
+		rowdict = {}
+		for row in cursor:
+			n = Node()
+			n.FetchFromDatabaseRow(row)
+			n.path = os.path.join(path, n.name)
+			rowdict[n.name] = n
+		# iterate over all directory entries and check them one by one
+		entries = os.listdir(self.path)
+		for e in entries:
+			n = Node()
+			n.FetchFromDirectory(os.path.join(path, e), e)
 
+			fullpath = os.path.join(path, e)
+			isdir = os.path.isdir(fullpath)
+			if e in rowdict:
+				row = rows[rowdict[e]]
+				# check file
+				CheckChecksum(fullpath, row[2], row[3])
+				# remove checked entry from dictionary: this node is processed
+				del rowdict[e]
+				# if directory do the recursion
+				if isdir:
+					UpdateRecurse(dbcon, row[0], fullpath)
+			else:
+				# add non-existing entry to list
+				log.Print(1, 'adding ' + fullpath)
+				cur.execute('insert into nodes (parent, path, isdir, checksum) values (?,?,?,?)', \
+					(rowid, e, isdir, GetChecksum(fullpath, isdir)))
+				# if directory do the recursion
+				if isdir:
+					UpdateRecurse(dbcon, cur.lastrowid, fullpath)
 
+		cursor = dbcon.cursor()
+		cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent=?', (self.rowid,))
+		for row in cursor:
+			n = Node()
+			n.FetchFromDatabaseRow(row)
+			n.depth = depth
+			n.path = os.path.join(path, n.name)
+			if n.isdir:
+				n.TraverseDatabase(dbcon, n.path, depth + 1, func, param)
+			func(n, dbcon, param)
+		cursor.close()
+"""
 
 class NodeDB:
 
@@ -317,7 +364,7 @@ class NodeDB:
 		log.Print(0, 'importing ' + path + ' ...')
 		n.WriteToDatabase(self.__dbcon)
 		if n.isdir:
-			n.Import(self.__dbcon, path)
+			n.Import(self.__dbcon)
 		self.__dbcon.commit()
 		log.Print(0, 'done\n')
 
@@ -431,21 +478,21 @@ def Main():
 	Main entry point of program
 	"""
 	#TODO: proper command line interface
-	#ndb = NodeDB(':memory:')
-	ndb = NodeDB('dtcon2.sqlite')
+	ndb = NodeDB(':memory:')
+	#ndb = NodeDB('dtcon2.sqlite')
+	#ndb.RecreateTables()
 
-	ndb.RecreateTables()
 	ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
-	ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b')
+	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b')
 
-	ndb.Print(None)
-	ndb.Print('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	#ndb.Print(None)
+	#ndb.Print('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
-	ndb.Export(None, 'schema')
-	ndb.Export('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a', 'schema')
+	#ndb.Export(None, 'schema')
+	#ndb.Export('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a', 'schema')
 
-	ndb.Check(None)
-	ndb.Check('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	#ndb.Check(None)
+	#ndb.Check('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
 	ndb.Close()
 
