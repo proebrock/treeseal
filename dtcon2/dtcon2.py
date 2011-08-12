@@ -145,35 +145,21 @@ class Node:
 			self.checksum = GetChecksum(self.path)
 
 	def WriteToDatabase(self, dbcon):
+		log.Print(0, 'adding to database ' + self.path + ' ...')
 		cursor = dbcon.cursor()
 		cursor.execute('insert into nodes (parent, name, isdir, size, checksum) values (?,?,?,?,?)', \
 			(self.parent, self.name, self.isdir, self.size, self.checksum))
 		self.rowid = cursor.lastrowid
 		cursor.close()
 	
-	def Import(self, dbcon):
-		for e in os.listdir(self.path):
-			n = Node()
-			n.FetchFromDirectory(os.path.join(self.path, e), e)
-			log.Print(0, 'importing ' + n.path + ' ...')
-			n.parent = self.rowid
-			n.WriteToDatabase(dbcon)
-			if n.isdir:
-				n.Import(dbcon)
-
-	def TraverseDatabase(self, dbcon, func, param):
-		cursor = dbcon.cursor()
-		cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent=?', (self.rowid,))
-		for row in cursor:
-			n = Node()
-			n.FetchFromDatabaseRow(row)
-			n.depth = self.depth + 1
-			n.path = os.path.join(self.path, n.name)
-			if n.isdir:
-				n.TraverseDatabase(dbcon, func, param)
-			func(n, dbcon, param)
-		cursor.close()
-
+	def Check(self):
+		if not self.isdir:
+			log.Print(0, 'checking ' + self.path + ' ...')
+			if self.checksum == None:
+				log.Print(2, 'No checksum defined for ' + path)
+			elif self.checksum != GetChecksum(self.path):
+				log.Print(2, 'Checksum error for ' + path)
+	
 	def Print(self, numindent):
 		prefix = '  ' * numindent
 		log.Print(0, '{0:s}node'.format(prefix, self.rowid))
@@ -192,9 +178,6 @@ class Node:
 		if self.checksum != None:
 			log.Print(0, '{0:s}checksum   {1:s}'.format(prefix, ChecksumToString(self.checksum, False)))
 
-	def TraversePrint(self, dbcon, param):
-		self.Print(self.depth)
-
 	def Export(self, filehandle):
 		if self.depth == 0:
 			if self.isdir:
@@ -212,86 +195,94 @@ class Node:
 					.format(self.rowid, self.name, ChecksumToString(self.checksum, True)))
 			filehandle.write('\t{0:d} -> {1:d};\n'.format(self.parent, self.rowid))
 
+	def Delete(self, dbcon):
+		dbcon.execute('delete from nodes where rowid=?', (self.rowid,))
+	
+	def DeleteDescendants(self, dbcon):
+		cursor = dbcon.cursor()
+		cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent=?', (self.rowid,))
+		for row in cursor:
+			n = Node()
+			n.FetchFromDatabaseRow(row)
+			if n.isdir:
+				n.DeleteDescendants(dbcon)
+		cursor.execute('delete from nodes where parent=?', (self.rowid,))
+		cursor.close()
+
+	def Import(self, dbcon):
+		for e in os.listdir(self.path):
+			n = Node()
+			n.FetchFromDirectory(os.path.join(self.path, e), e)
+			n.parent = self.rowid
+			n.depth = self.depth + 1
+			n.WriteToDatabase(dbcon)
+			if n.isdir:
+				n.Import(dbcon)
+
+	def TraverseDatabase(self, dbcon, func, param):
+		cursor = dbcon.cursor()
+		cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent=?', (self.rowid,))
+		for row in cursor:
+			n = Node()
+			n.FetchFromDatabaseRow(row)
+			n.depth = self.depth + 1
+			n.path = os.path.join(self.path, n.name)
+			if n.isdir:
+				n.TraverseDatabase(dbcon, func, param)
+			func(n, dbcon, param)
+		cursor.close()
+
+	def TraversePrint(self, dbcon, param):
+		self.Print(self.depth)
+
 	def TraverseExport(self, dbcon, param):
 		log.Print(0, 'exporting ' + self.path + ' ...')
 		self.Export(param)
 
-	def Check(self):
-		if self.checksum == None:
-			log.Print(2, 'No checksum defined for ' + path)
-		elif self.checksum != GetChecksum(self.path):
-			log.Print(2, 'Checksum error for ' + path)
-	
 	def TraverseCheck(self, dbcon, param):
-		if not self.isdir:
-			log.Print(0, 'checking ' + self.path + ' ...')
-			self.Check()
-	
-	def Delete(self, dbcon):
-		dbcon.execute('delete from nodes where rowid=?', (self.rowid,))
+		self.Check()
 	
 	def TraverseDelete(self, dbcon, param):
 		self.Delete(dbcon)
 
-	def DeleteChildren(self, dbcon):
-		cursor = dbcon.cursor()
-		cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent=?', (self.rowid,))
-		for row in cursor:
-			n = Node()
-			n.FetchFromDatabaseRow(row)
-			if n.isdir:
-				n.DeleteChildren(dbcon)
-		cursor.execute('delete from nodes where parent=?', (self.rowid,))
-		cursor.close()
-"""
-	def Update(self)
+	def Update(self, dbcon):
 		# fetch child nodes and create a map: name -> node
 		cursor = dbcon.cursor()
 		cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent=?', (self.rowid,))
-		rowdict = {}
+		dbnodes = {}
 		for row in cursor:
 			n = Node()
 			n.FetchFromDatabaseRow(row)
-			n.path = os.path.join(path, n.name)
-			rowdict[n.name] = n
+			n.depth = self.depth + 1
+			n.path = os.path.join(self.path, n.name)
+			dbnodes[n.name] = n
 		# iterate over all directory entries and check them one by one
 		entries = os.listdir(self.path)
 		for e in entries:
-			n = Node()
-			n.FetchFromDirectory(os.path.join(path, e), e)
-
-			fullpath = os.path.join(path, e)
-			isdir = os.path.isdir(fullpath)
-			if e in rowdict:
-				row = rows[rowdict[e]]
+			dirnode = Node()
+			dirnode.FetchFromDirectory(os.path.join(self.path, e), e)
+			dirnode.parent = self.rowid
+			dirnode.depth = self.depth + 1
+			if dirnode.name in dbnodes:
 				# check file
-				CheckChecksum(fullpath, row[2], row[3])
+				dirnode.Check()
+				# if directory do the recursion (use dbnode because it has the correct rowid)
+				if dirnode.isdir:
+					dbnodes[dirnode.name].Update(dbcon)
 				# remove checked entry from dictionary: this node is processed
-				del rowdict[e]
-				# if directory do the recursion
-				if isdir:
-					UpdateRecurse(dbcon, row[0], fullpath)
+				del dbnodes[dirnode.name]
 			else:
 				# add non-existing entry to list
-				log.Print(1, 'adding ' + fullpath)
-				cur.execute('insert into nodes (parent, path, isdir, checksum) values (?,?,?,?)', \
-					(rowid, e, isdir, GetChecksum(fullpath, isdir)))
-				# if directory do the recursion
-				if isdir:
-					UpdateRecurse(dbcon, cur.lastrowid, fullpath)
-
-		cursor = dbcon.cursor()
-		cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent=?', (self.rowid,))
-		for row in cursor:
-			n = Node()
-			n.FetchFromDatabaseRow(row)
-			n.depth = depth
-			n.path = os.path.join(path, n.name)
-			if n.isdir:
-				n.TraverseDatabase(dbcon, depth + 1, func, param)
-			func(n, dbcon, param)
+				dirnode.WriteToDatabase(dbcon)
+				# if directory do the recursion (WriteToDatabase set the rowid)
+				if dirnode.isdir:
+					dirnode.Update(dbcon)
 		cursor.close()
-"""
+		# iterate over remaining entries in rowdict, those entries should be removed
+		for n in dbnodes.values():
+			log.Print(1, 'deleting ' + n.path)
+			n.DeleteDescendants(dbcon)
+			n.Delete(dbcon)
 
 class NodeDB:
 
@@ -361,6 +352,8 @@ class NodeDB:
 		# TODO: use TraverseDirectory to be reused in Update
 		n = Node()
 		n.FetchFromDirectory(path, None)
+		n.parent = None
+		n.depth = 0
 		log.Print(0, 'importing ' + path + ' ...')
 		n.WriteToDatabase(self.__dbcon)
 		if n.isdir:
@@ -411,6 +404,7 @@ class NodeDB:
 	def SlowDelete(self, path):
 		self.TraverseDatabase(path, Node.TraverseDelete, None)
 		self.__dbcon.commit()
+		self.__dbcon.execute('vacuum')
 		log.Print(0, 'done\n')
 	
 	def Delete(self, path):
@@ -425,10 +419,37 @@ class NodeDB:
 			cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent is null and name=?', (path,))
 			n = Node()
 			n.FetchFromDatabaseRow(cursor.fetchone())
-			n.DeleteChildren(self.__dbcon)
-			cursor.execute('delete from nodes where rowid=?', (n.rowid,))
+			n.DeleteDescendants(self.__dbcon)
+			n.Delete(self.__dbcon)
 			cursor.close()
 		self.__dbcon.commit()
+		self.__dbcon.execute('vacuum')
+		log.Print(0, 'done\n')
+
+	def Update(self, path):
+		# TODO: similar structure as TraverseDatabase
+		cursor = self.__dbcon.cursor()
+		if path == None:
+			cursor.execute('select count(rowid) from nodes where parent is null')
+			if cursor.fetchone()[0] == 0:
+				log.Print(3, 'There are no nodes in the database.')
+			cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent is null')
+		else:
+			cursor.execute('select count(rowid) from nodes where parent is null and name=?', (path,))
+			if cursor.fetchone()[0] == 0:
+				log.Print(3, 'Path ' + path + ' does not exist in the database.')
+			cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent is null and name=?', (path,))
+		for row in cursor:
+			n = Node()
+			n.FetchFromDatabaseRow(row)
+			n.path = n.name
+			n.depth = 0
+			n.Check()
+			if n.isdir:
+				n.Update(self.__dbcon)
+		cursor.close()
+		self.__dbcon.commit()
+		self.__dbcon.execute('vacuum')
 		log.Print(0, 'done\n')
 
 
@@ -478,21 +499,24 @@ def Main():
 	Main entry point of program
 	"""
 	#TODO: proper command line interface
-	ndb = NodeDB(':memory:')
-	#ndb = NodeDB('dtcon2.sqlite')
+	#ndb = NodeDB(':memory:')
+	ndb = NodeDB('dtcon2.sqlite')
 	#ndb.RecreateTables()
 
-	ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
-	ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b')
+	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b')
 
-	ndb.Print(None)
-	ndb.Print('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	#ndb.Print(None)
+	#ndb.Print('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
-	ndb.Export(None, 'schema')
-	ndb.Export('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a', 'schema')
+	#ndb.Export(None, 'schema')
+	#ndb.Export('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a', 'schema')
 
-	ndb.Check(None)
-	ndb.Check('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	#ndb.Check(None)
+	#ndb.Check('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+
+	ndb.Update(None)
+	#ndb.Update('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
 	ndb.Close()
 
