@@ -144,8 +144,8 @@ class Node:
 			self.size = os.path.getsize(self.path)
 			self.checksum = GetChecksum(self.path)
 
-	def WriteToDatabase(self, dbcon):
-		log.Print(0, 'adding to database ' + self.path + ' ...')
+	def WriteToDatabase(self, dbcon, loglvl):
+		log.Print(loglvl, 'adding to database ' + self.path + ' ...')
 		cursor = dbcon.cursor()
 		cursor.execute('insert into nodes (parent, name, isdir, size, checksum) values (?,?,?,?,?)', \
 			(self.parent, self.name, self.isdir, self.size, self.checksum))
@@ -215,7 +215,7 @@ class Node:
 			n.FetchFromDirectory(os.path.join(self.path, e), e)
 			n.parent = self.rowid
 			n.depth = self.depth + 1
-			n.WriteToDatabase(dbcon)
+			n.WriteToDatabase(dbcon, 0)
 			if n.isdir:
 				n.Import(dbcon)
 
@@ -273,7 +273,7 @@ class Node:
 				del dbnodes[dirnode.name]
 			else:
 				# add non-existing entry to list
-				dirnode.WriteToDatabase(dbcon)
+				dirnode.WriteToDatabase(dbcon, 1)
 				# if directory do the recursion (WriteToDatabase set the rowid)
 				if dirnode.isdir:
 					dirnode.Update(dbcon)
@@ -346,33 +346,47 @@ class NodeDB:
 		"""
 		self.DropTables()
 		self.CreateTables()
+	
+	def RootPathExistsInDatabase(self, path):
+		cursor = self.__dbcon.cursor()
+		if path == None:
+			cursor.execute('select count(rowid) from nodes where parent is null')
+		else:
+			cursor.execute('select count(rowid) from nodes where parent is null and name=?', (path,))
+		result = cursor.fetchone()[0] > 0
+		cursor.close()
+		return result
+
+	def GetRootNodes(self, path):
+		cursor = self.__dbcon.cursor()
+		if path == None:
+			if not self.RootPathExistsInDatabase(path):
+				log.Print(3, 'There are no nodes in the database.')
+			cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent is null')
+		else:
+			if not self.RootPathExistsInDatabase(path):
+				log.Print(3, 'Path ' + path + ' does not exist in the database.')
+			cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent is null and name=?', (path,))
+		return cursor
 
 	def Import(self, path):
-		# TODO: check if path exists
-		# TODO: use TraverseDirectory to be reused in Update
+		if self.RootPathExistsInDatabase(path):
+			log.Print(3, 'Path ' + path + ' already exist in the database.')
+		if not os.path.exists(path):
+			log.Print(3, 'Path ' + path + ' cannot be found on disk.')
 		n = Node()
 		n.FetchFromDirectory(path, None)
 		n.parent = None
 		n.depth = 0
 		log.Print(0, 'importing ' + path + ' ...')
-		n.WriteToDatabase(self.__dbcon)
+		n.WriteToDatabase(self.__dbcon, 0)
 		if n.isdir:
 			n.Import(self.__dbcon)
 		self.__dbcon.commit()
 		log.Print(0, 'done\n')
 
 	def TraverseDatabase(self, path, func, param):
-		cursor = self.__dbcon.cursor()
-		if path == None:
-			cursor.execute('select count(rowid) from nodes where parent is null')
-			if cursor.fetchone()[0] == 0:
-				log.Print(3, 'There are no nodes in the database.')
-			cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent is null')
-		else:
-			cursor.execute('select count(rowid) from nodes where parent is null and name=?', (path,))
-			if cursor.fetchone()[0] == 0:
-				log.Print(3, 'Path ' + path + ' does not exist in the database.')
-			cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent is null and name=?', (path,))
+		cursor = self.GetRootNodes(path)
 		for row in cursor:
 			n = Node()
 			n.FetchFromDatabaseRow(row)
@@ -412,11 +426,7 @@ class NodeDB:
 			log.Print(0, 'deleting all nodes ...\n')
 			self.__dbcon.execute('delete from nodes')
 		else:
-			cursor = self.__dbcon.cursor()
-			cursor.execute('select count(rowid) from nodes where parent is null and name=?', (path,))
-			if cursor.fetchone()[0] == 0:
-				log.Print(3, 'Path ' + path + ' does not exist in the database.')
-			cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent is null and name=?', (path,))
+			cursor = self.GetRootNodes(path)
 			n = Node()
 			n.FetchFromDatabaseRow(cursor.fetchone())
 			n.DeleteDescendants(self.__dbcon)
@@ -427,18 +437,7 @@ class NodeDB:
 		log.Print(0, 'done\n')
 
 	def Update(self, path):
-		# TODO: similar structure as TraverseDatabase
-		cursor = self.__dbcon.cursor()
-		if path == None:
-			cursor.execute('select count(rowid) from nodes where parent is null')
-			if cursor.fetchone()[0] == 0:
-				log.Print(3, 'There are no nodes in the database.')
-			cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent is null')
-		else:
-			cursor.execute('select count(rowid) from nodes where parent is null and name=?', (path,))
-			if cursor.fetchone()[0] == 0:
-				log.Print(3, 'Path ' + path + ' does not exist in the database.')
-			cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent is null and name=?', (path,))
+		cursor = self.GetRootNodes(path)
 		for row in cursor:
 			n = Node()
 			n.FetchFromDatabaseRow(row)
@@ -501,22 +500,21 @@ def Main():
 	#TODO: proper command line interface
 	#ndb = NodeDB(':memory:')
 	ndb = NodeDB('dtcon2.sqlite')
-	#ndb.RecreateTables()
+	ndb.RecreateTables()
 
-	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
-	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b')
+	ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
-	#ndb.Print(None)
-	#ndb.Print('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	ndb.Print(None)
+	ndb.Print('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
-	#ndb.Export(None, 'schema')
-	#ndb.Export('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a', 'schema')
+	ndb.Export(None, 'schema')
+	ndb.Export('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a', 'schema')
 
-	#ndb.Check(None)
-	#ndb.Check('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	ndb.Check(None)
+	ndb.Check('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
 	ndb.Update(None)
-	#ndb.Update('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	ndb.Update('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
 	ndb.Close()
 
