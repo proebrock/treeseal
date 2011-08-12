@@ -100,7 +100,7 @@ class LogFacility:
 			return '{0:.1f}h'.format(elapsed/60/60)
 
 """
-Central facility for logging purposes used by all functions.
+Central facility for logging purposes used by all methods.
 """
 log = LogFacility('dtcon2.log')
 
@@ -111,6 +111,9 @@ NodeSelectColumnString = 'rowid, parent, name, isdir, size, checksum'
 class Node:
 
 	def __init__(self):
+		"""
+		Constructor of Node class
+		"""
 		self.rowid = None
 		self.parent = None
 		self.depth = None
@@ -121,6 +124,12 @@ class Node:
 		self.checksum = None
 
 	def FetchFromDatabaseRow(self, row):
+		"""
+		When database was read using a cursor, this method is used to extract
+		information from a cursor row into a node.
+		Some information cannot be retrieved from the database row, check
+		comments below.
+		"""
 		self.rowid = row[0]
 		self.parent = row[1]
 		# self.depth has to be set while traversing
@@ -131,6 +140,15 @@ class Node:
 		self.checksum = row[5]
 	
 	def FetchFromDirectory(self, path, name):
+		"""
+		When a directory was searched for file names, this method is used to
+		extract information into a node. "path" is the full featured
+		directory path of the node, name is the name under which the node
+		is stored in the database (full featured path for root node, file
+		name or directory name otherwise)
+		Some information cannot be retrieved from the database row, check
+		comments below.
+		"""
 		# self.rowid is set after writing to database
 		# self.parent has to be set while traversing
 		# self.depth has to be set while traversing
@@ -144,8 +162,11 @@ class Node:
 			self.size = os.path.getsize(self.path)
 			self.checksum = GetChecksum(self.path)
 
-	def WriteToDatabase(self, dbcon, loglvl):
-		log.Print(loglvl, 'adding to database ' + self.path + ' ...')
+	def WriteToDatabase(self, dbcon):
+		"""
+		Write (not in database existing) node to database
+		and set rowid due to the one received from the database
+		"""
 		cursor = dbcon.cursor()
 		cursor.execute('insert into nodes (parent, name, isdir, size, checksum) values (?,?,?,?,?)', \
 			(self.parent, self.name, self.isdir, self.size, self.checksum))
@@ -153,6 +174,10 @@ class Node:
 		cursor.close()
 	
 	def Check(self):
+		"""
+		Check node by calculating checksum of filename specified by path
+		and comparing it with stored checksum with
+		"""
 		if not self.isdir:
 			log.Print(0, 'checking ' + self.path + ' ...')
 			if self.checksum == None:
@@ -161,6 +186,9 @@ class Node:
 				log.Print(2, 'Checksum error for ' + path)
 	
 	def Print(self, numindent):
+		"""
+		Print details about current node into the log facility
+		"""
 		prefix = '  ' * numindent
 		log.Print(0, '{0:s}node'.format(prefix, self.rowid))
 		prefix += '->'
@@ -179,6 +207,9 @@ class Node:
 			log.Print(0, '{0:s}checksum   {1:s}'.format(prefix, ChecksumToString(self.checksum, False)))
 
 	def Export(self, filehandle):
+		"""
+		Write node information into file using the dot format (graphviz)
+		"""
 		if self.depth == 0:
 			if self.isdir:
 				filehandle.write('\t{0:d} [ style=bold, shape=box, label="{0:d}\\n{1:s}" ];\n'\
@@ -196,9 +227,15 @@ class Node:
 			filehandle.write('\t{0:d} -> {1:d};\n'.format(self.parent, self.rowid))
 
 	def Delete(self, dbcon):
+		"""
+		Delete node in database
+		"""
 		dbcon.execute('delete from nodes where rowid=?', (self.rowid,))
 	
 	def DeleteDescendants(self, dbcon):
+		"""
+		Delete all descendants of node (recursively) in database
+		"""
 		cursor = dbcon.cursor()
 		cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent=?', (self.rowid,))
 		for row in cursor:
@@ -210,16 +247,23 @@ class Node:
 		cursor.close()
 
 	def Import(self, dbcon):
+		"""
+		Recursive part of NodeDB.Import
+		"""
 		for e in os.listdir(self.path):
 			n = Node()
 			n.FetchFromDirectory(os.path.join(self.path, e), e)
 			n.parent = self.rowid
 			n.depth = self.depth + 1
-			n.WriteToDatabase(dbcon, 0)
+			log.Print(0, 'importing into database ' + n.path + ' ...')
+			n.WriteToDatabase(dbcon)
 			if n.isdir:
 				n.Import(dbcon)
 
 	def TraverseDatabase(self, dbcon, func, param):
+		"""
+		Recursive part of NodeDB.TraverseDatabase
+		"""
 		cursor = dbcon.cursor()
 		cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent=?', (self.rowid,))
 		for row in cursor:
@@ -233,19 +277,38 @@ class Node:
 		cursor.close()
 
 	def TraversePrint(self, dbcon, param):
+		"""
+		Method executed on every node by TraverseDatabase when
+		NodeDB.Print is called
+		"""
 		self.Print(self.depth)
 
 	def TraverseExport(self, dbcon, param):
+		"""
+		Method executed on every node by TraverseDatabase when
+		NodeDB.Export is called
+		"""
 		log.Print(0, 'exporting ' + self.path + ' ...')
 		self.Export(param)
 
 	def TraverseCheck(self, dbcon, param):
+		"""
+		Method executed on every node by TraverseDatabase when
+		NodeDB.Check is called
+		"""
 		self.Check()
 	
 	def TraverseDelete(self, dbcon, param):
+		"""
+		Method executed on every node by TraverseDatabase when
+		NodeDB.SlowDelete is called
+		"""
 		self.Delete(dbcon)
 
 	def Update(self, dbcon):
+		"""
+		Recursive part of NodeDB.Update
+		"""
 		# fetch child nodes and create a map: name -> node
 		cursor = dbcon.cursor()
 		cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent=?', (self.rowid,))
@@ -273,7 +336,8 @@ class Node:
 				del dbnodes[dirnode.name]
 			else:
 				# add non-existing entry to list
-				dirnode.WriteToDatabase(dbcon, 1)
+				log.Print(1, 'adding to database ' + dirnode.path + ' ...')
+				dirnode.WriteToDatabase(dbcon)
 				# if directory do the recursion (WriteToDatabase set the rowid)
 				if dirnode.isdir:
 					dirnode.Update(dbcon)
@@ -288,6 +352,7 @@ class NodeDB:
 
 	def __init__(self, dbpath):
 		"""
+		Constructor of NodeDB class
 		Open database: first determine checksum of database file and compare it
 		with the one stored in a separate checksum file to check for corruption
 		of the database. If the database file is a newly created, create tables.
@@ -310,11 +375,19 @@ class NodeDB:
 		if not dbexisted:
 			self.CreateTables()
 
+	def __del__(self):
+		"""
+		Destructor of LogFacility class
+		"""
+		if self.__dbpath != None:
+			self.Close()
+
 	def Close(self):
 		"""
 		Close database: close database and then update the separate checksum file 
 		"""
 		self.__dbcon.close()
+		self.__dbcon = None
 		if self.__dbpath != ':memory:':
 			# get checksum of database file and store it in an addtional file
 			csum = ''.join('%02x' % byte for byte in GetChecksum(self.__dbpath))
@@ -348,6 +421,11 @@ class NodeDB:
 		self.CreateTables()
 	
 	def RootPathExistsInDatabase(self, path):
+		"""
+		Method that checks the availability of either any root node
+		in the database (path=None) or a certain root node specified
+		by path
+		"""
 		cursor = self.__dbcon.cursor()
 		if path == None:
 			cursor.execute('select count(rowid) from nodes where parent is null')
@@ -358,6 +436,11 @@ class NodeDB:
 		return result
 
 	def GetRootNodes(self, path):
+		"""
+		Method retrieves all root notes of the database (path=None) or
+		a certain root node specified by path. Format is a database cursor
+		which must be closed after use (!)
+		"""
 		cursor = self.__dbcon.cursor()
 		if path == None:
 			if not self.RootPathExistsInDatabase(path):
@@ -370,6 +453,9 @@ class NodeDB:
 		return cursor
 
 	def Import(self, path):
+		"""
+		Import contents of path recursively into the database
+		"""
 		if self.RootPathExistsInDatabase(path):
 			log.Print(3, 'Path ' + path + ' already exist in the database.')
 		if not os.path.exists(path):
@@ -378,14 +464,25 @@ class NodeDB:
 		n.FetchFromDirectory(path, None)
 		n.parent = None
 		n.depth = 0
-		log.Print(0, 'importing ' + path + ' ...')
-		n.WriteToDatabase(self.__dbcon, 0)
+		log.Print(0, 'importing into database ' + n.path + ' ...')
+		n.WriteToDatabase(self.__dbcon)
 		if n.isdir:
 			n.Import(self.__dbcon)
 		self.__dbcon.commit()
 		log.Print(0, 'done\n')
 
 	def TraverseDatabase(self, path, func, param):
+		"""
+		Execute function func on every node in the database. Is used by
+		Print, Export and Check and SlowDelete. It takes the contents of
+		the database as reference and does not access the contents of the
+		file system, even though this can be implemented in the function
+		like Check determining checksums of files.
+		For the function inferface of func check the examples mentioned.
+		If path is specified, it must be the root of a directory tree under
+		control of dtcon2 and already existing in the database, if the root
+		is not specified, all existing trees in the database are processed.
+		"""
 		cursor = self.GetRootNodes(path)
 		for row in cursor:
 			n = Node()
@@ -398,10 +495,24 @@ class NodeDB:
 		cursor.close()
 
 	def Print(self, path):
+		"""
+		Print tree structure in database to the console.
+		Makes only sense for small directory trees and for debugging.
+		If path is specified, it must be the root of a directory tree under
+		control of dtcon2 and already existing in the database, if the root
+		is not specified, all existing trees in the database are processed.
+		"""
 		self.TraverseDatabase(path, Node.TraversePrint, None)
 		log.Print(0, '')
 
 	def Export(self, path, filename):
+		"""
+		Export tree structure in database to a svg showing a graphical representation of the
+		node tree in the database. Makes only sense for small directory trees and for debugging.
+		If path is specified, it must be the root of a directory tree under
+		control of dtcon2 and already existing in the database, if the root
+		is not specified, all existing trees in the database are processed.
+		"""
 		f = open(filename + '.dot', 'w')
 		f.write('digraph G\n{\n')
 		self.TraverseDatabase(path, Node.TraverseExport, f)
@@ -412,16 +523,40 @@ class NodeDB:
 		log.Print(0, 'done\n')
 
 	def Check(self, path):
+		"""
+		For each entry in the database check the checksum
+		(Does not update the database, e.g. if directory structure contains
+		new entries or if database contains no longer existing ones, check
+		Update if you want that functionality)
+		If path is specified, it must be the root of a directory tree under
+		control of dtcon2 and already existing in the database, if the root
+		is not specified, all existing trees in the database are processed.
+		"""
 		self.TraverseDatabase(path, Node.TraverseCheck, None)
 		log.Print(0, 'done\n')
 
 	def SlowDelete(self, path):
+		"""
+		Delete a path and all its contents recursively from the database.
+		REMARK: This is just implemented because of academic interest
+		because it uses TraverseDatabase and modifies the database. Better
+		use Delete because of speed
+		If path is specified, it must be the root of a directory tree under
+		control of dtcon2 and already existing in the database, if the root
+		is not specified, all existing trees in the database are processed.
+		"""
 		self.TraverseDatabase(path, Node.TraverseDelete, None)
 		self.__dbcon.commit()
 		self.__dbcon.execute('vacuum')
 		log.Print(0, 'done\n')
 	
 	def Delete(self, path):
+		"""
+		Delete a path and all its contents recursively from the database.
+		If path is specified, it must be the root of a directory tree under
+		control of dtcon2 and already existing in the database, if the root
+		is not specified, all existing trees in the database are processed.
+		"""
 		if path == None:
 			log.Print(0, 'deleting all nodes ...\n')
 			self.__dbcon.execute('delete from nodes')
@@ -437,6 +572,13 @@ class NodeDB:
 		log.Print(0, 'done\n')
 
 	def Update(self, path):
+		"""
+		Update contents of database by adding new directory entries,
+		deleting non-existing ones and by checking all the other ones.
+		If path is specified, it must be the root of a directory tree under
+		control of dtcon2 and already existing in the database, if the root
+		is not specified, all existing trees in the database are processed.
+		"""
 		cursor = self.GetRootNodes(path)
 		for row in cursor:
 			n = Node()
@@ -515,7 +657,5 @@ def Main():
 
 	ndb.Update(None)
 	ndb.Update('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
-
-	ndb.Close()
 
 Main()
