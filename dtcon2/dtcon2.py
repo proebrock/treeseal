@@ -168,6 +168,9 @@ class Node:
 		if not self.isdir:
 			self.checksum = GetChecksum(self.path)
 	
+	def ID(self):
+		return '{0:b}{1:s}'.format(self.isdir, self.name)
+
 	def WriteToDatabase(self, dbcon):
 		"""
 		Write (not in database existing) node to database
@@ -381,7 +384,7 @@ class Node:
 			n.FetchFromDatabaseRow(row)
 			n.depth = self.depth + 1
 			n.path = os.path.join(self.path, n.name)
-			dbnodes[n.name] = n
+			dbnodes[n.ID()] = n
 		# iterate over all directory entries and check them one by one
 		entries = os.listdir(self.path)
 		for e in entries:
@@ -389,9 +392,9 @@ class Node:
 			dirnode.FetchFromDirectory(os.path.join(self.path, e), e)
 			dirnode.parent = self.rowid
 			dirnode.depth = self.depth + 1
-			if dirnode.name in dbnodes:
+			if dirnode.ID() in dbnodes:
 				# get the database node 
-				dbnode = dbnodes[dirnode.name]
+				dbnode = dbnodes[dirnode.ID()]
 				if not dirnode.isdir:
 					# check file
 					log.Print(0, 'checking ' + dirnode.path)
@@ -400,7 +403,7 @@ class Node:
 					# if directory do the recursion (use dbnode because it has the correct rowid)
 					dbnode.Update(dbcon)
 				# remove processed entry from dictionary
-				del dbnodes[dirnode.name]
+				del dbnodes[dirnode.ID()]
 			else:
 				# add non-existing entry to list
 				log.Print(1, 'adding to database ' + dirnode.path + ' ...')
