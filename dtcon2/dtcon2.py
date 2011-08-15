@@ -370,7 +370,7 @@ class Node:
 		"""
 		self.Delete(dbcon)
 
-	def Update(self, dbcon):
+	def Update(self, dbcon, docheck=True):
 		"""
 		Recursive part of NodeDB.Update
 		"""
@@ -395,7 +395,7 @@ class Node:
 			if dirnode.ID() in dbnodes:
 				# get the database node 
 				dbnode = dbnodes[dirnode.ID()]
-				if not dirnode.isdir:
+				if not dirnode.isdir and docheck:
 					# check file
 					log.Print(0, 'checking ' + dirnode.path)
 					dbnode.Compare(dirnode)
@@ -496,7 +496,7 @@ class NodeDB:
 		self.DropTables()
 		self.CreateTables()
 	
-	def RootPathExistsInDatabase(self, path):
+	def RootPathExistsInDatabase(self, path=None):
 		"""
 		Method that checks the availability of either any root node
 		in the database (path=None) or a certain root node specified
@@ -511,7 +511,7 @@ class NodeDB:
 		cursor.close()
 		return result
 
-	def GetRootNodes(self, path):
+	def GetRootNodes(self, path=None):
 		"""
 		Method retrieves all root notes of the database (path=None) or
 		a certain root node specified by path. Format is a database cursor
@@ -572,7 +572,7 @@ class NodeDB:
 				n.TraverseDatabase(self.__dbcon, func, param)
 		cursor.close()
 
-	def Print(self, path):
+	def Print(self, path=None):
 		"""
 		Print tree structure in database to the console.
 		Makes only sense for small directory trees and for debugging.
@@ -583,7 +583,7 @@ class NodeDB:
 		self.TraverseDatabase(path, Node.TraversePrint, None)
 		log.Print(0, '')
 
-	def Export(self, path, filename):
+	def Export(self, filename, path=None):
 		"""
 		Export tree structure in database to a svg showing a graphical representation of the
 		node tree in the database. Makes only sense for small directory trees and for debugging.
@@ -608,7 +608,7 @@ class NodeDB:
 		os.remove(filename + '.dot')
 		log.Print(0, 'done\n')
 
-	def Check(self, path):
+	def Check(self, path=None):
 		"""
 		For each entry in the database check the checksum
 		(Does not update the database, e.g. if directory structure contains
@@ -621,7 +621,7 @@ class NodeDB:
 		self.TraverseDatabase(path, Node.TraverseCheck, None)
 		log.Print(0, 'done\n')
 
-	def SlowDelete(self, path):
+	def SlowDelete(self, path=None):
 		"""
 		Delete a path and all its contents recursively from the database.
 		REMARK: This is just implemented because of academic interest
@@ -636,7 +636,7 @@ class NodeDB:
 		self.__dbcon.execute('vacuum')
 		log.Print(0, 'done\n')
 	
-	def Delete(self, path):
+	def Delete(self, path=None):
 		"""
 		Delete a path and all its contents recursively from the database.
 		If path is specified, it must be the root of a directory tree under
@@ -657,7 +657,7 @@ class NodeDB:
 		self.__dbcon.execute('vacuum')
 		log.Print(0, 'done\n')
 
-	def Update(self, path):
+	def Update(self, path=None):
 		"""
 		Update contents of database by adding new directory entries,
 		deleting non-existing ones and by checking all the other ones.
@@ -723,21 +723,21 @@ def Main():
 	#ndb = NodeDB(':memory:')
 	ndb = NodeDB('dtcon2.sqlite')
 
-	#ndb.Delete(None)
-	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b')
+	ndb.Delete(None)
+	ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b')
 	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b\\dtcon2b.py')
 	#ndb.Import('C:\\Projects')
 
-	#ndb.Print(None)
+	#ndb.Print()
 	#ndb.Print('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
-	#ndb.Export(None, 'schema')
+	#ndb.Export('schema')
 	#ndb.Export('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a', 'schema')
 
-	#ndb.Check(None)
+	#ndb.Check()
 	#ndb.Check('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
-	ndb.Update(None)
+	#ndb.Update(None)
 	#ndb.Update('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
 Main()
