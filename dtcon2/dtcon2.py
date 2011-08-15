@@ -5,6 +5,7 @@ import hashlib
 import shlex
 import subprocess
 import time
+import datetime
 
 
 
@@ -106,7 +107,7 @@ log = LogFacility('dtcon2.log')
 
 
 
-NodeSelectColumnString = 'rowid, parent, name, isdir, size, checksum'
+NodeSelectColumnString = 'rowid, parent, name, isdir, size, ctime, atime, mtime, checksum'
 
 class Node:
 
@@ -121,6 +122,9 @@ class Node:
 		self.path = None
 		self.isdir = None
 		self.size = None
+		self.ctime = None
+		self.atime = None
+		self.mtime = None
 		self.checksum = None
 
 	def FetchFromDatabaseRow(self, row):
@@ -137,7 +141,10 @@ class Node:
 		# self.path has to be set while traversing
 		self.isdir = row[3]
 		self.size = row[4]
-		self.checksum = row[5]
+		self.ctime = row[5]
+		self.atime = row[6]
+		self.mtime = row[7]
+		self.checksum = row[8]
 	
 	def FetchFromDirectory(self, path, name):
 		"""
@@ -160,6 +167,11 @@ class Node:
 		self.isdir = os.path.isdir(self.path)
 		if not self.isdir:
 			self.size = os.path.getsize(self.path)
+		# this conversion from unix time stamp to local date/time might fail after year 2038....
+		self.ctime = datetime.datetime.fromtimestamp(os.path.getctime(self.path))
+		self.atime = datetime.datetime.fromtimestamp(os.path.getatime(self.path))
+		self.mtime = datetime.datetime.fromtimestamp(os.path.getmtime(self.path))
+		if not self.isdir:
 			self.checksum = GetChecksum(self.path)
 
 	def WriteToDatabase(self, dbcon):
@@ -168,8 +180,8 @@ class Node:
 		and set rowid due to the one received from the database
 		"""
 		cursor = dbcon.cursor()
-		cursor.execute('insert into nodes (parent, name, isdir, size, checksum) values (?,?,?,?,?)', \
-			(self.parent, self.name, self.isdir, self.size, self.checksum))
+		cursor.execute('insert into nodes (parent, name, isdir, size, ctime, atime, mtime, checksum) values (?,?,?,?,?,?,?,?)', \
+			(self.parent, self.name, self.isdir, self.size, self.ctime, self.atime, self.mtime, self.checksum))
 		self.rowid = cursor.lastrowid
 		cursor.close()
 	
@@ -204,22 +216,41 @@ class Node:
 		log.Print(0, '{0:s}node'.format(prefix))
 		prefix += '->'
 		if self.rowid != None:
-			log.Print(0, '{0:s}rowid      {1:d}'.format(prefix, self.rowid))
+			log.Print(0, '{0:s}rowid               {1:d}'.\
+				format(prefix, self.rowid))
 		else:
-			log.Print(0, '{0:s}rowid      <none>'.format(prefix))
+			log.Print(0, '{0:s}rowid               <none>'.\
+				format(prefix))
 		if self.parent != None:
-			log.Print(0, '{0:s}parent     {1:d}'.format(prefix, self.parent))
+			log.Print(0, '{0:s}parent              {1:d}'.\
+				format(prefix, self.parent))
 		else:
-			log.Print(0, '{0:s}parent     <none>'.format(prefix))
+			log.Print(0, '{0:s}parent              <none>'.\
+				format(prefix))
 		if self.depth != None:
-			log.Print(0, '{0:s}depth      {1:d}'.format(prefix, self.depth))
-		log.Print(0, '{0:s}name       {1:s}'.format(prefix, self.name))
-		log.Print(0, '{0:s}path       {1:s}'.format(prefix, self.path))
-		log.Print(0, '{0:s}isdir      {1:b}'.format(prefix, self.isdir))
+			log.Print(0, '{0:s}depth               {1:d}'\
+				.format(prefix, self.depth))
+		log.Print(0, '{0:s}name                {1:s}'.\
+			format(prefix, self.name))
+		log.Print(0, '{0:s}path                {1:s}'.\
+			format(prefix, self.path))
+		log.Print(0, '{0:s}isdir               {1:b}'.\
+			format(prefix, self.isdir))
 		if self.size != None:
-			log.Print(0, '{0:s}size       {1:d}'.format(prefix, self.size))
+			log.Print(0, '{0:s}size                {1:d}'.\
+				format(prefix, self.size))
+		if self.ctime != None:
+			log.Print(0, '{0:s}creation time       {1:s}'.\
+				format(prefix, self.ctime.strftime('%Y-%m-%d %H:%M:%S')))
+		if self.atime != None:
+			log.Print(0, '{0:s}access time         {1:s}'.\
+				format(prefix, self.atime.strftime('%Y-%m-%d %H:%M:%S')))
+		if self.mtime != None:
+			log.Print(0, '{0:s}modification time   {1:s}'.\
+				format(prefix, self.mtime.strftime('%Y-%m-%d %H:%M:%S')))
 		if self.checksum != None:
-			log.Print(0, '{0:s}checksum   {1:s}'.format(prefix, ChecksumToString(self.checksum, False)))
+			log.Print(0, '{0:s}checksum            {1:s}'.\
+				format(prefix, ChecksumToString(self.checksum, False)))
 
 	def Export(self, filehandle):
 		"""
@@ -393,7 +424,7 @@ class NodeDB:
 				csum = ''.join('%02x' % byte for byte in GetChecksum(self.__dbpath))
 				if csum != csumfile:
 					log.Print(3, 'Database file has been corrupted')
-		self.__dbcon = sqlite3.connect(self.__dbpath)
+		self.__dbcon = sqlite3.connect(self.__dbpath, detect_types=sqlite3.PARSE_DECLTYPES)
 		if not dbexisted:
 			self.CreateTables()
 
@@ -426,6 +457,9 @@ class NodeDB:
 			'name text not null,' + \
 			'isdir boolean not null,' + \
 			'size int,' + \
+			'ctime timestamp,' + \
+			'atime timestamp,' + \
+			'mtime timestamp,' + \
 			'checksum blob' + \
 			')')
 
@@ -668,10 +702,10 @@ def Main():
 	ndb = NodeDB(':memory:')
 	#ndb = NodeDB('dtcon2.sqlite')
 
-	ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b')
+	ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 	#ndb.Import('C:\\Projects')
 
-	#ndb.Print(None)
+	ndb.Print(None)
 	#ndb.Print('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
 	#ndb.Export(None, 'schema')
@@ -680,7 +714,7 @@ def Main():
 	#ndb.Check(None)
 	#ndb.Check('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
-	ndb.Update(None)
+	#ndb.Update(None)
 	#ndb.Update('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
 Main()
