@@ -16,7 +16,9 @@ class LogFacility:
 		Constructor of LogFacility class
 		"""
 		self.__starttime = time.clock()
-		self.Reset()
+		self.__warnings = []
+		self.__errors = []
+		self.__fatalerrors = []
 		if path != None:
 			self.__f = open(path, 'w')
 		else:
@@ -45,14 +47,6 @@ class LogFacility:
 			print('\nno warnings, errors or fatal errors')
 		else:
 			input("\nPress any key ...") 
-
-	def Reset(self):
-		"""
-		Reset buffers
-		"""
-		self.__warnings = []
-		self.__errors = []
-		self.__fatalerrors = []
 
 	def Print(self, lvl, message):
 		"""
