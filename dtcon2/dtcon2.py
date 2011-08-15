@@ -167,7 +167,7 @@ class Node:
 		self.mtime = datetime.datetime.fromtimestamp(os.path.getmtime(self.path))
 		if not self.isdir:
 			self.checksum = GetChecksum(self.path)
-
+	
 	def WriteToDatabase(self, dbcon):
 		"""
 		Write (not in database existing) node to database
@@ -439,6 +439,8 @@ class NodeDB:
 				if csum != csumfile:
 					log.Print(3, 'Database file has been corrupted')
 		self.__dbcon = sqlite3.connect(self.__dbpath, \
+			# necessary for proper retrival of datetime objects from the database,
+			# otherwise the cursor will return string values with the timestamps
 			detect_types=sqlite3.PARSE_DECLTYPES)
 		if not dbexisted:
 			self.CreateTables()
@@ -586,12 +588,20 @@ class NodeDB:
 		control of dtcon2 and already existing in the database, if the root
 		is not specified, all existing trees in the database are processed.
 		"""
+		# write temporary graphviz dot file
 		f = open(filename + '.dot', 'w')
 		f.write('digraph "dtcon2 schema"\n{\n')
 		self.TraverseDatabase(path, Node.TraverseExport, f)
 		f.write('}\n')
 		f.close()
-		ExecuteShell('dot -Tsvg -o' + filename + '.svg ' + filename + '.dot')
+		# process file with graphviz dot
+		cmdline = 'dot -Tsvg -o' + filename + '.svg ' + filename + '.dot'
+		args = shlex.split(cmdline)
+		fnull = open(os.devnull, 'w')
+		proc = subprocess.Popen(args, stdin=fnull, stdout=fnull, stderr=fnull)
+		fnull.close()
+		proc.communicate()
+		# clean up and exit
 		os.remove(filename + '.dot')
 		log.Print(0, 'done\n')
 
@@ -672,16 +682,6 @@ class NodeDB:
 
 
 
-def ExecuteShell(cmdline):
-	"""
-	Execute specified command line in a shell. Do not get console output.
-	"""
-	args = shlex.split(cmdline)
-	fnull = open(os.devnull, 'w')
-	proc = subprocess.Popen(args, stdin=fnull, stdout=fnull, stderr=fnull)
-	fnull.close()
-	proc.communicate()
-
 def GetChecksum(path):
 	"""
 	Calculate checksum of a file by blockwise reading and processing the file content
@@ -719,9 +719,9 @@ def Main():
 	#TODO: proper command line interface
 	#ndb = NodeDB(':memory:')
 	ndb = NodeDB('dtcon2.sqlite')
-	#ndb.Delete(None)
 
-	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	#ndb.Delete(None)
+	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b')
 	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b\\dtcon2b.py')
 	#ndb.Import('C:\\Projects')
 
@@ -731,10 +731,10 @@ def Main():
 	#ndb.Export(None, 'schema')
 	#ndb.Export('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a', 'schema')
 
-	ndb.Check(None)
+	#ndb.Check(None)
 	#ndb.Check('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
-	#ndb.Update(None)
+	ndb.Update(None)
 	#ndb.Update('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
 Main()
