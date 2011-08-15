@@ -174,8 +174,10 @@ class Node:
 		and set rowid due to the one received from the database
 		"""
 		cursor = dbcon.cursor()
-		cursor.execute('insert into nodes (parent, name, isdir, size, ctime, atime, mtime, checksum) values (?,?,?,?,?,?,?,?)', \
-			(self.parent, self.name, self.isdir, self.size, self.ctime, self.atime, self.mtime, self.checksum))
+		cursor.execute('insert into nodes (parent, name, isdir, size, ctime, atime, mtime, checksum) ' + \
+			'values (?,?,?,?,?,?,?,?)', \
+			(self.parent, self.name, self.isdir, self.size, \
+			self.ctime, self.atime, self.mtime, self.checksum))
 		self.rowid = cursor.lastrowid
 		cursor.close()
 	
@@ -188,15 +190,30 @@ class Node:
 		#self.Print(None)
 		#other.Print(None)
 		if self.isdir and not other.isdir:
-			log.Print(2, 'Directory ' + path + ' became a file.')
+			log.Print(2, 'Directory ' + self.path + ' became a file.')
 		if not self.isdir and other.isdir:
-			log.Print(2, 'File ' + path + ' became a directory.')
+			log.Print(2, 'File ' + self.path + ' became a directory.')
 		if not (self.isdir or other.isdir):
 			if self.checksum != other.checksum:
+				message = 'Checksum error for ' + self.path;
 				if self.size != other.size:
-					log.Print(2, 'Checksum error for ' + path + ' (file size has changed)')
+					message += ', file size changed ({0:d} -> {1:d})'.\
+						format(self.size, other.size)
+				elif self.ctime != other.ctime:
+					message += ', ctime changed ({0:s} -> {1:s})'.\
+						format(self.ctime.strftime('%Y-%m-%d %H:%M:%S'), \
+							other.ctime.strftime('%Y-%m-%d %H:%M:%S'))
+				elif self.atime != other.atime:
+					message += ', atime changed ({0:s} -> {1:s})'.\
+						format(self.atime.strftime('%Y-%m-%d %H:%M:%S'), \
+							other.atime.strftime('%Y-%m-%d %H:%M:%S'))
+				elif self.mtime != other.mtime:
+					message += ', mtime changed ({0:s} -> {1:s})'.\
+						format(self.mtime.strftime('%Y-%m-%d %H:%M:%S'), \
+							other.mtime.strftime('%Y-%m-%d %H:%M:%S'))
 				else:
-					log.Print(2, 'Checksum error for ' + path + ' (file size has not changed)')
+					message += ', file meta info seems to be the same, this is serious!'
+				log.Print(2, message)
 			
 	
 	def Print(self, numindent):
@@ -277,7 +294,8 @@ class Node:
 		Delete all descendants of node (recursively) in database
 		"""
 		cursor = dbcon.cursor()
-		cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent=?', (self.rowid,))
+		cursor.execute('select ' + NodeSelectColumnString + \
+			' from nodes where parent=?', (self.rowid,))
 		for row in cursor:
 			n = Node()
 			n.FetchFromDatabaseRow(row)
@@ -295,7 +313,7 @@ class Node:
 			n.FetchFromDirectory(os.path.join(self.path, e), e)
 			n.parent = self.rowid
 			n.depth = self.depth + 1
-			log.Print(0, 'importing into database ' + n.path + ' ...')
+			log.Print(0, 'importing ' + n.path + ' ...')
 			n.WriteToDatabase(dbcon)
 			if n.isdir:
 				n.Import(dbcon)
@@ -305,7 +323,8 @@ class Node:
 		Recursive part of NodeDB.TraverseDatabase
 		"""
 		cursor = dbcon.cursor()
-		cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent=?', (self.rowid,))
+		cursor.execute('select ' + NodeSelectColumnString + \
+			' from nodes where parent=?', (self.rowid,))
 		for row in cursor:
 			n = Node()
 			n.FetchFromDatabaseRow(row)
@@ -354,7 +373,8 @@ class Node:
 		"""
 		# fetch child nodes and create a map: name -> node
 		cursor = dbcon.cursor()
-		cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent=?', (self.rowid,))
+		cursor.execute('select ' + NodeSelectColumnString + \
+			' from nodes where parent=?', (self.rowid,))
 		dbnodes = {}
 		for row in cursor:
 			n = Node()
@@ -418,7 +438,8 @@ class NodeDB:
 				csum = ''.join('%02x' % byte for byte in GetChecksum(self.__dbpath))
 				if csum != csumfile:
 					log.Print(3, 'Database file has been corrupted')
-		self.__dbcon = sqlite3.connect(self.__dbpath, detect_types=sqlite3.PARSE_DECLTYPES)
+		self.__dbcon = sqlite3.connect(self.__dbpath, \
+			detect_types=sqlite3.PARSE_DECLTYPES)
 		if not dbexisted:
 			self.CreateTables()
 
@@ -495,11 +516,13 @@ class NodeDB:
 		if path == None:
 			if not self.RootPathExistsInDatabase(path):
 				log.Print(3, 'There are no nodes in the database.')
-			cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent is null')
+			cursor.execute('select ' + NodeSelectColumnString + \
+				' from nodes where parent is null')
 		else:
 			if not self.RootPathExistsInDatabase(path):
 				log.Print(3, 'Path ' + path + ' does not exist in the database.')
-			cursor.execute('select ' + NodeSelectColumnString + ' from nodes where parent is null and name=?', (path,))
+			cursor.execute('select ' + NodeSelectColumnString + \
+				' from nodes where parent is null and name=?', (path,))
 		return cursor
 
 	def Import(self, path):
@@ -514,7 +537,7 @@ class NodeDB:
 		n.FetchFromDirectory(path, None)
 		n.parent = None
 		n.depth = 0
-		log.Print(0, 'importing into database ' + n.path + ' ...')
+		log.Print(0, 'importing ' + n.path + ' ...')
 		n.WriteToDatabase(self.__dbcon)
 		if n.isdir:
 			n.Import(self.__dbcon)
@@ -564,7 +587,7 @@ class NodeDB:
 		is not specified, all existing trees in the database are processed.
 		"""
 		f = open(filename + '.dot', 'w')
-		f.write('digraph G\n{\n')
+		f.write('digraph "dtcon2 schema"\n{\n')
 		self.TraverseDatabase(path, Node.TraverseExport, f)
 		f.write('}\n')
 		f.close()
@@ -635,11 +658,12 @@ class NodeDB:
 			dbnode.FetchFromDatabaseRow(row)
 			dbnode.path = dbnode.name
 			dbnode.depth = 0
-			dirnode = Node()
-			dirnode.FetchFromDirectory(dbnode.path, dbnode.name)
-			log.Print(0, 'checking ' + dirnode.path)
-			dbnode.Compare(dirnode)
-			if dbnode.isdir:
+			if not dbnode.isdir:
+				dirnode = Node()
+				dirnode.FetchFromDirectory(dbnode.path, dbnode.name)
+				log.Print(0, 'checking ' + dirnode.path)
+				dbnode.Compare(dirnode)
+			else:
 				dbnode.Update(self.__dbcon)
 		cursor.close()
 		self.__dbcon.commit()
@@ -693,19 +717,21 @@ def Main():
 	Main entry point of program
 	"""
 	#TODO: proper command line interface
-	ndb = NodeDB(':memory:')
-	#ndb = NodeDB('dtcon2.sqlite')
+	#ndb = NodeDB(':memory:')
+	ndb = NodeDB('dtcon2.sqlite')
+	#ndb.Delete(None)
 
-	ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b\\dtcon2b.py')
 	#ndb.Import('C:\\Projects')
 
-	ndb.Print(None)
+	#ndb.Print(None)
 	#ndb.Print('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
 	#ndb.Export(None, 'schema')
 	#ndb.Export('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a', 'schema')
 
-	#ndb.Check(None)
+	ndb.Check(None)
 	#ndb.Check('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
 	#ndb.Update(None)
