@@ -219,7 +219,7 @@ class Node:
 				log.Print(2, message)
 			
 	
-	def Print(self, numindent):
+	def Print(self, numindent=0):
 		"""
 		Print details about current node into the log facility
 		"""
