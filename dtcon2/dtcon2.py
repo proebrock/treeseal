@@ -173,31 +173,46 @@ class Node:
 		self.rowid = cursor.lastrowid
 		cursor.close()
 	
-	def Check(self):
+	def Compare(self, other):
 		"""
-		Check node by calculating checksum of filename specified by path
-		and comparing it with stored checksum with
+		Compare the properties of two nodes. This function is called when
+		checking information stored in the database with the current situation
+		on the disk.
 		"""
-		if not self.isdir:
-			log.Print(0, 'checking ' + self.path + ' ...')
-			if self.checksum == None:
-				log.Print(2, 'No checksum defined for ' + path)
-			elif self.checksum != GetChecksum(self.path):
-				log.Print(2, 'Checksum error for ' + path)
+		#self.Print(None)
+		#other.Print(None)
+		if self.isdir and not other.isdir:
+			log.Print(2, 'Directory ' + path + ' became a file.')
+		if not self.isdir and other.isdir:
+			log.Print(2, 'File ' + path + ' became a directory.')
+		if not (self.isdir or other.isdir):
+			if self.checksum != other.checksum:
+				if self.size != other.size:
+					log.Print(2, 'Checksum error for ' + path + ' (file size has changed)')
+				else:
+					log.Print(2, 'Checksum error for ' + path + ' (file size has not changed)')
+			
 	
 	def Print(self, numindent):
 		"""
 		Print details about current node into the log facility
 		"""
-		prefix = '  ' * numindent
-		log.Print(0, '{0:s}node'.format(prefix, self.rowid))
+		if numindent == None:
+			prefix = ''
+		else:
+			prefix = '  ' * numindent
+		log.Print(0, '{0:s}node'.format(prefix))
 		prefix += '->'
-		log.Print(0, '{0:s}rowid      {1:d}'.format(prefix, self.rowid))
+		if self.rowid != None:
+			log.Print(0, '{0:s}rowid      {1:d}'.format(prefix, self.rowid))
+		else:
+			log.Print(0, '{0:s}rowid      <none>'.format(prefix))
 		if self.parent != None:
 			log.Print(0, '{0:s}parent     {1:d}'.format(prefix, self.parent))
 		else:
 			log.Print(0, '{0:s}parent     <none>'.format(prefix))
-		log.Print(0, '{0:s}depth      {1:d}'.format(prefix, self.depth))
+		if self.depth != None:
+			log.Print(0, '{0:s}depth      {1:d}'.format(prefix, self.depth))
 		log.Print(0, '{0:s}name       {1:s}'.format(prefix, self.name))
 		log.Print(0, '{0:s}path       {1:s}'.format(prefix, self.path))
 		log.Print(0, '{0:s}isdir      {1:b}'.format(prefix, self.isdir))
@@ -296,7 +311,10 @@ class Node:
 		Method executed on every node by TraverseDatabase when
 		NodeDB.Check is called
 		"""
-		self.Check()
+		dirnode = Node()
+		dirnode.FetchFromDirectory(self.path, self.name)
+		log.Print(0, 'checking ' + dirnode.path)
+		self.Compare(dirnode)
 	
 	def TraverseDelete(self, dbcon, param):
 		"""
@@ -327,12 +345,16 @@ class Node:
 			dirnode.parent = self.rowid
 			dirnode.depth = self.depth + 1
 			if dirnode.name in dbnodes:
-				# check file
-				dirnode.Check()
-				# if directory do the recursion (use dbnode because it has the correct rowid)
-				if dirnode.isdir:
-					dbnodes[dirnode.name].Update(dbcon)
-				# remove checked entry from dictionary: this node is processed
+				# get the database node 
+				dbnode = dbnodes[dirnode.name]
+				if not dirnode.isdir:
+					# check file
+					log.Print(0, 'checking ' + dirnode.path)
+					dbnode.Compare(dirnode)
+				else:
+					# if directory do the recursion (use dbnode because it has the correct rowid)
+					dbnode.Update(dbcon)
+				# remove processed entry from dictionary
 				del dbnodes[dirnode.name]
 			else:
 				# add non-existing entry to list
@@ -581,13 +603,16 @@ class NodeDB:
 		"""
 		cursor = self.GetRootNodes(path)
 		for row in cursor:
-			n = Node()
-			n.FetchFromDatabaseRow(row)
-			n.path = n.name
-			n.depth = 0
-			n.Check()
-			if n.isdir:
-				n.Update(self.__dbcon)
+			dbnode = Node()
+			dbnode.FetchFromDatabaseRow(row)
+			dbnode.path = dbnode.name
+			dbnode.depth = 0
+			dirnode = Node()
+			dirnode.FetchFromDirectory(dbnode.path, dbnode.name)
+			log.Print(0, 'checking ' + dirnode.path)
+			dbnode.Compare(dirnode)
+			if dbnode.isdir:
+				dbnode.Update(self.__dbcon)
 		cursor.close()
 		self.__dbcon.commit()
 		self.__dbcon.execute('vacuum')
@@ -640,22 +665,22 @@ def Main():
 	Main entry point of program
 	"""
 	#TODO: proper command line interface
-	#ndb = NodeDB(':memory:')
-	ndb = NodeDB('dtcon2.sqlite')
-	ndb.RecreateTables()
+	ndb = NodeDB(':memory:')
+	#ndb = NodeDB('dtcon2.sqlite')
 
-	ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b')
+	#ndb.Import('C:\\Projects')
 
-	ndb.Print(None)
-	ndb.Print('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	#ndb.Print(None)
+	#ndb.Print('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
-	ndb.Export(None, 'schema')
-	ndb.Export('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a', 'schema')
+	#ndb.Export(None, 'schema')
+	#ndb.Export('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a', 'schema')
 
-	ndb.Check(None)
-	ndb.Check('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	#ndb.Check(None)
+	#ndb.Check('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
 	ndb.Update(None)
-	ndb.Update('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	#ndb.Update('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
 Main()
