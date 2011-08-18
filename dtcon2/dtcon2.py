@@ -475,7 +475,7 @@ class NodeDB:
 				f = open(self.__csumpath, 'r')
 				csumfile = f.read()
 				f.close()
-				csum = ''.join('%02x' % byte for byte in GetChecksum(self.__dbpath))
+				csum = ChecksumToString(GetChecksum(self.__dbpath))
 				if csum != csumfile:
 					log.Print(3, 'Database file has been corrupted')
 		self.__dbcon = sqlite3.connect(self.__dbpath, \
@@ -500,7 +500,7 @@ class NodeDB:
 		self.__dbcon = None
 		if self.__dbpath != ':memory:':
 			# get checksum of database file and store it in an addtional file
-			csum = ''.join('%02x' % byte for byte in GetChecksum(self.__dbpath))
+			csum = ChecksumToString(GetChecksum(self.__dbpath))
 			f = open(self.__csumpath, 'w')
 			f.write(csum)
 			f.close()
@@ -747,7 +747,7 @@ def GetChecksum(path):
 	f.close()
 	return checksum.digest()
 
-def ChecksumToString(checksum, shorten):
+def ChecksumToString(checksum, shorten=False):
 	"""
 	Calculate checksum of a file by reading the directory contents.
 	Checksum can be shortened in order to have a more compact display.
