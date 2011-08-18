@@ -268,8 +268,22 @@ class Node:
 		log.Print(0, '{0:s}isdir               {1:b}'.\
 			format(prefix, self.isdir))
 		if self.size != None:
-			log.Print(0, '{0:s}size                {1:d}'.\
-				format(prefix, self.size))
+			if self.size < 1000:
+				sizestr = '{0:d}'.format(self.size)
+			elif self.size < 1000**2:
+				sizestr = '{0:.1f}K'.format(self.size/1000)
+			elif self.size < 1000**3:
+				sizestr = '{0:.1f}M'.format(self.size/1000**2)
+			elif self.size < 1000**4:
+				sizestr = '{0:.1f}G'.format(self.size/1000**3)
+			elif self.size < 1000**5:
+				sizestr = '{0:.1f}T'.format(self.size/1000**4)
+			elif self.size < 1000**6:
+				sizestr = '{0:.1f}P'.format(self.size/1000**5)
+			else:
+				sizestr = '{0:.1f}E'.format(self.size/1000**6)
+			log.Print(0, '{0:s}size                {1:s}B'.\
+				format(prefix, sizestr))
 		if self.ctime != None:
 			log.Print(0, '{0:s}creation time       {1:s}'.\
 				format(prefix, self.ctime.strftime('%Y-%m-%d %H:%M:%S')))
@@ -753,11 +767,11 @@ def Main():
 	Main entry point of program
 	"""
 	#TODO: proper command line interface
-	ndb = NodeDB(':memory:')
-	#ndb = NodeDB('dtcon2.sqlite')
+	#ndb = NodeDB(':memory:')
+	ndb = NodeDB('dtcon2.sqlite')
 
 	#ndb.Delete()
-	ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b\\dtcon2b.py')
 	#ndb.Import('C:\\Projects')
 
