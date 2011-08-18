@@ -186,7 +186,6 @@ class Node:
 			self.ctime, self.atime, self.mtime, self.checksum))
 		self.rowid = cursor.lastrowid
 		cursor.close()
-		self.UpdateDatabase(dbcon)
 	
 	def UpdateDatabase(self, dbcon):
 		"""
