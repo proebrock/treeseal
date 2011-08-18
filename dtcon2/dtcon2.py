@@ -210,7 +210,7 @@ class Node:
 			log.Print(2, 'File ' + self.path + ' became a directory.')
 		if not (self.isdir or other.isdir):
 			if self.checksum != other.checksum:
-				message = 'Checksum error for ' + self.path;
+				message = 'Checksum error for ' + self.path
 				sameMetaData = True
 				if self.size != other.size:
 					message += ', file size changed ({0:d} -> {1:d})'.\
@@ -295,7 +295,7 @@ class Node:
 				format(prefix, self.mtime.strftime('%Y-%m-%d %H:%M:%S')))
 		if self.checksum != None:
 			log.Print(0, '{0:s}checksum            {1:s}'.\
-				format(prefix, ChecksumToString(self.checksum, False)))
+				format(prefix, ChecksumToString(self.checksum)))
 
 	def Export(self, filehandle):
 		"""
@@ -482,6 +482,11 @@ class NodeDB:
 			# necessary for proper retrival of datetime objects from the database,
 			# otherwise the cursor will return string values with the timestamps
 			detect_types=sqlite3.PARSE_DECLTYPES)
+		# stores strings as ascii strings in the database, not as unicodes
+		# makes program easily compatible with python 2.X but introduces
+		# problems when file system supports unicode... :-(
+		if sys.version[0] == '2':
+			self.__dbcon.text_factory = str
 		if not dbexisted:
 			self.CreateTables()
 
@@ -775,7 +780,7 @@ def Main():
 	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b\\dtcon2b.py')
 	#ndb.Import('C:\\Projects')
 
-	ndb.Print()
+	#ndb.Print()
 	#ndb.Print('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
 	#ndb.Export('schema')
