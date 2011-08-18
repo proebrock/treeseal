@@ -210,23 +210,28 @@ class Node:
 		if not (self.isdir or other.isdir):
 			if self.checksum != other.checksum:
 				message = 'Checksum error for ' + self.path;
+				sameMetaData = True
 				if self.size != other.size:
 					message += ', file size changed ({0:d} -> {1:d})'.\
 						format(self.size, other.size)
-				elif self.ctime != other.ctime:
+					sameMetaData = False
+				if self.ctime != other.ctime:
 					message += ', ctime changed ({0:s} -> {1:s})'.\
 						format(self.ctime.strftime('%Y-%m-%d %H:%M:%S'), \
 							other.ctime.strftime('%Y-%m-%d %H:%M:%S'))
-				elif self.atime != other.atime:
+					sameMetaData = False
+				if self.atime != other.atime:
 					message += ', atime changed ({0:s} -> {1:s})'.\
 						format(self.atime.strftime('%Y-%m-%d %H:%M:%S'), \
 							other.atime.strftime('%Y-%m-%d %H:%M:%S'))
-				elif self.mtime != other.mtime:
+					sameMetaData = False
+				if self.mtime != other.mtime:
 					message += ', mtime changed ({0:s} -> {1:s})'.\
 						format(self.mtime.strftime('%Y-%m-%d %H:%M:%S'), \
 							other.mtime.strftime('%Y-%m-%d %H:%M:%S'))
-				else:
-					message += ', file meta info seems to be the same, this is serious!'
+					sameMetaData = False
+				if sameMetaData:
+					message += ', file meta info seems to be the same but checksum changed, THIS IS SERIOUS!'
 				log.Print(2, message)
 			
 	
@@ -404,15 +409,21 @@ class Node:
 			dirnode.parent = self.rowid
 			dirnode.depth = self.depth + 1
 			if dirnode.ID() in dbnodes:
-				# get the database node 
+				# node exists in database: get the database node 
 				dbnode = dbnodes[dirnode.ID()]
 				if not dirnode.isdir:
 					if docheck:
+						# check the entry
 						log.Print(0, 'checking ' + dirnode.path)
 						dbnode.Compare(dirnode)
 				else:
 					# if directory do the recursion (use dbnode because it has the correct rowid)
 					dbnode.Update(dbcon, docheck)
+				if not docheck:
+					# update the entry in the database with the current dirnode information
+					log.Print(0, 'updating ' + dirnode.path)
+					dirnode.rowid = dbnode.rowid
+					dirnode.UpdateDatabase(dbcon)
 				# remove processed entry from dictionary
 				del dbnodes[dirnode.ID()]
 			else:
@@ -671,7 +682,10 @@ class NodeDB:
 	def Update(self, path=None, docheck=True):
 		"""
 		Update contents of database by adding new directory entries,
-		deleting non-existing ones and by checking all the other ones.
+		deleting non-existing ones. If docheck is true (default), all
+		entries existing in the database and the file system are checked,
+		if the flag is false, the entries are updated in the database
+		according to the new file status.
 		If path is specified, it must be the root of a directory tree under
 		control of dtcon2 and already existing in the database, if the root
 		is not specified, all existing trees in the database are processed.
@@ -682,14 +696,20 @@ class NodeDB:
 			dbnode.FetchFromDatabaseRow(row)
 			dbnode.path = dbnode.name
 			dbnode.depth = 0
+			dirnode = Node()
+			dirnode.FetchFromDirectory(dbnode.path, dbnode.name)
 			if not dbnode.isdir:
 				if docheck:
-					dirnode = Node()
-					dirnode.FetchFromDirectory(dbnode.path, dbnode.name)
+					# check the entry
 					log.Print(0, 'checking ' + dirnode.path)
 					dbnode.Compare(dirnode)
 			else:
 				dbnode.Update(self.__dbcon, docheck)
+			if not docheck:
+				# update the entry in the database with the current dirnode information
+				log.Print(0, 'updating ' + dirnode.path)
+				dirnode.rowid = dbnode.rowid
+				dirnode.UpdateDatabase(self.__dbcon)
 		cursor.close()
 		self.__dbcon.commit()
 		self.__dbcon.execute('vacuum')
@@ -732,11 +752,11 @@ def Main():
 	Main entry point of program
 	"""
 	#TODO: proper command line interface
-	ndb = NodeDB(':memory:')
-	#ndb = NodeDB('dtcon2.sqlite')
+	#ndb = NodeDB(':memory:')
+	ndb = NodeDB('dtcon2.sqlite')
 
 	#ndb.Delete()
-	ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b\\dtcon2b.py')
 	#ndb.Import('C:\\Projects')
 
@@ -749,7 +769,7 @@ def Main():
 	#ndb.Check()
 	#ndb.Check('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
-	#ndb.Update(None, False)
+	ndb.Update(None)
 	#ndb.Update('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
 Main()
