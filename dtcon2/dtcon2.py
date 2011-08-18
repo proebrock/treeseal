@@ -395,13 +395,13 @@ class Node:
 			if dirnode.ID() in dbnodes:
 				# get the database node 
 				dbnode = dbnodes[dirnode.ID()]
-				if not dirnode.isdir and docheck:
-					# check file
-					log.Print(0, 'checking ' + dirnode.path)
-					dbnode.Compare(dirnode)
+				if not dirnode.isdir:
+					if docheck:
+						log.Print(0, 'checking ' + dirnode.path)
+						dbnode.Compare(dirnode)
 				else:
 					# if directory do the recursion (use dbnode because it has the correct rowid)
-					dbnode.Update(dbcon)
+					dbnode.Update(dbcon, docheck)
 				# remove processed entry from dictionary
 				del dbnodes[dirnode.ID()]
 			else:
@@ -657,7 +657,7 @@ class NodeDB:
 		self.__dbcon.execute('vacuum')
 		log.Print(0, 'done\n')
 
-	def Update(self, path=None):
+	def Update(self, path=None, docheck=True):
 		"""
 		Update contents of database by adding new directory entries,
 		deleting non-existing ones and by checking all the other ones.
@@ -672,12 +672,13 @@ class NodeDB:
 			dbnode.path = dbnode.name
 			dbnode.depth = 0
 			if not dbnode.isdir:
-				dirnode = Node()
-				dirnode.FetchFromDirectory(dbnode.path, dbnode.name)
-				log.Print(0, 'checking ' + dirnode.path)
-				dbnode.Compare(dirnode)
+				if docheck:
+					dirnode = Node()
+					dirnode.FetchFromDirectory(dbnode.path, dbnode.name)
+					log.Print(0, 'checking ' + dirnode.path)
+					dbnode.Compare(dirnode)
 			else:
-				dbnode.Update(self.__dbcon)
+				dbnode.Update(self.__dbcon, docheck)
 		cursor.close()
 		self.__dbcon.commit()
 		self.__dbcon.execute('vacuum')
@@ -723,10 +724,10 @@ def Main():
 	#ndb = NodeDB(':memory:')
 	ndb = NodeDB('dtcon2.sqlite')
 
-	ndb.Delete(None)
-	ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b')
+	ndb.Delete()
+	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b')
 	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b\\dtcon2b.py')
-	#ndb.Import('C:\\Projects')
+	ndb.Import('C:\\Projects')
 
 	#ndb.Print()
 	#ndb.Print('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
@@ -737,7 +738,7 @@ def Main():
 	#ndb.Check()
 	#ndb.Check('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
-	#ndb.Update(None)
+	#ndb.Update(None, False)
 	#ndb.Update('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
 Main()
