@@ -6,6 +6,7 @@ import shlex
 import subprocess
 import time
 import datetime
+import binascii
 
 
 
@@ -741,9 +742,9 @@ def ChecksumToString(checksum, shorten):
 		return '<none>'
 	else:
 		if shorten:
-			return ''.join('%02x' % byte for byte in checksum[0:7]) + '...'
+			return binascii.hexlify(checksum[0:7]).decode('utf-8') + '...'
 		else:
-			return ''.join('%02x' % byte for byte in checksum)
+			return binascii.hexlify(checksum).decode('utf-8')
 
 
 
@@ -752,15 +753,15 @@ def Main():
 	Main entry point of program
 	"""
 	#TODO: proper command line interface
-	#ndb = NodeDB(':memory:')
-	ndb = NodeDB('dtcon2.sqlite')
+	ndb = NodeDB(':memory:')
+	#ndb = NodeDB('dtcon2.sqlite')
 
 	#ndb.Delete()
-	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b\\dtcon2b.py')
 	#ndb.Import('C:\\Projects')
 
-	#ndb.Print()
+	ndb.Print()
 	#ndb.Print('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
 	#ndb.Export('schema')
@@ -769,7 +770,7 @@ def Main():
 	#ndb.Check()
 	#ndb.Check('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
-	ndb.Update(None)
+	#ndb.Update(None, True)
 	#ndb.Update('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
 Main()
