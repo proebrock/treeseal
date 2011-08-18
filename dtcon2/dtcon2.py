@@ -101,7 +101,10 @@ log = LogFacility('dtcon2.log')
 
 
 
-NodeSelectColumnString = 'rowid, parent, name, isdir, size, ctime, atime, mtime, checksum'
+NodeSelectString = 'rowid,parent,name,isdir,size,ctime,atime,mtime,checksum'
+# same as the NodeSelectString but without rowid (the first one) and in the
+# form used by update: col1=?,col2=?,...
+NodeUpdateString = '=?,'.join(NodeSelectString.rsplit(',')[1:]) + '=?'
 
 class Node:
 
@@ -173,7 +176,7 @@ class Node:
 
 	def WriteToDatabase(self, dbcon):
 		"""
-		Write (not in database existing) node to database
+		Write node (NOT EXISTING in database) to database
 		and set rowid due to the one received from the database
 		"""
 		cursor = dbcon.cursor()
@@ -183,6 +186,15 @@ class Node:
 			self.ctime, self.atime, self.mtime, self.checksum))
 		self.rowid = cursor.lastrowid
 		cursor.close()
+		self.UpdateDatabase(dbcon)
+	
+	def UpdateDatabase(self, dbcon):
+		"""
+		Write node (ALREADY EXISTING in database) to database
+		"""
+		dbcon.execute('update nodes set ' + NodeUpdateString + ' where rowid=?',\
+			(self.parent, self.name, self.isdir, self.size, \
+			self.ctime, self.atime, self.mtime, self.checksum, self.rowid))
 	
 	def Compare(self, other):
 		"""
@@ -297,7 +309,7 @@ class Node:
 		Delete all descendants of node (recursively) in database
 		"""
 		cursor = dbcon.cursor()
-		cursor.execute('select ' + NodeSelectColumnString + \
+		cursor.execute('select ' + NodeSelectString + \
 			' from nodes where parent=?', (self.rowid,))
 		for row in cursor:
 			n = Node()
@@ -326,7 +338,7 @@ class Node:
 		Recursive part of NodeDB.TraverseDatabase
 		"""
 		cursor = dbcon.cursor()
-		cursor.execute('select ' + NodeSelectColumnString + \
+		cursor.execute('select ' + NodeSelectString + \
 			' from nodes where parent=?', (self.rowid,))
 		for row in cursor:
 			n = Node()
@@ -376,7 +388,7 @@ class Node:
 		"""
 		# fetch child nodes and create a map: name -> node
 		cursor = dbcon.cursor()
-		cursor.execute('select ' + NodeSelectColumnString + \
+		cursor.execute('select ' + NodeSelectString + \
 			' from nodes where parent=?', (self.rowid,))
 		dbnodes = {}
 		for row in cursor:
@@ -521,12 +533,12 @@ class NodeDB:
 		if path == None:
 			if not self.RootPathExistsInDatabase(path):
 				log.Print(3, 'There are no nodes in the database.')
-			cursor.execute('select ' + NodeSelectColumnString + \
+			cursor.execute('select ' + NodeSelectString + \
 				' from nodes where parent is null')
 		else:
 			if not self.RootPathExistsInDatabase(path):
 				log.Print(3, 'Path ' + path + ' does not exist in the database.')
-			cursor.execute('select ' + NodeSelectColumnString + \
+			cursor.execute('select ' + NodeSelectString + \
 				' from nodes where parent is null and name=?', (path,))
 		return cursor
 
@@ -721,13 +733,13 @@ def Main():
 	Main entry point of program
 	"""
 	#TODO: proper command line interface
-	#ndb = NodeDB(':memory:')
-	ndb = NodeDB('dtcon2.sqlite')
+	ndb = NodeDB(':memory:')
+	#ndb = NodeDB('dtcon2.sqlite')
 
-	ndb.Delete()
-	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b')
+	#ndb.Delete()
+	ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b\\dtcon2b.py')
-	ndb.Import('C:\\Projects')
+	#ndb.Import('C:\\Projects')
 
 	#ndb.Print()
 	#ndb.Print('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
