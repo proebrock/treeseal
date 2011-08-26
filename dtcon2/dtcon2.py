@@ -13,12 +13,18 @@ import binascii
 class LogEntry:
 
 	def __init__(self, level, message, path=None):
+		"""
+		Constructor of LogEntry class
+		"""
 		self.__time = datetime.datetime.now()
 		self.__level = level
 		self.__message = message
 		self.__path = path
 	
 	def ToString(self, short=False):
+		"""
+		Covert log entry to string (long format is default)
+		"""
 		result = self.__time.strftime('%Y-%m-%d %H:%M:%S')
 		result += ' '
 		if self.__level == 0:
@@ -37,10 +43,16 @@ class LogEntry:
 		return result
 	
 	def Print(self, short=False):
+		"""
+		Print log entry to console
+		"""
 		print(self.ToString(short))
 	
 	def Write(self, f, short=False):
-		f.write(self.ToString(short))
+		"""
+		Write log entry to file
+		"""
+		f.write(self.ToString(short) + '\n')
 
 class LogFacility:
 
@@ -56,6 +68,11 @@ class LogFacility:
 			self.__f = open(path, 'w')
 		else:
 			self.__f = None
+
+	def ClearBuffers(self):
+		self.__warnings = []
+		self.__errors = []
+		self.__fatalerrors = []
 
 	def __del__(self):
 		"""
@@ -88,7 +105,7 @@ class LogFacility:
 		"""
 		# create log entry
 		entry = LogEntry(level, message, path)
-		# determine message prefix and update counters
+		# determine if and where message entry should be saved (not for Notice level)
 		if level == 0:
 			pass
 		elif level == 1:
@@ -198,7 +215,7 @@ class Node:
 		self.isdir = os.path.isdir(self.path)
 		if not self.isdir:
 			self.size = os.path.getsize(self.path)
-		# this conversion from unix time stamp to local date/time might fail after year 2038....
+		# this conversion from unix time stamp to local date/time might fail after year 2038...
 		self.ctime = datetime.datetime.fromtimestamp(os.path.getctime(self.path))
 		self.atime = datetime.datetime.fromtimestamp(os.path.getatime(self.path))
 		self.mtime = datetime.datetime.fromtimestamp(os.path.getmtime(self.path))
@@ -709,7 +726,7 @@ class NodeDB:
 		self.TraverseDatabase(path, Node.TraverseDelete, None)
 		self.__dbcon.commit()
 		self.__dbcon.execute('vacuum')
-		log.Print(0, 'Done\n')
+		log.Print(0, 'Done.\n')
 	
 	def Delete(self, path=None):
 		"""
@@ -719,7 +736,7 @@ class NodeDB:
 		is not specified, all existing trees in the database are processed.
 		"""
 		if path == None:
-			log.Print(0, 'Deleting all nodes ...\n')
+			log.Print(0, 'Deleting all nodes')
 			self.__dbcon.execute('delete from nodes')
 		else:
 			cursor = self.GetRootNodes(path)
@@ -730,7 +747,7 @@ class NodeDB:
 			cursor.close()
 		self.__dbcon.commit()
 		self.__dbcon.execute('vacuum')
-		log.Print(0, 'Done\n')
+		log.Print(0, 'Done.\n')
 
 	def Update(self, path=None, docheck=True):
 		"""
@@ -766,7 +783,7 @@ class NodeDB:
 		cursor.close()
 		self.__dbcon.commit()
 		self.__dbcon.execute('vacuum')
-		log.Print(0, 'Done\n')
+		log.Print(0, 'Done.\n')
 
 
 
@@ -809,8 +826,8 @@ def Main():
 	#ndb = NodeDB(':memory:')
 	ndb = NodeDB('dtcon2.sqlite')
 
-	#ndb.Delete()
-	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	ndb.Delete()
+	ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b\\dtcon2b.py')
 	#ndb.Import('C:\\Projects')
 
