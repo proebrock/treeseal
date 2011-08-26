@@ -10,6 +10,38 @@ import binascii
 
 
 
+class LogEntry:
+
+	def __init__(self, level, message, path=None):
+		self.__time = datetime.datetime.now()
+		self.__level = level
+		self.__message = message
+		self.__path = path
+	
+	def ToString(self, short=False):
+		result = self.__time.strftime('%Y-%m-%d %H:%M:%S')
+		result += ' '
+		if self.__level == 0:
+			pass
+		elif self.__level == 1:
+			result += 'Warning: '
+		elif self.__level == 2:
+			result += 'Error: '
+		elif self.__level == 3:
+			result += '### Fatal Error: '
+		else:
+			raise Exception('Unknown log level {0:d}'.format(self.__level))
+		result += self.__message
+		if self.__path != None:
+			result += ' ' + self.__path
+		return result
+	
+	def Print(self, short=False):
+		print(self.ToString(short))
+	
+	def Write(self, f, short=False):
+		f.write(self.ToString(short))
+
 class LogFacility:
 
 	def __init__(self, path):
@@ -35,45 +67,44 @@ class LogFacility:
 		if len(self.__fatalerrors) > 0:
 			print('\n{0:d} fatal errors:'.format(len(self.__fatalerrors)))
 			for f in self.__fatalerrors:
-				print(f)
+				f.Print(True)
 		if len(self.__errors) > 0:
 			print('\n{0:d} errors:'.format(len(self.__errors)))
 			for e in self.__errors:
-				print(e)
+				e.Print(True)
 		if len(self.__warnings) > 0:
 			print('\n{0:d} warnings:'.format(len(self.__warnings)))
 			for w in self.__warnings:
-				print(w)
+				w.Print(True)
 		if (len(self.__warnings) == 0) and (len(self.__errors) == 0) and (len(self.__fatalerrors) == 0):
 			print('\nno warnings, errors or fatal errors')
 		else:
 			input("\nPress any key ...") 
 
-	def Print(self, lvl, message):
+	def Print(self, level, message, path=None):
 		"""
 		Print message of certain importance level. Printing is handled by the log facility.
 		Importance levels are: 0 - Notice, 1 - Warning, 2 - Error, 3 - Fatal Error
 		"""
+		# create log entry
+		entry = LogEntry(level, message, path)
 		# determine message prefix and update counters
-		if lvl == 0:
-			prefix = ''
-		elif lvl == 1:
-			prefix = 'Warning: '
-			self.__warnings.append(message)
-		elif lvl == 2:
-			prefix = 'Error: '
-			self.__errors.append(message)
-		elif lvl == 3:
-			prefix = '### Fatal Error: '
-			self.__fatalerrors.append(message)
+		if level == 0:
+			pass
+		elif level == 1:
+			self.__warnings.append(entry)
+		elif level == 2:
+			self.__errors.append(entry)
+		elif level == 3:
+			self.__fatalerrors.append(entry)
 		else:
-			raise Exception('Unknown log level {0:d}'.format(lvl))
+			raise Exception('Unknown log level {0:d}'.format(level))
 		# write message to different targets
-		print(prefix + message)
+		entry.Print()
 		if self.__f != None:
-			self.__f.write(prefix + message + '\n')
+			entry.Write(self.__f)
 		# if fatal, exit program
-		if lvl == 3:
+		if level == 3:
 			sys.exit()
 
 	def ElapsedTime(self):
@@ -88,7 +119,9 @@ class LogFacility:
 		Determine elapsed time since start of the program as a string.
 		"""
 		elapsed = self.ElapsedTime()
-		if elapsed < 60:
+		if elapsed < 1:
+			return '{0:.1f}ms'.format(elapsed*1000)
+		elif elapsed < 60:
 			return '{0:.1f}s'.format(elapsed)
 		elif elapsed < 60 * 60:
 			return '{0:.1f}min'.format(elapsed/60)
@@ -205,9 +238,9 @@ class Node:
 		#self.Print(None)
 		#other.Print(None)
 		if self.isdir and not other.isdir:
-			log.Print(2, 'Directory ' + self.path + ' became a file.')
+			log.Print(2, 'Directory became a file.', self.path)
 		if not self.isdir and other.isdir:
-			log.Print(2, 'File ' + self.path + ' became a directory.')
+			log.Print(2, 'File became a directory.', self.path)
 		if not (self.isdir or other.isdir):
 			if self.checksum != other.checksum:
 				message = 'Checksum error for ' + self.path
@@ -244,28 +277,28 @@ class Node:
 			prefix = ''
 		else:
 			prefix = '  ' * numindent
-		log.Print(0, '{0:s}node'.format(prefix))
+		print('{0:s}node'.format(prefix))
 		prefix += '->'
 		if self.rowid != None:
-			log.Print(0, '{0:s}rowid               {1:d}'.\
+			print('{0:s}rowid               {1:d}'.\
 				format(prefix, self.rowid))
 		else:
-			log.Print(0, '{0:s}rowid               <none>'.\
+			print('{0:s}rowid               <none>'.\
 				format(prefix))
 		if self.parent != None:
-			log.Print(0, '{0:s}parent              {1:d}'.\
+			print('{0:s}parent              {1:d}'.\
 				format(prefix, self.parent))
 		else:
-			log.Print(0, '{0:s}parent              <none>'.\
+			print('{0:s}parent              <none>'.\
 				format(prefix))
 		if self.depth != None:
-			log.Print(0, '{0:s}depth               {1:d}'\
+			print('{0:s}depth               {1:d}'\
 				.format(prefix, self.depth))
-		log.Print(0, '{0:s}name                {1:s}'.\
+		print('{0:s}name                {1:s}'.\
 			format(prefix, self.name))
-		log.Print(0, '{0:s}path                {1:s}'.\
+		print('{0:s}path                {1:s}'.\
 			format(prefix, self.path))
-		log.Print(0, '{0:s}isdir               {1:b}'.\
+		print('{0:s}isdir               {1:b}'.\
 			format(prefix, self.isdir))
 		if self.size != None:
 			if self.size < 1000:
@@ -282,19 +315,19 @@ class Node:
 				sizestr = '{0:.1f}P'.format(self.size/1000**5)
 			else:
 				sizestr = '{0:.1f}E'.format(self.size/1000**6)
-			log.Print(0, '{0:s}size                {1:s}B'.\
+			print('{0:s}size                {1:s}B'.\
 				format(prefix, sizestr))
 		if self.ctime != None:
-			log.Print(0, '{0:s}creation time       {1:s}'.\
+			print('{0:s}creation time       {1:s}'.\
 				format(prefix, self.ctime.strftime('%Y-%m-%d %H:%M:%S')))
 		if self.atime != None:
-			log.Print(0, '{0:s}access time         {1:s}'.\
+			print('{0:s}access time         {1:s}'.\
 				format(prefix, self.atime.strftime('%Y-%m-%d %H:%M:%S')))
 		if self.mtime != None:
-			log.Print(0, '{0:s}modification time   {1:s}'.\
+			print('{0:s}modification time   {1:s}'.\
 				format(prefix, self.mtime.strftime('%Y-%m-%d %H:%M:%S')))
 		if self.checksum != None:
-			log.Print(0, '{0:s}checksum            {1:s}'.\
+			print('{0:s}checksum            {1:s}'.\
 				format(prefix, ChecksumToString(self.checksum)))
 
 	def Export(self, filehandle):
@@ -347,7 +380,7 @@ class Node:
 			n.FetchFromDirectory(os.path.join(self.path, e), e)
 			n.parent = self.rowid
 			n.depth = self.depth + 1
-			log.Print(0, 'importing ' + n.path + ' ...')
+			log.Print(0, 'Importing', n.path)
 			n.WriteToDatabase(dbcon)
 			if n.isdir:
 				n.Import(dbcon)
@@ -381,7 +414,7 @@ class Node:
 		Method executed on every node by TraverseDatabase when
 		NodeDB.Export is called
 		"""
-		log.Print(0, 'exporting ' + self.path + ' ...')
+		log.Print(0, 'Exporting', self.path)
 		self.Export(param)
 
 	def TraverseCheck(self, dbcon, param):
@@ -391,7 +424,7 @@ class Node:
 		"""
 		dirnode = Node()
 		dirnode.FetchFromDirectory(self.path, self.name)
-		log.Print(0, 'checking ' + dirnode.path)
+		log.Print(0, 'Checking', dirnode.path)
 		self.Compare(dirnode)
 	
 	def TraverseDelete(self, dbcon, param):
@@ -429,21 +462,21 @@ class Node:
 				if not dirnode.isdir:
 					if docheck:
 						# check the entry
-						log.Print(0, 'checking ' + dirnode.path)
+						log.Print(0, 'Checking', dirnode.path)
 						dbnode.Compare(dirnode)
 				else:
 					# if directory do the recursion (use dbnode because it has the correct rowid)
 					dbnode.Update(dbcon, docheck)
 				if not docheck:
 					# update the entry in the database with the current dirnode information
-					log.Print(0, 'updating ' + dirnode.path)
+					log.Print(0, 'Updating', dirnode.path)
 					dirnode.rowid = dbnode.rowid
 					dirnode.UpdateDatabase(dbcon)
 				# remove processed entry from dictionary
 				del dbnodes[dirnode.ID()]
 			else:
 				# add non-existing entry to list
-				log.Print(1, 'adding to database ' + dirnode.path + ' ...')
+				log.Print(1, 'Adding', dirnode.path)
 				dirnode.WriteToDatabase(dbcon)
 				# if directory do the recursion (WriteToDatabase set the rowid)
 				if dirnode.isdir:
@@ -451,7 +484,7 @@ class Node:
 		cursor.close()
 		# iterate over remaining entries in rowdict, those entries should be removed
 		for n in dbnodes.values():
-			log.Print(1, 'deleting ' + n.path)
+			log.Print(1, 'Deleting', n.path)
 			n.DeleteDescendants(dbcon)
 			n.Delete(dbcon)
 
@@ -477,7 +510,7 @@ class NodeDB:
 				f.close()
 				csum = ChecksumToString(GetChecksum(self.__dbpath))
 				if csum != csumfile:
-					log.Print(3, 'Database file has been corrupted')
+					log.Print(3, 'Database file has been corrupted.', dbpath)
 		self.__dbcon = sqlite3.connect(self.__dbpath, \
 			# necessary for proper retrival of datetime objects from the database,
 			# otherwise the cursor will return string values with the timestamps
@@ -562,12 +595,12 @@ class NodeDB:
 		cursor = self.__dbcon.cursor()
 		if path == None:
 			if not self.RootPathExistsInDatabase(path):
-				log.Print(3, 'There are no nodes in the database.')
+				log.Print(3, 'There are no root nodes in the database.')
 			cursor.execute('select ' + NodeSelectString + \
 				' from nodes where parent is null')
 		else:
 			if not self.RootPathExistsInDatabase(path):
-				log.Print(3, 'Path ' + path + ' does not exist in the database.')
+				log.Print(3, 'Path  does not exist in the database.', path)
 			cursor.execute('select ' + NodeSelectString + \
 				' from nodes where parent is null and name=?', (path,))
 		return cursor
@@ -577,19 +610,19 @@ class NodeDB:
 		Import contents of path recursively into the database
 		"""
 		if self.RootPathExistsInDatabase(path):
-			log.Print(3, 'Path ' + path + ' already exist in the database.')
+			log.Print(3, 'Path already exist in the database.', path)
 		if not os.path.exists(path):
-			log.Print(3, 'Path ' + path + ' cannot be found on disk.')
+			log.Print(3, 'Path cannot be found on disk.', path)
 		n = Node()
 		n.FetchFromDirectory(path, None)
 		n.parent = None
 		n.depth = 0
-		log.Print(0, 'importing ' + n.path + ' ...')
+		log.Print(0, 'Importing',path)
 		n.WriteToDatabase(self.__dbcon)
 		if n.isdir:
 			n.Import(self.__dbcon)
 		self.__dbcon.commit()
-		log.Print(0, 'done\n')
+		log.Print(0, 'Done.\n')
 
 	def TraverseDatabase(self, path, func, param):
 		"""
@@ -623,7 +656,7 @@ class NodeDB:
 		is not specified, all existing trees in the database are processed.
 		"""
 		self.TraverseDatabase(path, Node.TraversePrint, None)
-		log.Print(0, '')
+		print('')
 
 	def Export(self, filename, path=None):
 		"""
@@ -648,7 +681,7 @@ class NodeDB:
 		proc.communicate()
 		# clean up and exit
 		os.remove(filename + '.dot')
-		log.Print(0, 'done\n')
+		log.Print(0, 'Done.\n')
 
 	def Check(self, path=None):
 		"""
@@ -661,7 +694,7 @@ class NodeDB:
 		is not specified, all existing trees in the database are processed.
 		"""
 		self.TraverseDatabase(path, Node.TraverseCheck, None)
-		log.Print(0, 'done\n')
+		log.Print(0, 'Done.\n')
 
 	def SlowDelete(self, path=None):
 		"""
@@ -676,7 +709,7 @@ class NodeDB:
 		self.TraverseDatabase(path, Node.TraverseDelete, None)
 		self.__dbcon.commit()
 		self.__dbcon.execute('vacuum')
-		log.Print(0, 'done\n')
+		log.Print(0, 'Done\n')
 	
 	def Delete(self, path=None):
 		"""
@@ -686,7 +719,7 @@ class NodeDB:
 		is not specified, all existing trees in the database are processed.
 		"""
 		if path == None:
-			log.Print(0, 'deleting all nodes ...\n')
+			log.Print(0, 'Deleting all nodes ...\n')
 			self.__dbcon.execute('delete from nodes')
 		else:
 			cursor = self.GetRootNodes(path)
@@ -697,7 +730,7 @@ class NodeDB:
 			cursor.close()
 		self.__dbcon.commit()
 		self.__dbcon.execute('vacuum')
-		log.Print(0, 'done\n')
+		log.Print(0, 'Done\n')
 
 	def Update(self, path=None, docheck=True):
 		"""
@@ -721,19 +754,19 @@ class NodeDB:
 			if not dbnode.isdir:
 				if docheck:
 					# check the entry
-					log.Print(0, 'checking ' + dirnode.path)
+					log.Print(0, 'Checking', dirnode.path)
 					dbnode.Compare(dirnode)
 			else:
 				dbnode.Update(self.__dbcon, docheck)
 			if not docheck:
 				# update the entry in the database with the current dirnode information
-				log.Print(0, 'updating ' + dirnode.path)
+				log.Print(0, 'Updating', dirnode.path)
 				dirnode.rowid = dbnode.rowid
 				dirnode.UpdateDatabase(self.__dbcon)
 		cursor.close()
 		self.__dbcon.commit()
 		self.__dbcon.execute('vacuum')
-		log.Print(0, 'done\n')
+		log.Print(0, 'Done\n')
 
 
 
@@ -771,7 +804,8 @@ def Main():
 	"""
 	Main entry point of program
 	"""
-	#TODO: proper command line interface
+	#TODO: test suite
+	#TODO: proper command line interface or GUI (?)
 	#ndb = NodeDB(':memory:')
 	ndb = NodeDB('dtcon2.sqlite')
 
