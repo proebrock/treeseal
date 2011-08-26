@@ -21,12 +21,14 @@ class LogEntry:
 		self.__message = message
 		self.__path = path
 	
-	def ToString(self, short=False):
+	def ToString(self, showdate=True, showlevel=True):
 		"""
 		Covert log entry to string (long format is default)
 		"""
-		result = self.__time.strftime('%Y-%m-%d %H:%M:%S')
-		result += ' '
+		result = ''
+		if showdate:
+			result += self.__time.strftime('%Y-%m-%d %H:%M:%S')
+			result += ' '
 		if self.__level == 0:
 			pass
 		elif self.__level == 1:
@@ -42,17 +44,17 @@ class LogEntry:
 			result += ' ' + self.__path
 		return result
 	
-	def Print(self, short=False):
+	def Print(self, showdate=True, showlevel=True):
 		"""
 		Print log entry to console
 		"""
-		print(self.ToString(short))
+		print(self.ToString(showdate, showlevel))
 	
-	def Write(self, f, short=False):
+	def Write(self, f,showdate=True, showlevel=True):
 		"""
 		Write log entry to file
 		"""
-		f.write(self.ToString(short) + '\n')
+		f.write(self.ToString(showdate, showlevel) + '\n')
 
 class LogFacility:
 
@@ -84,15 +86,15 @@ class LogFacility:
 		if len(self.__fatalerrors) > 0:
 			print('\n{0:d} fatal errors:'.format(len(self.__fatalerrors)))
 			for f in self.__fatalerrors:
-				f.Print(True)
+				f.Print(False, False)
 		if len(self.__errors) > 0:
 			print('\n{0:d} errors:'.format(len(self.__errors)))
 			for e in self.__errors:
-				e.Print(True)
+				e.Print(False, False)
 		if len(self.__warnings) > 0:
 			print('\n{0:d} warnings:'.format(len(self.__warnings)))
 			for w in self.__warnings:
-				w.Print(True)
+				w.Print(False, False)
 		if (len(self.__warnings) == 0) and (len(self.__errors) == 0) and (len(self.__fatalerrors) == 0):
 			print('\nno warnings, errors or fatal errors')
 		else:
@@ -117,7 +119,7 @@ class LogFacility:
 		else:
 			raise Exception('Unknown log level {0:d}'.format(level))
 		# write message to different targets
-		entry.Print()
+		entry.Print(False, True)
 		if self.__f != None:
 			entry.Write(self.__f)
 		# if fatal, exit program
@@ -828,8 +830,8 @@ def Main():
 	#ndb = NodeDB(':memory:')
 	ndb = NodeDB('dtcon2.sqlite')
 
-	ndb.Delete()
-	ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	#ndb.Delete()
+	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b\\dtcon2b.py')
 	#ndb.Import('C:\\Projects')
 
@@ -842,7 +844,7 @@ def Main():
 	#ndb.Check()
 	#ndb.Check('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
-	#ndb.Update(None, True)
+	ndb.Update(None, True)
 	#ndb.Update('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
 Main()
