@@ -142,8 +142,10 @@ class LogFacility:
 			return '{0:.1f}s'.format(elapsed)
 		elif elapsed < 60 * 60:
 			return '{0:.1f}min'.format(elapsed/60)
-		else:
+		elif elapsed < 24 * 60 * 60:
 			return '{0:.1f}h'.format(elapsed/60/60)
+		else:
+			return '{0:.1f}d'.format(elapsed/24/60/60)
 
 """
 Central facility for logging purposes used by all methods.
