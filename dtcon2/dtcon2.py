@@ -10,6 +10,61 @@ import binascii
 
 
 
+# ==================================================================
+# ============================== Util ==============================
+# ==================================================================
+
+def SizeToString(size):
+	if size < 1000:
+		sizestr = '{0:d}'.format(size)
+	elif size < 1000**2:
+		sizestr = '{0:.1f}K'.format(size/1000)
+	elif size < 1000**3:
+		sizestr = '{0:.1f}M'.format(size/1000**2)
+	elif size < 1000**4:
+		sizestr = '{0:.1f}G'.format(size/1000**3)
+	elif size < 1000**5:
+		sizestr = '{0:.1f}T'.format(size/1000**4)
+	elif size < 1000**6:
+		sizestr = '{0:.1f}P'.format(size/1000**5)
+	else:
+		sizestr = '{0:.1f}E'.format(size/1000**6)
+	return sizestr + 'B'
+
+def GetChecksum(path):
+	"""
+	Calculate checksum of a file by blockwise reading and processing the file content
+	"""
+	checksum = hashlib.sha256()
+	buffersize = 2**20
+	f = open(path,'rb')
+	while True:
+		data = f.read(buffersize)
+		if not data:
+			break
+		checksum.update(data)
+	f.close()
+	return checksum.digest()
+
+def ChecksumToString(checksum, shorten=False):
+	"""
+	Calculate checksum of a file by reading the directory contents.
+	Checksum can be shortened in order to have a more compact display.
+	"""
+	if checksum == None:
+		return '<none>'
+	else:
+		if shorten:
+			return binascii.hexlify(checksum[0:7]).decode('utf-8') + '...'
+		else:
+			return binascii.hexlify(checksum).decode('utf-8')
+
+
+
+# ======================================================================
+# ============================== LogEntry ==============================
+# ======================================================================
+
 class LogEntry:
 
 	def __init__(self, level, message, path=None):
@@ -67,7 +122,7 @@ class LogFacility:
 		self.__errors = []
 		self.__fatalerrors = []
 		if path != None:
-			self.__f = open(path, 'w')
+			self.__f = open(path, 'a')
 		else:
 			self.__f = None
 
@@ -155,6 +210,10 @@ Central facility for logging purposes used by all methods.
 log = LogFacility('dtcon2.log')
 
 
+
+# ==================================================================
+# ============================== Node ==============================
+# ==================================================================
 
 NodeSelectString = 'rowid,parent,name,isdir,size,ctime,atime,mtime,checksum'
 # same as the NodeSelectString but without rowid (the first one) and in the
@@ -256,8 +315,8 @@ class Node:
 		checking information stored in the database with the current situation
 		on the disk.
 		"""
-		#self.Print(None)
-		#other.Print(None)
+		self.Print(None)
+		other.Print(None)
 		if self.isdir and not other.isdir:
 			log.Print(2, 'Directory became a file.', self.path)
 		if not self.isdir and other.isdir:
@@ -322,22 +381,8 @@ class Node:
 		print('{0:s}isdir               {1:b}'.\
 			format(prefix, self.isdir))
 		if self.size != None:
-			if self.size < 1000:
-				sizestr = '{0:d}'.format(self.size)
-			elif self.size < 1000**2:
-				sizestr = '{0:.1f}K'.format(self.size/1000)
-			elif self.size < 1000**3:
-				sizestr = '{0:.1f}M'.format(self.size/1000**2)
-			elif self.size < 1000**4:
-				sizestr = '{0:.1f}G'.format(self.size/1000**3)
-			elif self.size < 1000**5:
-				sizestr = '{0:.1f}T'.format(self.size/1000**4)
-			elif self.size < 1000**6:
-				sizestr = '{0:.1f}P'.format(self.size/1000**5)
-			else:
-				sizestr = '{0:.1f}E'.format(self.size/1000**6)
-			print('{0:s}size                {1:s}B'.\
-				format(prefix, sizestr))
+			print('{0:s}size                {1:s}'.\
+				format(prefix, SizeToString(sizestr)))
 		if self.ctime != None:
 			print('{0:s}creation time       {1:s}'.\
 				format(prefix, self.ctime.strftime('%Y-%m-%d %H:%M:%S')))
@@ -509,6 +554,12 @@ class Node:
 			n.DeleteDescendants(dbcon)
 			n.Delete(dbcon)
 
+
+
+# ====================================================================
+# ============================== NodeDB ==============================
+# ====================================================================
+
 class NodeDB:
 
 	def __init__(self, dbpath):
@@ -679,6 +730,39 @@ class NodeDB:
 		self.TraverseDatabase(path, Node.TraversePrint, None)
 		print('')
 
+	def PrintStatus(self):
+		cursor = self.__dbcon.cursor()
+		# root nodes
+		cursor.execute('select count(rowid) from nodes where parent is null')
+		numrootnodes = cursor.fetchone()[0]
+		if numrootnodes > 0:
+			print('{0:d} root nodes in database:'.format(numrootnodes))
+			cursor.execute('select ' + NodeSelectString + \
+				' from nodes where parent is null')
+			for row in cursor:
+				n = Node()
+				n.FetchFromDatabaseRow(row)
+				n.path = n.name
+				print('  ' + n.path)
+		else:
+			print('No root nodes in database.')
+		if numrootnodes > 0:
+			# total number of nodes
+			cursor.execute('select count(rowid),sum(size) from nodes')
+			row = cursor.fetchone()
+			numnodes = row[0]
+			totalsize = row[1]
+			cursor.execute('select count(rowid) from nodes where isdir=1')
+			numdirs = cursor.fetchone()[0]
+			cursor.execute('select count(rowid) from nodes where isdir=0')
+			numfiles = cursor.fetchone()[0]
+			print('')
+			print('{0:d} nodes, {1:d} dirs, {2:d} files, {3:s} size'.\
+				format(numnodes, numdirs, numfiles, SizeToString(totalsize)))
+		# cleanup
+		cursor.close()
+		print('')
+
 	def Export(self, filename, path=None):
 		"""
 		Export tree structure in database to a svg showing a graphical representation of the
@@ -791,35 +875,9 @@ class NodeDB:
 
 
 
-def GetChecksum(path):
-	"""
-	Calculate checksum of a file by blockwise reading and processing the file content
-	"""
-	checksum = hashlib.sha256()
-	buffersize = 2**20
-	f = open(path,'rb')
-	while True:
-		data = f.read(buffersize)
-		if not data:
-			break
-		checksum.update(data)
-	f.close()
-	return checksum.digest()
-
-def ChecksumToString(checksum, shorten=False):
-	"""
-	Calculate checksum of a file by reading the directory contents.
-	Checksum can be shortened in order to have a more compact display.
-	"""
-	if checksum == None:
-		return '<none>'
-	else:
-		if shorten:
-			return binascii.hexlify(checksum[0:7]).decode('utf-8') + '...'
-		else:
-			return binascii.hexlify(checksum).decode('utf-8')
-
-
+# ==================================================================
+# ============================== Main ==============================
+# ==================================================================
 
 def Main():
 	"""
@@ -834,6 +892,7 @@ def Main():
 	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b\\dtcon2b.py')
 	#ndb.Import('C:\\Projects')
+	ndb.PrintStatus()
 
 	#ndb.Print()
 	#ndb.Print('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
@@ -844,7 +903,7 @@ def Main():
 	#ndb.Check()
 	#ndb.Check('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
-	ndb.Update(None, True)
+	#ndb.Update(None, True)
 	#ndb.Update('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
 
 Main()
