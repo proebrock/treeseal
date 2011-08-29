@@ -7,12 +7,16 @@ import subprocess
 import time
 import datetime
 import binascii
+import argparse
 
 
 
 # ==================================================================
 # ============================== Util ==============================
 # ==================================================================
+
+ProgramName = 'dtcon'
+ProgramVersion = '2.0'
 
 def SizeToString(size):
 	if size < 1000:
@@ -207,7 +211,7 @@ class LogFacility:
 """
 Central facility for logging purposes used by all methods.
 """
-log = LogFacility('dtcon2.log')
+log = LogFacility(ProgramName + '.log')
 
 
 
@@ -315,8 +319,8 @@ class Node:
 		checking information stored in the database with the current situation
 		on the disk.
 		"""
-		self.Print(None)
-		other.Print(None)
+		#self.Print(None)
+		#other.Print(None)
 		if self.isdir and not other.isdir:
 			log.Print(2, 'Directory became a file.', self.path)
 		if not self.isdir and other.isdir:
@@ -382,7 +386,7 @@ class Node:
 			format(prefix, self.isdir))
 		if self.size != None:
 			print('{0:s}size                {1:s}'.\
-				format(prefix, SizeToString(sizestr)))
+				format(prefix, SizeToString(self.size)))
 		if self.ctime != None:
 			print('{0:s}creation time       {1:s}'.\
 				format(prefix, self.ctime.strftime('%Y-%m-%d %H:%M:%S')))
@@ -617,7 +621,7 @@ class NodeDB:
 
 	def CreateTables(self):
 		"""
-		Initialization of empty database: create tables used by dtcon2
+		Initialization of empty database: create tables used by program
 		"""
 		self.__dbcon.execute('create table nodes (' + \
 			'parent int,' + \
@@ -632,13 +636,13 @@ class NodeDB:
 
 	def DropTables(self):
 		"""
-		Remove all tables from the database connected with dtcon2
+		Remove all tables from the database connected with program
 		"""
 		self.__dbcon.execute('drop table nodes')
 
 	def RecreateTables(self):
 		"""
-		Remove and the create all tables used by dtcon2
+		Remove and the create all tables used by program
 		"""
 		self.DropTables()
 		self.CreateTables()
@@ -705,7 +709,7 @@ class NodeDB:
 		like Check determining checksums of files.
 		For the function inferface of func check the examples mentioned.
 		If path is specified, it must be the root of a directory tree under
-		control of dtcon2 and already existing in the database, if the root
+		control of program and already existing in the database, if the root
 		is not specified, all existing trees in the database are processed.
 		"""
 		cursor = self.GetRootNodes(path)
@@ -724,13 +728,13 @@ class NodeDB:
 		Print tree structure in database to the console.
 		Makes only sense for small directory trees and for debugging.
 		If path is specified, it must be the root of a directory tree under
-		control of dtcon2 and already existing in the database, if the root
+		control of program and already existing in the database, if the root
 		is not specified, all existing trees in the database are processed.
 		"""
 		self.TraverseDatabase(path, Node.TraversePrint, None)
 		print('')
 
-	def PrintStatus(self):
+	def Status(self):
 		cursor = self.__dbcon.cursor()
 		# root nodes
 		cursor.execute('select count(rowid) from nodes where parent is null')
@@ -768,12 +772,12 @@ class NodeDB:
 		Export tree structure in database to a svg showing a graphical representation of the
 		node tree in the database. Makes only sense for small directory trees and for debugging.
 		If path is specified, it must be the root of a directory tree under
-		control of dtcon2 and already existing in the database, if the root
+		control of program and already existing in the database, if the root
 		is not specified, all existing trees in the database are processed.
 		"""
 		# write temporary graphviz dot file
 		f = open(filename + '.dot', 'w')
-		f.write('digraph "dtcon2 schema"\n{\n')
+		f.write('digraph "' + ProgramName + ' schema"\n{\n')
 		self.TraverseDatabase(path, Node.TraverseExport, f)
 		f.write('}\n')
 		f.close()
@@ -795,7 +799,7 @@ class NodeDB:
 		new entries or if database contains no longer existing ones, check
 		Update if you want that functionality)
 		If path is specified, it must be the root of a directory tree under
-		control of dtcon2 and already existing in the database, if the root
+		control of program and already existing in the database, if the root
 		is not specified, all existing trees in the database are processed.
 		"""
 		self.TraverseDatabase(path, Node.TraverseCheck, None)
@@ -808,7 +812,7 @@ class NodeDB:
 		because it uses TraverseDatabase and modifies the database. Better
 		use Delete because of speed
 		If path is specified, it must be the root of a directory tree under
-		control of dtcon2 and already existing in the database, if the root
+		control of program and already existing in the database, if the root
 		is not specified, all existing trees in the database are processed.
 		"""
 		self.TraverseDatabase(path, Node.TraverseDelete, None)
@@ -820,7 +824,7 @@ class NodeDB:
 		"""
 		Delete a path and all its contents recursively from the database.
 		If path is specified, it must be the root of a directory tree under
-		control of dtcon2 and already existing in the database, if the root
+		control of program and already existing in the database, if the root
 		is not specified, all existing trees in the database are processed.
 		"""
 		if path == None:
@@ -845,7 +849,7 @@ class NodeDB:
 		if the flag is false, the entries are updated in the database
 		according to the new file status.
 		If path is specified, it must be the root of a directory tree under
-		control of dtcon2 and already existing in the database, if the root
+		control of program and already existing in the database, if the root
 		is not specified, all existing trees in the database are processed.
 		"""
 		cursor = self.GetRootNodes(path)
@@ -879,31 +883,58 @@ class NodeDB:
 # ============================== Main ==============================
 # ==================================================================
 
+#DatabaseHandle = NodeDB(':memory:')
+DatabaseHandle = NodeDB(ProgramName + '.sqlite')
+
+class MainAction(argparse.Action):
+	def __call__(self, parser, namespace, values, option_string=None):
+		if self.dest == 'status':
+			DatabaseHandle.Status()
+		elif self.dest == 'import':
+			DatabaseHandle.Import(values[0])
+		elif self.dest == 'delete':
+			DatabaseHandle.Delete(values)
+		elif self.dest == 'print':
+			DatabaseHandle.Print(values)
+		elif self.dest == 'export':
+			DatabaseHandle.Export(values, 'schema')
+		elif self.dest == 'check':
+			DatabaseHandle.Check(values)
+		elif self.dest == 'update':
+			DatabaseHandle.Update(values)
+		else:
+			log.Print(3, 'Command line parser returned with unknown command \'' + self.dest + '\'.')
+
 def Main():
 	"""
 	Main entry point of program
 	"""
-	#TODO: test suite
-	#TODO: proper command line interface or GUI (?)
-	#ndb = NodeDB(':memory:')
-	ndb = NodeDB('dtcon2.sqlite')
-
-	#ndb.Delete()
-	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
-	#ndb.Import('C:\\Users\\roebrocp\\Desktop\\dtcon2\\b\\dtcon2b.py')
-	#ndb.Import('C:\\Projects')
-	ndb.PrintStatus()
-
-	#ndb.Print()
-	#ndb.Print('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
-
-	#ndb.Export('schema')
-	#ndb.Export('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a', 'schema')
-
-	#ndb.Check()
-	#ndb.Check('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
-
-	#ndb.Update(None, True)
-	#ndb.Update('C:\\Users\\roebrocp\\Desktop\\dtcon2\\a')
+	parser = argparse.ArgumentParser(prog=ProgramName, \
+		description='Directory consistency checking', \
+		epilog='files used by %(prog)s: TODO')
+	parser.add_argument('-v', '--version', action='version', version='%(prog)s version 2.0')
+	parser.add_argument('-s', '--status', dest='status', nargs=0, action=MainAction, \
+		help='Print status of database to console')
+	parser.add_argument('-i', '--import', dest='import', nargs=1, metavar='PATH', action=MainAction, \
+		help='Import file or directory tree specified by PATH into database')
+	parser.add_argument('-d', '--delete', dest='delete', nargs='?', metavar='PATH', action=MainAction, \
+		help='Delete PATH or (if none specified) all paths from database')
+	parser.add_argument('-p', '--print', dest='print', nargs='?', metavar='PATH', action=MainAction, \
+		help='Print PATH or (if none specified) all paths from database to console')
+	parser.add_argument('-e', '--export', dest='export', nargs='?', metavar='PATH', action=MainAction, \
+		help='Export PATH or (if none specified) all paths from database into a SVG ' + \
+		'representation of the tree. Output file is \'schema.svg\'. ' + \
+		'Mainly used for debugging purposes.')
+	parser.add_argument('-c', '--check', dest='check', nargs='?', metavar='PATH', action=MainAction, \
+		help='Check PATH or (if none specified) all paths from database by ' + \
+		'traversing nodes in database and checking checksums of existing files. ' + \
+		'No update of database when directory structure has changed, database is ' + \
+		'not changed by this command.')
+	parser.add_argument('-u', '--update', dest='update', nargs='?', metavar='PATH', action=MainAction, \
+		help='Update PATH or (if none specified) all paths from database by ' + \
+		'traversing the directory structure and checking files existing in the ' + \
+		'database, adding new ones to the database and removing no longer existing ' + \
+		'ones from the database.')
+	parser.parse_args()
 
 Main()
