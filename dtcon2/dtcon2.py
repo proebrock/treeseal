@@ -883,35 +883,45 @@ class NodeDB:
 # ============================== Main ==============================
 # ==================================================================
 
-#DatabaseHandle = NodeDB(':memory:')
-DatabaseHandle = NodeDB(ProgramName + '.sqlite')
+class MyArgParser(argparse.ArgumentParser):
+	DatabaseHandle = None
+
+
 
 class MainAction(argparse.Action):
 	def __call__(self, parser, namespace, values, option_string=None):
+		"""
+		This method is called every time the command line parser hits
+		an argument and has retrieved its parameters
+		"""
 		if self.dest == 'status':
-			DatabaseHandle.Status()
+			parser.DatabaseHandle.Status()
 		elif self.dest == 'import':
-			DatabaseHandle.Import(values[0])
+			parser.DatabaseHandle.Import(values[0])
 		elif self.dest == 'delete':
-			DatabaseHandle.Delete(values)
+			parser.DatabaseHandle.Delete(values)
 		elif self.dest == 'print':
-			DatabaseHandle.Print(values)
+			parser.DatabaseHandle.Print(values)
 		elif self.dest == 'export':
-			DatabaseHandle.Export(values, 'schema')
+			parser.DatabaseHandle.Export(values, 'schema')
 		elif self.dest == 'check':
-			DatabaseHandle.Check(values)
+			parser.DatabaseHandle.Check(values)
 		elif self.dest == 'update':
-			DatabaseHandle.Update(values)
+			parser.DatabaseHandle.Update(values)
 		else:
 			log.Print(3, 'Command line parser returned with unknown command \'' + self.dest + '\'.')
+
+
 
 def Main():
 	"""
 	Main entry point of program
 	"""
-	parser = argparse.ArgumentParser(prog=ProgramName, \
+	parser = MyArgParser(prog=ProgramName, \
 		description='Directory consistency checking', \
 		epilog='files used by %(prog)s: TODO')
+	#parser.DatabaseHandle = NodeDB(':memory:')
+	parser.DatabaseHandle = NodeDB(ProgramName + '.sqlite')
 	parser.add_argument('-v', '--version', action='version', version='%(prog)s version 2.0')
 	parser.add_argument('-s', '--status', dest='status', nargs=0, action=MainAction, \
 		help='Print status of database to console')
@@ -936,5 +946,7 @@ def Main():
 		'database, adding new ones to the database and removing no longer existing ' + \
 		'ones from the database.')
 	parser.parse_args()
+
+
 
 Main()
