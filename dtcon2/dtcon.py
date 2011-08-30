@@ -603,7 +603,7 @@ class NodeDB:
 		"""
 		Destructor of LogFacility class
 		"""
-		if self.__dbpath != None:
+		if self.__dbcon != None:
 			self.Close()
 
 	def Close(self):
@@ -963,6 +963,8 @@ def Main():
 			db.Update(action[1])
 		else:
 			log.Print(3, 'Command line parser returned with unknown command \'' + self.dest + '\'.')
+	
+	db.Close()
 
 
 
