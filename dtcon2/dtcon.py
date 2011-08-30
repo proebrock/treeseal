@@ -884,32 +884,21 @@ class NodeDB:
 # ==================================================================
 
 class MyArgParser(argparse.ArgumentParser):
-	DatabaseHandle = None
+	ActionList = []
+	DatabaseInMemory = False
 
 
 
 class MainAction(argparse.Action):
 	def __call__(self, parser, namespace, values, option_string=None):
 		"""
-		This method is called every time the command line parser hits
-		an argument and has retrieved its parameters
+		Parser action method:
+		Put commands into command list, check for "memory" flag
 		"""
-		if self.dest == 'status':
-			parser.DatabaseHandle.Status()
-		elif self.dest == 'import':
-			parser.DatabaseHandle.Import(values[0])
-		elif self.dest == 'delete':
-			parser.DatabaseHandle.Delete(values)
-		elif self.dest == 'print':
-			parser.DatabaseHandle.Print(values)
-		elif self.dest == 'export':
-			parser.DatabaseHandle.Export(values, 'schema')
-		elif self.dest == 'check':
-			parser.DatabaseHandle.Check(values)
-		elif self.dest == 'update':
-			parser.DatabaseHandle.Update(values)
+		if self.dest == 'memory':
+			parser.DatabaseInMemory = True
 		else:
-			log.Print(3, 'Command line parser returned with unknown command \'' + self.dest + '\'.')
+			parser.ActionList.append([self.dest, values])
 
 
 
@@ -917,12 +906,14 @@ def Main():
 	"""
 	Main entry point of program
 	"""
+	# configure parser
 	parser = MyArgParser(prog=ProgramName, \
 		description='Directory consistency checking', \
 		epilog='files used by %(prog)s: TODO')
-	#parser.DatabaseHandle = NodeDB(':memory:')
-	parser.DatabaseHandle = NodeDB(ProgramName + '.sqlite')
 	parser.add_argument('-v', '--version', action='version', version='%(prog)s version 2.0')
+	parser.add_argument('-m', '--memory', dest='memory', nargs=0, action=MainAction, \
+		help='Use database located in memory. This database is empty at the beginning so use' + \
+		' import first. All data is gone after the program has finished. For testing purposes.')
 	parser.add_argument('-s', '--status', dest='status', nargs=0, action=MainAction, \
 		help='Print status of database to console')
 	parser.add_argument('-i', '--import', dest='import', nargs=1, metavar='PATH', action=MainAction, \
@@ -945,7 +936,33 @@ def Main():
 		'traversing the directory structure and checking files existing in the ' + \
 		'database, adding new ones to the database and removing no longer existing ' + \
 		'ones from the database.')
+	# parse arguments
 	parser.parse_args()
+
+	# open database dependent on arguments
+	if parser.DatabaseInMemory:
+		db = NodeDB(':memory:')
+	else:
+		db = NodeDB(ProgramName + '.sqlite')
+	
+	# execute actions specified by arguments
+	for action in parser.ActionList:
+		if action[0] == 'status':
+			db.Status()
+		elif action[0] == 'import':
+			db.Import(action[1][0])
+		elif action[0] == 'delete':
+			db.Delete(action[1])
+		elif action[0] == 'print':
+			db.Print(action[1])
+		elif action[0] == 'export':
+			db.Export(action[1], 'schema')
+		elif action[0] == 'check':
+			db.Check(action[1])
+		elif action[0] == 'update':
+			db.Update(action[1])
+		else:
+			log.Print(3, 'Command line parser returned with unknown command \'' + self.dest + '\'.')
 
 
 
