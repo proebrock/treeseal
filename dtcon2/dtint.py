@@ -823,7 +823,6 @@ class NodeDB:
 		"""
 		self.TraverseDatabase(path, Node.TraverseDelete, None)
 		self.__dbcon.commit()
-		self.__dbcon.execute('vacuum')
 		log.Print(0, 'Done.\n')
 	
 	def Delete(self, path=None):
@@ -844,7 +843,6 @@ class NodeDB:
 			n.Delete(self.__dbcon)
 			cursor.close()
 		self.__dbcon.commit()
-		self.__dbcon.execute('vacuum')
 		log.Print(0, 'Done.\n')
 
 	def Update(self, path=None, docheck=True):
@@ -880,7 +878,6 @@ class NodeDB:
 				dirnode.UpdateDatabase(self.__dbcon)
 		cursor.close()
 		self.__dbcon.commit()
-		self.__dbcon.execute('vacuum')
 		log.Print(0, 'Done.\n')
 
 
