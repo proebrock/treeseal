@@ -439,6 +439,8 @@ class Node:
 		for row in cursor:
 			n = Node()
 			n.FetchFromDatabaseRow(row)
+			n.depth = self.depth + 1
+			n.path = os.path.join(self.path, n.name)
 			if n.isdir:
 				n.DeleteDescendants(dbcon)
 		cursor.execute('delete from nodes where parent=?', (self.rowid,))
@@ -839,6 +841,8 @@ class NodeDB:
 			cursor = self.GetRootNodes(path)
 			n = Node()
 			n.FetchFromDatabaseRow(cursor.fetchone())
+			n.path = n.name
+			n.depth = 0
 			n.DeleteDescendants(self.__dbcon)
 			n.Delete(self.__dbcon)
 			cursor.close()
