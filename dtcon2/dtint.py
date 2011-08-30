@@ -280,6 +280,8 @@ class Node:
 		else:
 			self.name = name
 		self.path = path
+		if not os.path.exists(self.path):
+			return
 		self.isdir = os.path.isdir(self.path)
 		if not self.isdir:
 			self.size = os.path.getsize(self.path)
@@ -493,10 +495,13 @@ class Node:
 		Method executed on every node by TraverseDatabase when
 		NodeDB.Check is called
 		"""
-		dirnode = Node()
-		dirnode.FetchFromDirectory(self.path, self.name)
-		log.Print(0, 'Checking', dirnode.path)
-		self.Compare(dirnode)
+		if os.path.exists(self.path):
+			dirnode = Node()
+			dirnode.FetchFromDirectory(self.path, self.name)
+			log.Print(0, 'Checking', dirnode.path)
+			self.Compare(dirnode)
+		else:
+			log.Print(2, 'Path does not exist in file system', self.path)
 	
 	def TraverseDelete(self, dbcon, param):
 		"""
