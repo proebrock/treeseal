@@ -581,6 +581,7 @@ class NodeDB:
 		with the one stored in a separate checksum file to check for corruption
 		of the database. If the database file is a newly created, create tables.
 		"""
+		self.__dbcon = None
 		self.__dbpath = dbpath
 		if self.__dbpath == ':memory:':
 			dbexisted = False
