@@ -220,10 +220,9 @@ log = LogFacility(ProgramName + '.log')
 # ============================== Node ==============================
 # ==================================================================
 
-NodeSelectString = 'rowid,parent,name,isdir,size,ctime,atime,mtime,checksum'
-# same as the NodeSelectString but without rowid (the first one) and in the
-# form used by update: col1=?,col2=?,...
-NodeUpdateString = '=?,'.join(NodeSelectString.rsplit(',')[1:]) + '=?'
+NodeInsertString = 'parent,name,isdir,size,ctime,atime,mtime,checksum'
+NodeSelectString = 'nodeid,' + NodeInsertString
+NodeUpdateString = '=?,'.join(NodeInsertString.rsplit(',')) + '=?'
 
 class Node:
 
@@ -231,7 +230,7 @@ class Node:
 		"""
 		Constructor of Node class
 		"""
-		self.rowid = None
+		self.nodeid = None
 		self.parent = None
 		self.depth = None
 		self.name = None
@@ -250,7 +249,7 @@ class Node:
 		Some information cannot be retrieved from the database row, check
 		comments below.
 		"""
-		self.rowid = row[0]
+		self.nodeid = row[0]
 		self.parent = row[1]
 		# self.depth has to be set while traversing
 		self.name = row[2]
@@ -272,7 +271,7 @@ class Node:
 		Some information cannot be retrieved from the database row, check
 		comments below.
 		"""
-		# self.rowid is set after writing to database
+		# self.nodeid is set after writing to database
 		# self.parent has to be set while traversing
 		# self.depth has to be set while traversing
 		if name == None:
@@ -292,29 +291,29 @@ class Node:
 		if not self.isdir:
 			self.checksum = GetChecksum(self.path)
 	
-	def ID(self):
+	def DictKey(self):
 		return '{0:b}{1:s}'.format(self.isdir, self.name)
 
 	def WriteToDatabase(self, dbcon):
 		"""
 		Write node (NOT EXISTING in database) to database
-		and set rowid due to the one received from the database
+		and set nodeid due to the one received from the database
 		"""
 		cursor = dbcon.cursor()
-		cursor.execute('insert into nodes (parent, name, isdir, size, ctime, atime, mtime, checksum) ' + \
-			'values (?,?,?,?,?,?,?,?)', \
+		cursor.execute('insert into nodes (' + NodeInsertString + \
+			') values (?,?,?,?,?,?,?,?)', \
 			(self.parent, self.name, self.isdir, self.size, \
 			self.ctime, self.atime, self.mtime, self.checksum))
-		self.rowid = cursor.lastrowid
+		self.nodeid = cursor.lastrowid
 		cursor.close()
 	
 	def UpdateDatabase(self, dbcon):
 		"""
 		Write node (ALREADY EXISTING in database) to database
 		"""
-		dbcon.execute('update nodes set ' + NodeUpdateString + ' where rowid=?',\
+		dbcon.execute('update nodes set ' + NodeUpdateString + ' where nodeid=?',\
 			(self.parent, self.name, self.isdir, self.size, \
-			self.ctime, self.atime, self.mtime, self.checksum, self.rowid))
+			self.ctime, self.atime, self.mtime, self.checksum, self.nodeid))
 	
 	def Compare(self, other):
 		"""
@@ -366,11 +365,11 @@ class Node:
 			prefix = '  ' * numindent
 		print('{0:s}node'.format(prefix))
 		prefix += '->'
-		if self.rowid != None:
-			print('{0:s}rowid               {1:d}'.\
-				format(prefix, self.rowid))
+		if self.nodeid != None:
+			print('{0:s}nodeid              {1:d}'.\
+				format(prefix, self.nodeid))
 		else:
-			print('{0:s}rowid               <none>'.\
+			print('{0:s}nodeid              <none>'.\
 				format(prefix))
 		if self.parent != None:
 			print('{0:s}parent              {1:d}'.\
@@ -410,24 +409,24 @@ class Node:
 		if self.depth == 0:
 			if self.isdir:
 				filehandle.write('\t{0:d} [ style=bold, shape=box, label="{0:d}\\n{1:s}" ];\n'\
-					.format(self.rowid, self.name.replace('\\', '\\\\')))
+					.format(self.nodeid, self.name.replace('\\', '\\\\')))
 			else:
 				filehandle.write('\t{0:d} [ style=bold, shape=ellipse, label="{0:d}\\n{1:s}\\n{2:s}" ];\n'\
-					.format(self.rowid, self.name.replace('\\', '\\\\'), ChecksumToString(self.checksum, True)))
+					.format(self.nodeid, self.name.replace('\\', '\\\\'), ChecksumToString(self.checksum, True)))
 		else:
 			if self.isdir:
 				filehandle.write('\t{0:d} [ shape=box, label="{0:d}\\n{1:s}" ];\n'\
-					.format(self.rowid, self.name))
+					.format(self.nodeid, self.name))
 			else:
 				filehandle.write('\t{0:d} [ shape=ellipse, label="{0:d}\\n{1:s}\\n{2:s}" ];\n'\
-					.format(self.rowid, self.name, ChecksumToString(self.checksum, True)))
-			filehandle.write('\t{0:d} -> {1:d};\n'.format(self.parent, self.rowid))
+					.format(self.nodeid, self.name, ChecksumToString(self.checksum, True)))
+			filehandle.write('\t{0:d} -> {1:d};\n'.format(self.parent, self.nodeid))
 
 	def Delete(self, dbcon):
 		"""
 		Delete node in database
 		"""
-		dbcon.execute('delete from nodes where rowid=?', (self.rowid,))
+		dbcon.execute('delete from nodes where nodeid=?', (self.nodeid,))
 	
 	def DeleteDescendants(self, dbcon):
 		"""
@@ -435,7 +434,7 @@ class Node:
 		"""
 		cursor = dbcon.cursor()
 		cursor.execute('select ' + NodeSelectString + \
-			' from nodes where parent=?', (self.rowid,))
+			' from nodes where parent=?', (self.nodeid,))
 		for row in cursor:
 			n = Node()
 			n.FetchFromDatabaseRow(row)
@@ -443,7 +442,7 @@ class Node:
 			n.path = os.path.join(self.path, n.name)
 			if n.isdir:
 				n.DeleteDescendants(dbcon)
-		cursor.execute('delete from nodes where parent=?', (self.rowid,))
+		cursor.execute('delete from nodes where parent=?', (self.nodeid,))
 		cursor.close()
 
 	def Import(self, dbcon):
@@ -453,7 +452,7 @@ class Node:
 		for e in os.listdir(self.path):
 			n = Node()
 			n.FetchFromDirectory(os.path.join(self.path, e), e)
-			n.parent = self.rowid
+			n.parent = self.nodeid
 			n.depth = self.depth + 1
 			log.Print(0, 'Importing', n.path)
 			n.WriteToDatabase(dbcon)
@@ -466,7 +465,7 @@ class Node:
 		"""
 		cursor = dbcon.cursor()
 		cursor.execute('select ' + NodeSelectString + \
-			' from nodes where parent=?', (self.rowid,))
+			' from nodes where parent=?', (self.nodeid,))
 		for row in cursor:
 			n = Node()
 			n.FetchFromDatabaseRow(row)
@@ -519,44 +518,44 @@ class Node:
 		# fetch child nodes and create a map: name -> node
 		cursor = dbcon.cursor()
 		cursor.execute('select ' + NodeSelectString + \
-			' from nodes where parent=?', (self.rowid,))
+			' from nodes where parent=?', (self.nodeid,))
 		dbnodes = {}
 		for row in cursor:
 			n = Node()
 			n.FetchFromDatabaseRow(row)
 			n.depth = self.depth + 1
 			n.path = os.path.join(self.path, n.name)
-			dbnodes[n.ID()] = n
+			dbnodes[n.DictKey()] = n
 		# iterate over all directory entries and check them one by one
 		entries = os.listdir(self.path)
 		for e in entries:
 			dirnode = Node()
 			dirnode.FetchFromDirectory(os.path.join(self.path, e), e)
-			dirnode.parent = self.rowid
+			dirnode.parent = self.nodeid
 			dirnode.depth = self.depth + 1
-			if dirnode.ID() in dbnodes:
+			if dirnode.DictKey() in dbnodes:
 				# node exists in database: get the database node 
-				dbnode = dbnodes[dirnode.ID()]
+				dbnode = dbnodes[dirnode.DictKey()]
 				if not dirnode.isdir:
 					if docheck:
 						# check the entry
 						log.Print(0, 'Checking', dirnode.path)
 						dbnode.Compare(dirnode)
 				else:
-					# if directory do the recursion (use dbnode because it has the correct rowid)
+					# if directory do the recursion (use dbnode because it has the correct nodeid)
 					dbnode.Update(dbcon, docheck)
 				if not docheck:
 					# update the entry in the database with the current dirnode information
 					log.Print(0, 'Updating', dirnode.path)
-					dirnode.rowid = dbnode.rowid
+					dirnode.nodeid = dbnode.nodeid
 					dirnode.UpdateDatabase(dbcon)
 				# remove processed entry from dictionary
-				del dbnodes[dirnode.ID()]
+				del dbnodes[dirnode.DictKey()]
 			else:
 				# add non-existing entry to list
 				log.Print(1, 'Adding', dirnode.path)
 				dirnode.WriteToDatabase(dbcon)
-				# if directory do the recursion (WriteToDatabase set the rowid)
+				# if directory do the recursion (WriteToDatabase set the nodeid)
 				if dirnode.isdir:
 					dirnode.Update(dbcon)
 		cursor.close()
@@ -633,10 +632,11 @@ class NodeDB:
 		Initialization of empty database: create tables used by program
 		"""
 		self.__dbcon.execute('create table nodes (' + \
-			'parent int,' + \
+			'nodeid integer primary key,' + \
+			'parent integer,' + \
 			'name text not null,' + \
 			'isdir boolean not null,' + \
-			'size int,' + \
+			'size integer,' + \
 			'ctime timestamp,' + \
 			'atime timestamp,' + \
 			'mtime timestamp,' + \
@@ -664,9 +664,9 @@ class NodeDB:
 		"""
 		cursor = self.__dbcon.cursor()
 		if path == None:
-			cursor.execute('select count(rowid) from nodes where parent is null')
+			cursor.execute('select count(nodeid) from nodes where parent is null')
 		else:
-			cursor.execute('select count(rowid) from nodes where parent is null and name=?', (path,))
+			cursor.execute('select count(nodeid) from nodes where parent is null and name=?', (path,))
 		result = cursor.fetchone()[0] > 0
 		cursor.close()
 		return result
@@ -746,7 +746,7 @@ class NodeDB:
 	def Status(self):
 		cursor = self.__dbcon.cursor()
 		# root nodes
-		cursor.execute('select count(rowid) from nodes where parent is null')
+		cursor.execute('select count(nodeid) from nodes where parent is null')
 		numrootnodes = cursor.fetchone()[0]
 		if numrootnodes > 0:
 			print('{0:d} root nodes in database:'.format(numrootnodes))
@@ -761,13 +761,13 @@ class NodeDB:
 			print('No root nodes in database.')
 		if numrootnodes > 0:
 			# total number of nodes
-			cursor.execute('select count(rowid),sum(size) from nodes')
+			cursor.execute('select count(nodeid),sum(size) from nodes')
 			row = cursor.fetchone()
 			numnodes = row[0]
 			totalsize = row[1]
-			cursor.execute('select count(rowid) from nodes where isdir=1')
+			cursor.execute('select count(nodeid) from nodes where isdir=1')
 			numdirs = cursor.fetchone()[0]
-			cursor.execute('select count(rowid) from nodes where isdir=0')
+			cursor.execute('select count(nodeid) from nodes where isdir=0')
 			numfiles = cursor.fetchone()[0]
 			print('')
 			print('{0:d} nodes, {1:d} dirs, {2:d} files, {3:s} size stored in database'.\
@@ -826,6 +826,7 @@ class NodeDB:
 		"""
 		self.TraverseDatabase(path, Node.TraverseDelete, None)
 		self.__dbcon.commit()
+		self.__dbcon.execute('vacuum')
 		log.Print(0, 'Done.\n')
 	
 	def Delete(self, path=None):
@@ -848,6 +849,7 @@ class NodeDB:
 			n.Delete(self.__dbcon)
 			cursor.close()
 		self.__dbcon.commit()
+		self.__dbcon.execute('vacuum')
 		log.Print(0, 'Done.\n')
 
 	def Update(self, path=None, docheck=True):
@@ -879,10 +881,11 @@ class NodeDB:
 			if not docheck:
 				# update the entry in the database with the current dirnode information
 				log.Print(0, 'Updating', dirnode.path)
-				dirnode.rowid = dbnode.rowid
+				dirnode.nodeid = dbnode.nodeid
 				dirnode.UpdateDatabase(self.__dbcon)
 		cursor.close()
 		self.__dbcon.commit()
+		self.__dbcon.execute('vacuum')
 		log.Print(0, 'Done.\n')
 
 
