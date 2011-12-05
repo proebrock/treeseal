@@ -125,6 +125,7 @@ class LogFacility:
 		"""
 		Constructor of LogFacility class
 		"""
+		self.ShowElapsedTime = False;
 		self.__starttime = time.clock()
 		self.__warnings = []
 		self.__errors = []
@@ -148,7 +149,8 @@ class LogFacility:
 		"""
 		if self.__f != None:
 			self.__f.close()
-		print('elapsed time ' + self.ElapsedTimeStr())
+		if self.ShowElapsedTime:
+			print('elapsed time ' + self.ElapsedTimeStr())
 		if len(self.__fatalerrors) > 0:
 			print('\n{0:d} fatal errors:'.format(len(self.__fatalerrors)))
 			for f in self.__fatalerrors:
@@ -161,9 +163,7 @@ class LogFacility:
 			print('\n{0:d} warnings:'.format(len(self.__warnings)))
 			for w in self.__warnings:
 				w.Print(False, False)
-		if (len(self.__warnings) == 0) and (len(self.__errors) == 0) and (len(self.__fatalerrors) == 0):
-			print('\nno warnings, errors or fatal errors')
-		else:
+		if not (len(self.__warnings) == 0) or not (len(self.__errors) == 0) or not (len(self.__fatalerrors) == 0):
 			input("\nPress any key ...") 
 
 	def Print(self, level, message, path=None):
@@ -1021,16 +1021,22 @@ def Main():
 		elif action[0] == 'relocate':
 			db.Relocate(action[1][0], action[1][1])
 		elif action[0] == 'import':
+			log.ShowElapsedTime = True
 			db.Import(action[1][0])
 		elif action[0] == 'delete':
+			log.ShowElapsedTime = True
 			db.Delete(action[1])
 		elif action[0] == 'print':
+			log.ShowElapsedTime = True
 			db.Print(action[1])
 		elif action[0] == 'export':
+			log.ShowElapsedTime = True
 			db.Export(action[1], 'schema')
 		elif action[0] == 'check':
+			log.ShowElapsedTime = True
 			db.Check(action[1])
 		elif action[0] == 'update':
+			log.ShowElapsedTime = True
 			db.Update(action[1])
 		else:
 			log.Print(3, 'Command line parser returned with unknown command \'' + self.dest + '\'.')
