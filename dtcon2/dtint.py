@@ -20,6 +20,9 @@ ProgramName = 'dtint'
 ProgramVersion = '2.0'
 
 def SizeToString(size):
+	"""
+	Return string with (file) size with appropriate SI prefix
+	"""
 	if size < 1000:
 		sizestr = '{0:d}'.format(size)
 	elif size < 1000**2:
@@ -132,6 +135,9 @@ class LogFacility:
 			self.__f = None
 
 	def ClearBuffers(self):
+		"""
+		Clear all buffers
+		"""
 		self.__warnings = []
 		self.__errors = []
 		self.__fatalerrors = []
@@ -292,6 +298,12 @@ class Node:
 			self.checksum = GetChecksum(self.path)
 	
 	def DictKey(self):
+		"""
+		When building up a dictionary with directory entries as keys,
+		it is not enough to use the file names because there might be a 
+		directory and a file both with the same name. This method returns
+		a flag indicating if the file is a directory or not and the file name
+		"""
 		return '{0:b}{1:s}'.format(self.isdir, self.name)
 
 	def WriteToDatabase(self, dbcon):
@@ -744,6 +756,9 @@ class NodeDB:
 		print('')
 
 	def Status(self):
+		"""
+		Print status of database contents: list of root nodes and some statistics
+		"""
 		cursor = self.__dbcon.cursor()
 		# root nodes
 		cursor.execute('select count(nodeid) from nodes where parent is null')
@@ -759,7 +774,7 @@ class NodeDB:
 				if os.path.exists(n.path):
 					print('  ' + n.path)
 				else:
-					print('  ' + n.path + ' (not found)')
+					print('  ' + n.path + ' (not found in file system)')
 		else:
 			print('No root nodes in database.')
 		if numrootnodes > 0:
@@ -780,6 +795,9 @@ class NodeDB:
 		print('')
 
 	def Relocate(self, oldpath, newpath):
+		"""
+		Change root node path of one entry in the database, useful if directory tree has been moved
+		"""
 		# check if old root node exists and new one does not exist in the database
 		if not self.RootPathExistsInDatabase(oldpath):
 			log.Print(3, 'Path does not exist in the database.', oldpath)
@@ -964,7 +982,7 @@ def Main():
 		help='Print status of database to console')
 	parser.add_argument('-r', '--relocate', dest='relocate', nargs=2, metavar=('OLD_PATH', 'NEW_PATH'), action=MainAction, \
 		help='Indicate to the database that a path to a directory tree has been changed ' + \
-		'by specifying the old and the new path')
+		'by specifying the old and the new path. Useful if directory tree has been moved.')
 	parser.add_argument('-i', '--import', dest='import', nargs=1, metavar='PATH', action=MainAction, \
 		help='Import file or directory tree specified by PATH into database')
 	parser.add_argument('-d', '--delete', dest='delete', nargs='?', metavar='PATH', action=MainAction, \
