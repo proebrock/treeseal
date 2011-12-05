@@ -776,6 +776,16 @@ class NodeDB:
 		cursor.close()
 		print('')
 
+	def Relocate(self, oldpath, newpath):
+		# check if old root node exists and new one does not exist in the database
+		if not self.RootPathExistsInDatabase(oldpath):
+			log.Print(3, 'Path does not exist in the database.', oldpath)
+		if self.RootPathExistsInDatabase(newpath):
+			log.Print(3, 'Path already exist in the database.', newpath)
+		# do the renaming
+		self.__dbcon.execute('update nodes set name=? where parent is null and name=?', (newpath, oldpath))
+		self.__dbcon.commit()
+
 	def Export(self, filename, path=None):
 		"""
 		Export tree structure in database to a svg showing a graphical representation of the
@@ -949,6 +959,9 @@ def Main():
 		' import first. All data is gone after the program has finished. For testing purposes.')
 	parser.add_argument('-s', '--status', dest='status', nargs=0, action=MainAction, \
 		help='Print status of database to console')
+	parser.add_argument('-r', '--relocate', dest='relocate', nargs=2, metavar=('OLD_PATH', 'NEW_PATH'), action=MainAction, \
+		help='Indicate to the database that a path to a directory tree has been changed ' + \
+		'by specifying the old and the new path')
 	parser.add_argument('-i', '--import', dest='import', nargs=1, metavar='PATH', action=MainAction, \
 		help='Import file or directory tree specified by PATH into database')
 	parser.add_argument('-d', '--delete', dest='delete', nargs='?', metavar='PATH', action=MainAction, \
@@ -984,6 +997,8 @@ def Main():
 	for action in parser.ActionList:
 		if action[0] == 'status':
 			db.Status()
+		elif action[0] == 'relocate':
+			db.Relocate(action[1][0], action[1][1])
 		elif action[0] == 'import':
 			db.Import(action[1][0])
 		elif action[0] == 'delete':
