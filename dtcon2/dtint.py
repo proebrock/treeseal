@@ -959,11 +959,11 @@ def Main():
 		This database can be used to later on to verify the integrity of the data.
 		'''), \
 		epilog=textwrap.dedent('''
-		The command line parameters for status, import, delete, print, export,
-		check and update can be combined to realize a certain squence of orders.
-		For example the command '(prog)s -d -i foo' will first delete all nodes
-		in the database and then import the file or directory 'foo'. The command
-		'(prog)s -i foo -c -p -e -s' will import the file or directory 'foo',
+		The command line parameters for status, relocate, import, delete, print,
+		export, check and update can be combined to realize a certain squence of
+		orders. For example the command '(prog)s -d -i foo' will first delete all
+		nodes in the database and then import the file or directory 'foo'. The
+		command '(prog)s -i foo -c -p -e -s' will import the file or directory 'foo',
 		then run a check, then print and export the current database contents and
 		finally print a status on the console.
 
