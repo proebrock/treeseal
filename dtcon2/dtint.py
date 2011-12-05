@@ -756,7 +756,10 @@ class NodeDB:
 				n = Node()
 				n.FetchFromDatabaseRow(row)
 				n.path = n.name
-				print('  ' + n.path)
+				if os.path.exists(n.path):
+					print('  ' + n.path)
+				else:
+					print('  ' + n.path + ' (not found)')
 		else:
 			print('No root nodes in database.')
 		if numrootnodes > 0:
