@@ -52,7 +52,7 @@ def GetChecksum(path):
 			break
 		checksum.update(data)
 	f.close()
-	return checksum.digest()
+	return buffer(checksum.digest())
 
 def ChecksumToString(checksum, shorten=False):
 	"""
