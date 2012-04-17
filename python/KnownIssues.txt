@@ -1,9 +1,0 @@
-dtint.py works thanks to Python on different platforms.
-
-But right now it is not (yet) a real cross-platfrom application. There are still a couple of open issues when you create a database on one platform and try to check/update it on a different platform:
-
-1) The path of the root nodes is not converted in a platform independent format, like the directory separators (all other nodes do not contain directory separators)
-
-2) The checksum is saved in a binary format in the database, which causes trouble when using different big and little endian machines; use the "struct" module with "pack" and "unpack" methods
-
-3) There seem to be some differences in the time stamp formats even though the printed time stamps on the console look equal. Maybe sub-seconds? Maybe another binary issue?
