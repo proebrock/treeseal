@@ -164,7 +164,7 @@ class LogFacility:
 			for w in self.__warnings:
 				w.Print(False, False)
 		if not (len(self.__warnings) == 0) or not (len(self.__errors) == 0) or not (len(self.__fatalerrors) == 0):
-			input("\nPress any key ...") 
+			raw_input("\nPress enter ...") 
 
 	def Print(self, level, message, path=None):
 		"""
