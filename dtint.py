@@ -457,19 +457,26 @@ class Node:
 		cursor.execute('delete from nodes where parent=?', (self.nodeid,))
 		cursor.close()
 
-	def Import(self, dbcon):
+	def TraverseDir(self, func, param):
 		"""
-		Recursive part of NodeDB.Import
+		Recursive part of NodeDB.TraverseDir
 		"""
 		for e in os.listdir(self.path):
 			n = Node()
 			n.FetchFromDirectory(os.path.join(self.path, e), e)
 			n.parent = self.nodeid
 			n.depth = self.depth + 1
-			log.Print(0, 'Importing', n.path)
-			n.WriteToDatabase(dbcon)
+			func(n, param)
 			if n.isdir:
-				n.Import(dbcon)
+				n.TraverseDir(func, param)
+
+	def TraverseImport(self, param):
+		"""
+		Method executed on every node by TraverseDir when
+		NodeDB.Import is called
+		"""
+		log.Print(0, 'Importing', self.path)
+		self.WriteToDatabase(param)
 
 	def TraverseDatabase(self, dbcon, func, param):
 		"""
@@ -702,6 +709,23 @@ class NodeDB:
 				' from nodes where parent is null and name=?', (path,))
 		return cursor
 
+	def TraverseDir(self, path, func, param):
+		"""
+		Execute function func on every file and directory of the specified
+		path. Is used by Print and Import. It takes the contents of the
+		filesystem as reference and does not access the contents of the
+		database, even though this can be implemented in the function like
+		Import importing data into the database.
+		For the function inferface of func check the examples mentioned.
+		"""
+		n = Node()
+		n.FetchFromDirectory(path, None)
+		n.parent = None
+		n.depth = 0
+		func(n, param)
+		if n.isdir:
+			n.TraverseDir(func, param)
+
 	def Import(self, path):
 		"""
 		Import contents of path recursively into the database
@@ -710,24 +734,17 @@ class NodeDB:
 			log.Print(3, 'Path already exist in the database.', path)
 		if not os.path.exists(path):
 			log.Print(3, 'Path cannot be found on disk.', path)
-		n = Node()
-		n.FetchFromDirectory(path, None)
-		n.parent = None
-		n.depth = 0
-		log.Print(0, 'Importing',path)
-		n.WriteToDatabase(self.__dbcon)
-		if n.isdir:
-			n.Import(self.__dbcon)
+		self.TraverseDir(path, Node.TraverseImport, self.__dbcon)
 		self.__dbcon.commit()
 		log.Print(0, 'Done.\n')
 
 	def TraverseDatabase(self, path, func, param):
 		"""
 		Execute function func on every node in the database. Is used by
-		Print, Export and Check and SlowDelete. It takes the contents of
-		the database as reference and does not access the contents of the
-		file system, even though this can be implemented in the function
-		like Check determining checksums of files.
+		Print, Export and Check. It takes the contents of the database
+		as reference and does not access the contents of the file system,
+		even though this can be implemented in the function like Check
+		determining checksums of files.
 		For the function inferface of func check the examples mentioned.
 		If path is specified, it must be the root of a directory tree under
 		control of program and already existing in the database, if the root
@@ -851,6 +868,8 @@ class NodeDB:
 		If path is specified, it must be the root of a directory tree under
 		control of program and already existing in the database, if the root
 		is not specified, all existing trees in the database are processed.
+		Remark: This could be implemented using TraverseDatabase but it is not
+		very efficient to delete each single node with a single database call...
 		"""
 		if path == None:
 			log.Print(0, 'Deleting all nodes')
