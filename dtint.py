@@ -125,7 +125,7 @@ class LogFacility:
 		"""
 		Constructor of LogFacility class
 		"""
-		self.ShowElapsedTime = False;
+		self.ShowElapsedTime = False
 		self.__starttime = time.clock()
 		self.__warnings = []
 		self.__errors = []
