@@ -36,9 +36,10 @@ suitable, you have to look for something else.
 
 Collection of links to similar tools or techniques:
 
+* Maybe use a distributed version control system, e.g. [Git](http://git-scm.com/)
 * [shatag](https://bitbucket.org/maugier/shatag)
 * [fswatch](http://fswatch.sourceforge.net/)
-* [Enhancing File System Integrity Through Checksums ](http://www.filesystems.org/docs/nc-checksum-tr/nc-checksum.html)
+* [Enhancing File System Integrity Through Checksums](http://www.filesystems.org/docs/nc-checksum-tr/nc-checksum.html)
 * Some Intrusion Detection Systems (IDE)
 
 
