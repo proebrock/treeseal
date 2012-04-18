@@ -497,7 +497,7 @@ class Node:
 
 	def TraversePrint(self, dbcon, param):
 		"""
-		Method executed on every node by TraverseDatabase when
+		Method executed on every node by TraverseDir and TraverseDatabase when
 		NodeDB.Print is called
 		"""
 		self.Print(self.depth)
@@ -712,7 +712,7 @@ class NodeDB:
 	def TraverseDir(self, path, func, param):
 		"""
 		Execute function func on every file and directory of the specified
-		path. Is used by Print and Import. It takes the contents of the
+		path. Is used by PrintDir and Import. It takes the contents of the
 		filesystem as reference and does not access the contents of the
 		database, even though this can be implemented in the function like
 		Import importing data into the database.
@@ -759,7 +759,7 @@ class NodeDB:
 	def TraverseDatabase(self, path, func, param):
 		"""
 		Execute function func on every node in the database. Is used by
-		Print, Export and Check. It takes the contents of the database
+		PrintDB, Export and Check. It takes the contents of the database
 		as reference and does not access the contents of the file system,
 		even though this can be implemented in the function like Check
 		determining checksums of files.
