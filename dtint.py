@@ -483,9 +483,9 @@ class Node:
 			n.FetchFromDatabaseRow(row)
 			n.depth = self.depth + 1
 			n.path = os.path.join(self.path, n.name)
+			func(n, dbcon, param)
 			if n.isdir:
 				n.TraverseDatabase(dbcon, func, param)
-			func(n, dbcon, param)
 		cursor.close()
 
 	def TraversePrint(self, dbcon, param):
@@ -845,21 +845,6 @@ class NodeDB:
 		self.TraverseDatabase(path, Node.TraverseCheck, None)
 		log.Print(0, 'Done.\n')
 
-	def SlowDelete(self, path=None):
-		"""
-		Delete a path and all its contents recursively from the database.
-		REMARK: This is just implemented because of academic interest
-		because it uses TraverseDatabase and modifies the database. Better
-		use Delete because of speed
-		If path is specified, it must be the root of a directory tree under
-		control of program and already existing in the database, if the root
-		is not specified, all existing trees in the database are processed.
-		"""
-		self.TraverseDatabase(path, Node.TraverseDelete, None)
-		self.__dbcon.commit()
-		self.__dbcon.execute('vacuum')
-		log.Print(0, 'Done.\n')
-	
 	def Delete(self, path=None):
 		"""
 		Delete a path and all its contents recursively from the database.
