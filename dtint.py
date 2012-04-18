@@ -755,6 +755,7 @@ class NodeDB:
 			cursor.close()
 		else:
 			self.TraverseDir(path, Node.TraversePrint, None)
+		print('')
 
 	def TraverseDatabase(self, path, func, param):
 		"""
