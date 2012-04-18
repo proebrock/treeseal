@@ -1031,7 +1031,7 @@ def Main():
 			db.Print(action[1])
 		elif action[0] == 'export':
 			log.ShowElapsedTime = True
-			db.Export(action[1], 'schema')
+			db.Export('schema', action[1])
 		elif action[0] == 'check':
 			log.ShowElapsedTime = True
 			db.Check(action[1])
