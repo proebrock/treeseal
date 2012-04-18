@@ -48,7 +48,7 @@ Features
 * Command line based
 * Portable, supports mixed usage of systems (create DB on one OS, check on another)
 * Stores all information in a single [SQLite](http://www.sqlite.org/) database
-* Easy to use, one file, no installation necessary
+* Easy to use, one file, no compilation or installation necessary
 * Readable and well documented source code
 
 
@@ -56,9 +56,4 @@ Requirements
 ------------
 
 * [Python](http://www.python.org/) (2.X)
-
-
-
-
-
-
+* [Graphviz](http://www.graphviz.org/) (for viewing graphs in debugging)
