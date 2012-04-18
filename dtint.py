@@ -457,7 +457,7 @@ class Node:
 		cursor.execute('delete from nodes where parent=?', (self.nodeid,))
 		cursor.close()
 
-	def TraverseDir(self, func, param):
+	def TraverseDir(self, dbcon, func, param):
 		"""
 		Recursive part of NodeDB.TraverseDir
 		"""
@@ -466,17 +466,17 @@ class Node:
 			n.FetchFromDirectory(os.path.join(self.path, e), e)
 			n.parent = self.nodeid
 			n.depth = self.depth + 1
-			func(n, param)
+			func(n, dbcon, param)
 			if n.isdir:
-				n.TraverseDir(func, param)
+				n.TraverseDir(dbcon, func, param)
 
-	def TraverseImport(self, param):
+	def TraverseImport(self, dbcon, param):
 		"""
 		Method executed on every node by TraverseDir when
 		NodeDB.Import is called
 		"""
 		log.Print(0, 'Importing', self.path)
-		self.WriteToDatabase(param)
+		self.WriteToDatabase(dbcon)
 
 	def TraverseDatabase(self, dbcon, func, param):
 		"""
@@ -718,13 +718,15 @@ class NodeDB:
 		Import importing data into the database.
 		For the function inferface of func check the examples mentioned.
 		"""
+		if not os.path.exists(path):
+			log.Print(3, 'Path cannot be found on disk.', path)
 		n = Node()
 		n.FetchFromDirectory(path, None)
 		n.parent = None
 		n.depth = 0
-		func(n, param)
+		func(n, self.__dbcon, param)
 		if n.isdir:
-			n.TraverseDir(func, param)
+			n.TraverseDir(self.__dbcon, func, param)
 
 	def Import(self, path):
 		"""
@@ -732,11 +734,27 @@ class NodeDB:
 		"""
 		if self.RootPathExistsInDatabase(path):
 			log.Print(3, 'Path already exist in the database.', path)
-		if not os.path.exists(path):
-			log.Print(3, 'Path cannot be found on disk.', path)
-		self.TraverseDir(path, Node.TraverseImport, self.__dbcon)
+		self.TraverseDir(path, Node.TraverseImport, None)
 		self.__dbcon.commit()
 		log.Print(0, 'Done.\n')
+		
+	def PrintDir(self, path=None):
+		"""
+		Print tree structure in directory to the console.
+		Makes only sense for small directory trees and for debugging.
+		If path is specified, it must be an existing directory in the filesystem
+		if the root is not specified, all existing trees in the database
+		are processed.
+		"""
+		if path == None:
+			cursor = self.GetRootNodes()
+			for row in cursor:
+				n = Node()
+				n.FetchFromDatabaseRow(row)
+				self.TraverseDir(n.name, Node.TraversePrint, None)
+			cursor.close()
+		else:
+			self.TraverseDir(path, Node.TraversePrint, None)
 
 	def TraverseDatabase(self, path, func, param):
 		"""
@@ -761,7 +779,7 @@ class NodeDB:
 				n.TraverseDatabase(self.__dbcon, func, param)
 		cursor.close()
 
-	def Print(self, path=None):
+	def PrintDB(self, path=None):
 		"""
 		Print tree structure in database to the console.
 		Makes only sense for small directory trees and for debugging.
@@ -991,8 +1009,10 @@ def Main():
 		help='Import file or directory tree specified by PATH into database')
 	parser.add_argument('-d', '--delete', dest='delete', nargs='?', metavar='PATH', action=MainAction, \
 		help='Delete PATH or (if none specified) all paths from database')
-	parser.add_argument('-p', '--print', dest='print', nargs='?', metavar='PATH', action=MainAction, \
+	parser.add_argument('-p', '--printdb', dest='printdb', nargs='?', metavar='PATH', action=MainAction, \
 		help='Print PATH or (if none specified) all paths from database to console')
+	parser.add_argument('--printdir', dest='printdir', nargs='?', metavar='PATH', action=MainAction, \
+		help='Print PATH or (if none specified) all paths from directory to console')
 	parser.add_argument('-e', '--export', dest='export', nargs='?', metavar='PATH', action=MainAction, \
 		help='Export PATH or (if none specified) all paths from database into a SVG ' + \
 		'representation of the tree. Output file is \'schema.svg\'. ' + \
@@ -1030,9 +1050,12 @@ def Main():
 		elif action[0] == 'delete':
 			log.ShowElapsedTime = True
 			db.Delete(action[1])
-		elif action[0] == 'print':
-			log.ShowElapsedTime = True
-			db.Print(action[1])
+		elif action[0] == 'printdb':
+			log.ShowElapsedTime = False
+			db.PrintDB(action[1])
+		elif action[0] == 'printdir':
+			log.ShowElapsedTime = False
+			db.PrintDir(action[1])
 		elif action[0] == 'export':
 			log.ShowElapsedTime = True
 			db.Export('schema', action[1])
