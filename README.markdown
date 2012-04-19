@@ -1,9 +1,6 @@
 dtint - Directory tree integrity checking
 =========================================
 
-Summary
--------
-
 Dtint is a tool for checking the integrity of a data structure by keeping
 checksums and meta information for each file in a separate database.
 
@@ -58,3 +55,92 @@ Requirements
 
 * [Python](http://www.python.org/) (2.X)
 * [Graphviz](http://www.graphviz.org/) (for viewing graphs in debugging)
+
+
+Usage
+-----
+Lets say you have a directory you want to secure using dtint, lets say it is
+`backup`. You create a directory somewhere else (not inside `backup`) where you
+store dtint and the database. Now you are ready to create the database and
+import the information:
+
+    $ dtint.py --import backup
+    Importing backup
+    Importing backup/images
+    Importing backup/images/dog.jpg
+    Importing backup/images/child.jpg
+    Importing backup/images/wife.jpg
+    Importing backup/images/cat.jpg
+    Importing backup/images/car.jpg
+    Importing backup/letters
+    Importing backup/letters/letter_to_mum.txt
+    Done.
+
+    elapsed time 140.0ms
+
+The program will recursively traverse through the `backup` directory calculating
+checksums and importing them into the database. This may take some time.
+Afterwards we find some new files in our directory: `dtint.sqlite` is the
+database file, `dtint.sqlite.sha256` contains a checksum over the database and
+`dtint.log` collects all log outputs of the program.
+
+To get an overview over the contents of the database, we can display its status:
+
+    $ ./dtint.py --status
+    1 root nodes in database:
+      backup
+
+    9 nodes, 3 dirs, 6 files, 23.0MB size stored in database
+
+For more detailed information about all nodes in the database, check the
+help for the `--printdb` and `--export` commands.
+
+To check the contents of the directory against the database we do:
+
+    $ ./dtint.py --check
+    Checking backup
+    Checking backup/images
+    Checking backup/images/dog.jpg
+    Checking backup/images/child.jpg
+    Checking backup/images/wife.jpg
+    Checking backup/images/cat.jpg
+    Checking backup/images/car.jpg
+    Checking backup/letters
+    Checking backup/letters/letter_to_mum.txt
+    Done.
+
+    elapsed time 130.0ms
+
+Lets change one file on purpose and do a check again:
+
+    $ ls >> backup/letters/letter_to_mum.txt
+    $ ./dtint.py --check
+    Checking backup
+    Checking backup/images
+    Checking backup/images/dog.jpg
+    Checking backup/images/child.jpg
+    Checking backup/images/wife.jpg
+    Checking backup/images/cat.jpg
+    Checking backup/images/car.jpg
+    Checking backup/letters
+    Checking backup/letters/letter_to_mum.txt
+    Error: Checksum error for backup/letters/letter_to_mum.txt,
+      file size changed (77824 -> 77902),
+      ctime changed (2012-04-19 12:00:40 -> 2012-04-19 12:29:45),
+      atime changed (2012-04-18 11:43:21 -> 2012-04-19 12:00:58),
+      mtime changed (2012-03-26 07:52:16 -> 2012-04-19 12:29:45)
+    Done.
+
+    elapsed time 130.0ms
+
+    1 errors:
+    Error: Checksum error for backup/letters/letter_to_mum.txt,
+      file size changed (77824 -> 77902),
+      ctime changed (2012-04-19 12:00:40 -> 2012-04-19 12:29:45),
+      atime changed (2012-04-18 11:43:21 -> 2012-04-19 12:00:58),
+      mtime changed (2012-03-26 07:52:16 -> 2012-04-19 12:29:45)
+
+    Press enter ...
+
+The program plots status messages and error messages first, in the end there
+is another list of errors to have a summary.
