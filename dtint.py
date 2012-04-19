@@ -329,18 +329,20 @@ class Node:
 			(self.parent, self.name, self.isdir, self.size, \
 			self.ctime, self.atime, self.mtime, self.checksum, self.nodeid))
 	
-	def Compare(self, other):
+	def IsEqual(self, other):
 		"""
-		Compare the properties of two nodes. This function is called when
-		checking information stored in the database with the current situation
-		on the disk.
+		Compare the properties of two nodes and return true when both are the
+		same. This function is called when checking information stored in the
+		database with the current situation in the filesystem.
 		"""
 		#self.Print(None)
 		#other.Print(None)
 		if self.isdir and not other.isdir:
 			log.Print(2, 'Directory became a file.', self.path)
+			return False
 		if not self.isdir and other.isdir:
 			log.Print(2, 'File became a directory.', self.path)
+			return False
 		if not (self.isdir or other.isdir):
 			if self.checksum != other.checksum:
 				message = 'Checksum error for ' + self.path
@@ -367,6 +369,8 @@ class Node:
 				if sameMetaData:
 					message += ', file meta info seems to be the same but checksum changed, THIS IS SERIOUS!'
 				log.Print(2, message)
+				return False
+		return True
 			
 	
 	def Print(self, numindent=0):
@@ -521,7 +525,7 @@ class Node:
 			dirnode = Node()
 			dirnode.FetchFromDirectory(self.path, self.name)
 			log.Print(0, 'Checking', dirnode.path)
-			self.Compare(dirnode)
+			self.IsEqual(dirnode)
 		else:
 			log.Print(2, 'Path does not exist in file system', self.path)
 	
@@ -532,7 +536,7 @@ class Node:
 		"""
 		self.Delete(dbcon)
 
-	def Update(self, dbcon, docheck=True):
+	def Update(self, dbcon, dofix=True):
 		"""
 		Recursive part of NodeDB.Update
 		"""
@@ -558,18 +562,17 @@ class Node:
 				# node exists in database: get the database node 
 				dbnode = dbnodes[dirnode.DictKey()]
 				if not dirnode.isdir:
-					if docheck:
-						# check the entry
-						log.Print(0, 'Checking', dirnode.path)
-						dbnode.Compare(dirnode)
+					# check the entry
+					log.Print(0, 'Checking', dirnode.path)
+					equal = dbnode.IsEqual(dirnode)
+					if not equal and dofix:
+					# update the entry in the database with the current dirnode information
+						log.Print(0, 'Updating', dirnode.path)
+						dirnode.nodeid = dbnode.nodeid
+						dirnode.UpdateDatabase(dbcon)
 				else:
 					# if directory do the recursion (use dbnode because it has the correct nodeid)
-					dbnode.Update(dbcon, docheck)
-				if not docheck:
-					# update the entry in the database with the current dirnode information
-					log.Print(0, 'Updating', dirnode.path)
-					dirnode.nodeid = dbnode.nodeid
-					dirnode.UpdateDatabase(dbcon)
+					dbnode.Update(dbcon, dofix)
 				# remove processed entry from dictionary
 				del dbnodes[dirnode.DictKey()]
 			else:
@@ -908,13 +911,15 @@ class NodeDB:
 		self.__dbcon.execute('vacuum')
 		log.Print(0, 'Done.\n')
 
-	def Update(self, path=None, docheck=True):
+	def Update(self, path=None, dofix=False):
 		"""
-		Update contents of database by adding new directory entries,
-		deleting non-existing ones. If docheck is true (default), all
-		entries existing in the database and the file system are checked,
-		if the flag is false, the entries are updated in the database
-		according to the new file status.
+		Checking contents of database. If new or missing files are discovered,
+		the database is updated accordingly by deleting old entries or adding
+		new ones. If bad checksums are discovered, there are error messages,
+		but the entries in the database are not updated to help you check
+		the errors and taking care of them. If the flag dofix is true, occurring
+		errors are displayed and then fixed by updating the database according
+		to the new status of the file.
 		If path is specified, it must be the root of a directory tree under
 		control of program and already existing in the database, if the root
 		is not specified, all existing trees in the database are processed.
@@ -928,17 +933,16 @@ class NodeDB:
 			dirnode = Node()
 			dirnode.FetchFromDirectory(dbnode.path, dbnode.name)
 			if not dbnode.isdir:
-				if docheck:
-					# check the entry
-					log.Print(0, 'Checking', dirnode.path)
-					dbnode.Compare(dirnode)
+				# check the entry
+				log.Print(0, 'Checking', dirnode.path)
+				equal = dbnode.IsEqual(dirnode)
+				if not equal and dofix:
+					# update the entry in the database with the current dirnode information
+					log.Print(0, 'Updating', dirnode.path)
+					dirnode.nodeid = dbnode.nodeid
+					dirnode.UpdateDatabase(self.__dbcon)
 			else:
-				dbnode.Update(self.__dbcon, docheck)
-			if not docheck:
-				# update the entry in the database with the current dirnode information
-				log.Print(0, 'Updating', dirnode.path)
-				dirnode.nodeid = dbnode.nodeid
-				dirnode.UpdateDatabase(self.__dbcon)
+				dbnode.Update(self.__dbcon, dofix)
 		cursor.close()
 		self.__dbcon.commit()
 		self.__dbcon.execute('vacuum')
@@ -1029,7 +1033,13 @@ def Main():
 		help='Update PATH or (if none specified) all paths from database by ' + \
 		'traversing the directory structure and checking files existing in the ' + \
 		'database, adding new ones to the database and removing no longer existing ' + \
-		'ones from the database.')
+		'ones from the database. Detected modified checksums are not updated in' + \
+		'the database.')
+	parser.add_argument('-f', '--fix', dest='fix', nargs='?', metavar='PATH', action=MainAction, \
+		help='Update PATH or (if none specified) all paths from database by ' + \
+		'traversing the directory structure and checking files existing in the ' + \
+		'database, adding new ones to the database, removing no longer existing ' + \
+		'ones from the database and updating modified checksums in the database.')
 	# parse arguments
 	parser.parse_args()
 	# if no actions specified, just show help
@@ -1067,7 +1077,10 @@ def Main():
 			db.Check(action[1])
 		elif action[0] == 'update':
 			log.ShowElapsedTime = True
-			db.Update(action[1])
+			db.Update(action[1], False)
+		elif action[0] == 'fix':
+			log.ShowElapsedTime = True
+			db.Update(action[1], True)
 		else:
 			log.Print(3, 'Command line parser returned with unknown command \'' + self.dest + '\'.')
 	# close database
