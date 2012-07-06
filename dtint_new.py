@@ -221,8 +221,10 @@ DatabaseUpdateString = '=?,'.join(DatabaseVarNames[1:]) + '=?'
 class Database:
 
 	def __init__(self, metaDir):
+		if not os.path.exists(metaDir):
+			raise MyException('Given meta data directory does not exist.', 3)
 		if not os.path.isdir(metaDir):
-			raise MyException('Given meta directory is not a directory.', 3)
+			raise MyException('Given meta data directory is not a directory.', 3)
 		self.__dbFile = os.path.join(metaDir, 'base.sqlite3')
 		self.__sgFile = os.path.join(metaDir, 'base.signature')
 		self.__dbcon = None
@@ -342,9 +344,15 @@ class Database:
 class Filesystem:
 
 	def __init__(self, rootDir, metaDir):
-		if not os.path.isdir(metaDir):
+		if not os.path.exists(rootDir):
+			raise MyException('Given root directory does not exist.', 3)
+		if not os.path.isdir(rootDir):
 			raise MyException('Given root directory is not a directory.', 3)
 		self.__rootDir = rootDir
+		if not os.path.exists(metaDir):
+			raise MyException('Given meta data directory does not exist.', 3)
+		if not os.path.isdir(metaDir):
+			raise MyException('Given meta data directory is not a directory.', 3)
 		self.__metaDir = metaDir
 
 	def Reset(self):
@@ -389,6 +397,8 @@ class Filesystem:
 class Main:
 
 	def __init__(self, rootDir):
+		if not os.path.exists(rootDir):
+			raise MyException('Given root directory does not exist.', 3)
 		if not os.path.isdir(rootDir):
 			raise MyException('Given root directory is not a directory.', 3)
 		metaDir = os.path.join(rootDir, '.' + ProgramName)
