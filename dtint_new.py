@@ -110,7 +110,7 @@ class NodeInfo:
 		self.mtime = None
 		self.checksum = None
 
-	def Print(self, prefix = ''):
+	def Print(self, prefix=''):
 		if self.isdir == None:
 			print('{0:s}isdir               <unknown>'. format(prefix))
 		else:
@@ -146,13 +146,18 @@ class Node:
 
 	def __init__(self):
 		# unique identifiers in filesystem and database
+		self.name = None
 		self.path = None
 		self.nodeid = None
 		# data
 		self.fsInfo = None
 		self.dbInfo = None
 		
-	def Print(self, prefix = ''):
+	def Print(self, prefix=''):
+		if self.name == None:
+			print('{0:s}name                <unknown>'.format(prefix))
+		else:
+			print('{0:s}name                {1:s}'.format(prefix, self.name))
 		if self.path == None:
 			print('{0:s}path                <unknown>'.format(prefix))
 		else:
@@ -160,7 +165,7 @@ class Node:
 		if self.nodeid == None:
 			print('{0:s}nodeid              <unknown>'.format(prefix))
 		else:
-			print('{0:s}nodeid              {1:s}'.format(prefix, self.path))
+			print('{0:s}nodeid              {1:d}'.format(prefix, self.nodeid))
 		print('{0:s}info in filesystem:'.format(prefix))
 		if self.fsInfo == None:
 			print('{0:s}<unknown>'.format(prefix + '  '))
@@ -172,16 +177,35 @@ class Node:
 		else:
 			self.dbInfo.Print(prefix + '  ')
 
+
+
+class NodeList(list):
+	
+	def Print(self):
+		for node in self:
+			node.Print()
+		
+
+
+
+# --- SQL strings for database access ---
+# Always keep in sync with Node and NodeInfo classes!
+# Careful with changing spaces: some strings are auto-generated!
 DatabaseCreateString = \
 	'nodeid integer primary key,' + \
 	'parent integer,' + \
-	'name text not null,' + \
+	'name text,' + \
 	'isdir boolean not null,' + \
 	'size integer,' + \
 	'ctime timestamp,' + \
 	'atime timestamp,' + \
 	'mtime timestamp,' + \
 	'checksum blob'
+DatabaseVarNames = map(lambda s: s.split(' ')[0], DatabaseCreateString.split(','))
+DatabaseInsertVars = ','.join(DatabaseVarNames[1:])
+DatabaseInsertQMarks = (len(DatabaseVarNames)-2) * '?,' + '?'
+DatabaseSelectString = ','.join(DatabaseVarNames)
+DatabaseUpdateString = '=?,'.join(DatabaseVarNames[1:]) + '=?'
 
 
 
@@ -247,14 +271,62 @@ class Database:
 		if wasOpen:
 			self.CheckAndOpen()
 
-	def GetRootNode(self, node = None):
-		pass
+	def GetRootNode(self):
+		node = Node()
+		cursor = self.__dbcon.cursor()
+		cursor.execute('select ' + DatabaseSelectString + \
+			' from nodes where parent is null')
+		self.Fetch(node, cursor.fetchone())
+		cursor.close()
+		return node
 
-	def Fetch(self, node):
-		pass
 
+	def Fetch(self, node, row):
+		node.nodeid = row[0]
+		# ignore parentid in row[1]
+		node.name = row[2]
+		node.dbInfo = NodeInfo()
+		node.dbInfo.isdir = row[3]
+		node.dbInfo.size = row[4]
+		node.dbInfo.ctime = row[5]
+		node.dbInfo.atime = row[6]
+		node.dbInfo.mtime = row[7]
+		node.dbInfo.checksum = row[8]
+	
 	def GetChildren(self, node):
-		pass
+		result = NodeList()
+		cursor = self.__dbcon.cursor()
+		cursor.execute('select ' + DatabaseSelectString + \
+			' from nodes where parent=?', (node.nodeid,))
+		for row in cursor:
+			child = Node()
+			self.Fetch(child, row)
+			result.append(child)
+		cursor.close()
+		return result	
+		
+	def InsertNode(self, node, parentnode=None):
+		if node.dbInfo == None:
+			raise MyException('Cannot write an empty node to database.', 3)
+		if not node.nodeid == None:
+			raise MyException('Node already contains a valid node id, ' + \
+				'so maybe you want to update instead of insert?', 3)
+		if parentnode == None:
+			parentid = None
+		else:
+			parentid = parentnode.nodeid
+		cursor = self.__dbcon.cursor()
+		cursor.execute('insert into nodes (' + DatabaseInsertVars + \
+			') values (' + DatabaseInsertQMarks + ')', \
+			(parentid, node.name, node.dbInfo.isdir, node.dbInfo.size, \
+			node.dbInfo.ctime, node.dbInfo.atime, node.dbInfo.mtime, \
+			node.dbInfo.checksum))
+		node.nodeid = cursor.lastrowid
+		cursor.close()
+		
+	def Commit(self):
+		self.__dbcon.commit()
+		self.__dbcon.execute('vacuum')
 
 
 
@@ -270,9 +342,9 @@ class Filesystem:
 		if not os.path.exists(self.__metaDir):
 			os.mkdir(self.__metaDir)
 
-	def GetRootNode(self, node = None):
-		if node == None:
-			node = Node()
+	def GetRootNode(self):
+		node = Node()
+		node.name = ''
 		node.path = self.__rootDir
 		self.Fetch(node)
 		return node
@@ -291,15 +363,17 @@ class Filesystem:
 			node.fsInfo.checksum = cs.GetChecksum()
 
 	def GetChildren(self, node):
-		result = []
-		for e in os.listdir(node.path):
-			childpath = os.path.join(node.path, e)
+		result = NodeList()
+		for childname in os.listdir(node.path):
+			childpath = os.path.join(node.path, childname)
 			if childpath == self.__metaDir:
 				continue
 			child = Node()
+			child.name = childname
 			child.path = childpath
 			self.Fetch(child)
 			result.append(child)
+		return result
 
 
 
@@ -321,11 +395,19 @@ class Main:
 
 	def Close(self):
 		self.__db.CloseAndSecure()
+		
+	def ImportRecurse(self, nodelist, parentnode):
+		for node in nodelist:
+			node.dbInfo = node.fsInfo
+			self.__db.InsertNode(node, parentnode)
+			if node.fsInfo.isdir:
+				self.ImportRecurse(self.__fs.GetChildren(node), node)
 
 	def Import(self):
-		n = self.__fs.GetRootNode()
-		self.__fs.GetChildren(n)
-
+		nodelist = NodeList()
+		nodelist.append(self.__fs.GetRootNode())
+		self.ImportRecurse(nodelist, None)
+		self.__db.Commit()
 
 
 
@@ -334,5 +416,4 @@ m.Reset()
 m.Open()
 m.Import()
 m.Close()	
-		
-		
+
