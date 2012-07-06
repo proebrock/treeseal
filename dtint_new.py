@@ -51,7 +51,31 @@ class Checksum:
 
 
 
+class MyException(Exception):
+
+	def __init__(self, message, level):
+		self.__message = message
+		self.__level = level
+
+	def __str__(self):
+		result = ''
+		if self.__level == 0:
+			result += 'Info: '
+		elif self.__level == 1:
+			result += 'Warning: '
+		elif self.__level == 2:
+			result += 'Error: '
+		elif self.__level == 3:
+			result += '### Fatal Error: '
+		else:
+			raise Exception('Unknown log level {0:d}'.format(self.__level))
+		result += self.__message
+		return result
+
+
+
 class NodeInfo:
+
 	def __init__(self):
 		self.isdir = None
 		self.size = None
@@ -63,6 +87,7 @@ class NodeInfo:
 
 
 class Node:
+
 	def __init__(self):
 		self.path = None
 		self.dbcon = None
@@ -89,9 +114,10 @@ DatabaseCreateString = \
 
 
 class Database:
+
 	def __init__(self, path):
 		self.__dbfile = path + '.sqlite3'
-		self.__sigfile = path + '.sig'
+		self.__sigfile = path + '.signature'
 		self.__dbcon = None
 
 	def __del__(self):
@@ -113,8 +139,7 @@ class Database:
 		cs = Checksum()
 		cs.CalculateChecksum(self.__dbfile)
 		if not cs.IsValid(self.__sigfile):
-			print('Error\n')
-			sys.exit() # TODO
+			raise MyException('The internal database has been corrupted.', 3)
 		self.Open()
 		
 	def Close(self):
@@ -151,6 +176,7 @@ class Database:
 
 
 class Main:
+
 	def __init__(self, path):
 		self.__rootDir = path
 		self.__metaDir = os.path.join(self.__rootDir, '.' + ProgramName)
@@ -166,6 +192,7 @@ class Main:
 
 	def Close(self):
 		self.__db.CloseAndSecure()
+
 
 
 m = Main('/home/roebrocp/Projects/dtint-example')
