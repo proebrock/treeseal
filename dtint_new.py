@@ -153,7 +153,9 @@ class Node:
 		# data
 		self.fsInfo = None
 		self.dbInfo = None
-		
+		# container of type NodeTree to keep child nodes (all or selected ones)
+		self.children = None
+
 	def Print(self, prefix=''):
 		if self.name == None:
 			print('{0:s}name                <unknown>'.format(prefix))
@@ -180,7 +182,7 @@ class Node:
 
 
 
-class NodeList:
+class NodeTree:
 
 	def __init__(self):
 		self.__dict = {}
@@ -191,10 +193,18 @@ class NodeList:
 	def __iter__(self):
 		return self.__dict.itervalues()
 
+	def __getitem__(self, key):
+		return self.__dict.values().__getitem__(key)
+
+	def PrintRecurse(self, nodelist, depth):
+		for node in nodelist:
+			node.Print(depth * '    ')
+			#print((depth * '    ') + node.name)
+			if not node.children == None:
+				self.PrintRecurse(node.children, depth + 1)
+
 	def Print(self):
-		for node in self:
-			node.Print()
-		
+		self.PrintRecurse(self, 0)
 
 
 
@@ -211,7 +221,7 @@ DatabaseCreateString = \
 	'atime timestamp,' + \
 	'mtime timestamp,' + \
 	'checksum blob'
-DatabaseVarNames = map(lambda s: s.split(' ')[0], DatabaseCreateString.split(','))
+DatabaseVarNames = [s.split(' ')[0] for s in DatabaseCreateString.split(',')]
 DatabaseInsertVars = ','.join(DatabaseVarNames[1:])
 DatabaseInsertQMarks = (len(DatabaseVarNames)-2) * '?,' + '?'
 DatabaseSelectString = ','.join(DatabaseVarNames)
@@ -306,7 +316,7 @@ class Database:
 		node.dbInfo.checksum = row[8]
 	
 	def GetChildren(self, node):
-		result = NodeList()
+		result = NodeTree()
 		cursor = self.__dbcon.cursor()
 		cursor.execute('select ' + DatabaseSelectString + \
 			' from nodes where parent=?', (node.nodeid,))
@@ -339,6 +349,9 @@ class Database:
 	def Commit(self):
 		self.__dbcon.commit()
 		self.__dbcon.execute('vacuum')
+
+	def MergeInfo(self, nodelist):
+		pass
 
 
 
@@ -381,7 +394,7 @@ class Filesystem:
 			node.fsInfo.checksum = cs.GetChecksum()
 
 	def GetChildren(self, node):
-		result = NodeList()
+		result = NodeTree()
 		for childname in os.listdir(node.path):
 			childpath = os.path.join(node.path, childname)
 			if childpath == self.__metaDir:
@@ -395,7 +408,7 @@ class Filesystem:
 
 
 
-class Main:
+class Instance:
 
 	def __init__(self, rootDir):
 		if not os.path.exists(rootDir):
@@ -424,16 +437,30 @@ class Main:
 				self.ImportRecurse(self.__fs.GetChildren(node), node)
 
 	def Import(self):
-		nodelist = NodeList()
+		nodelist = NodeTree()
 		nodelist.append(self.__fs.GetRootNode())
 		self.ImportRecurse(nodelist, None)
 		self.__db.Commit()
 
+	def GetTreeRecurse(self, nodetree, skipValids):
+		self.__db.MergeInfo(nodetree)
+		for node in nodetree:
+			if node.fsInfo.isdir:
+				node.children = self.__fs.GetChildren(node)
+				self.GetTreeRecurse(node.children, skipValids)
+
+	def GetTree(self, skipValids=True):
+		nodetree = NodeTree()
+		nodetree.append(self.__fs.GetRootNode())
+		self.GetTreeRecurse(nodetree, skipValids)
+		return nodetree
 
 
-m = Main('/home/roebrocp/Projects/dtint-example')
-m.Reset()
-m.Open()
-m.Import()
-m.Close()	
 
+inst = Instance('../dtint-example')
+inst.Reset()
+inst.Open()
+inst.Import()
+t = inst.GetTree(False)
+t.Print()
+inst.Close()
