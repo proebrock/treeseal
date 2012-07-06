@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import binascii
+import datetime
 import hashlib
 import os
 import sqlite3
@@ -9,6 +10,25 @@ import wx
 
 ProgramName = 'dtint'
 ProgramVersion = '2.0'
+
+
+
+def SizeToString(size):
+	if size < 1000:
+		sizestr = '{0:d}'.format(size)
+	elif size < 1000**2:
+		sizestr = '{0:.1f}K'.format(size/1000)
+	elif size < 1000**3:
+		sizestr = '{0:.1f}M'.format(size/1000**2)
+	elif size < 1000**4:
+		sizestr = '{0:.1f}G'.format(size/1000**3)
+	elif size < 1000**5:
+		sizestr = '{0:.1f}T'.format(size/1000**4)
+	elif size < 1000**6:
+		sizestr = '{0:.1f}P'.format(size/1000**5)
+	else:
+		sizestr = '{0:.1f}E'.format(size/1000**6)
+	return sizestr + 'B'
 
 
 
@@ -28,6 +48,12 @@ class Checksum:
 			checksum.update(data)
 		f.close()
 		self.__checksum = buffer(checksum.digest())
+
+	def SetChecksum(self, checksum):
+		self.__checksum = checksum
+
+	def GetChecksum(self):
+		return self.__checksum
 
 	def GetChecksumString(self, short=False):
 		if self.__checksum == None:
@@ -84,21 +110,67 @@ class NodeInfo:
 		self.mtime = None
 		self.checksum = None
 
-
+	def Print(self, prefix = ''):
+		if self.isdir == None:
+			print('{0:s}isdir               <unknown>'. format(prefix))
+		else:
+			print('{0:s}isdir               {1:b}'.format(prefix, self.isdir))
+		if self.size == None:
+			print('{0:s}size                <unknown>'. format(prefix))
+		else:
+			print('{0:s}size                {1:s}'.format(prefix, SizeToString(self.size)))
+		if self.ctime == None:
+			print('{0:s}creation time       <unknown>'.format(prefix))
+		else:
+			print('{0:s}creation time       {1:s}'.\
+				format(prefix, self.ctime.strftime('%Y-%m-%d %H:%M:%S')))
+		if self.atime == None:
+			print('{0:s}access time         <unknown>'.format(prefix))
+		else:
+			print('{0:s}access time         {1:s}'.\
+				format(prefix, self.atime.strftime('%Y-%m-%d %H:%M:%S')))
+		if self.mtime == None:
+			print('{0:s}modification time   <unknown>'.format(prefix))
+		else:
+			print('{0:s}modification time   {1:s}'.\
+				format(prefix, self.mtime.strftime('%Y-%m-%d %H:%M:%S')))
+		if self.checksum == None:
+			print('{0:s}checksum            <unknown>'.format(prefix))
+		else:
+			cs = Checksum()
+			cs.SetChecksum(self.checksum)
+			print('{0:s}checksum            {1:s}'.\
+				format(prefix, cs.GetChecksumString(True)))
 
 class Node:
 
 	def __init__(self):
+		# unique identifiers in filesystem and database
 		self.path = None
-		self.dbcon = None
-	
 		self.nodeid = None
-		self.name = None
+		# data
+		self.fsInfo = None
+		self.dbInfo = None
 		
-		self.dbInfo = NodeInfo()
-		self.fsInfo = NodeInfo()
-
-
+	def Print(self, prefix = ''):
+		if self.path == None:
+			print('{0:s}path                <unknown>'.format(prefix))
+		else:
+			print('{0:s}path                {1:s}'.format(prefix, self.path))
+		if self.nodeid == None:
+			print('{0:s}nodeid              <unknown>'.format(prefix))
+		else:
+			print('{0:s}nodeid              {1:s}'.format(prefix, self.path))
+		print('{0:s}info in filesystem:'.format(prefix))
+		if self.fsInfo == None:
+			print('{0:s}<unknown>'.format(prefix + '  '))
+		else:
+			self.fsInfo.Print(prefix + '  ')
+		print('{0:s}info in database:'.format(prefix))
+		if self.dbInfo == None:
+			print('{0:s}<unknown>'.format(prefix + '  '))
+		else:
+			self.dbInfo.Print(prefix + '  ')
 
 DatabaseCreateString = \
 	'nodeid integer primary key,' + \
@@ -115,9 +187,11 @@ DatabaseCreateString = \
 
 class Database:
 
-	def __init__(self, path):
-		self.__dbfile = path + '.sqlite3'
-		self.__sigfile = path + '.signature'
+	def __init__(self, metaDir):
+		if not os.path.isdir(metaDir):
+			raise MyException('Given meta directory is not a directory.', 3)
+		self.__dbFile = os.path.join(metaDir, 'base.sqlite3')
+		self.__sgFile = os.path.join(metaDir, 'base.signature')
 		self.__dbcon = None
 
 	def __del__(self):
@@ -125,7 +199,7 @@ class Database:
 			self.CloseAndSecure()
 
 	def Open(self):
-		self.__dbcon = sqlite3.connect(self.__dbfile, \
+		self.__dbcon = sqlite3.connect(self.__dbFile, \
 			# necessary for proper retrival of datetime objects from the database,
 			# otherwise the cursor will return string values with the timestamps
 			detect_types=sqlite3.PARSE_DECLTYPES)
@@ -134,37 +208,37 @@ class Database:
 		# problems when file system supports unicode... :-(
 		if sys.version[0] == '2':
 			self.__dbcon.text_factory = str
-	
+
 	def CheckAndOpen(self):
 		cs = Checksum()
-		cs.CalculateChecksum(self.__dbfile)
-		if not cs.IsValid(self.__sigfile):
+		cs.CalculateChecksum(self.__dbFile)
+		if not cs.IsValid(self.__sgFile):
 			raise MyException('The internal database has been corrupted.', 3)
 		self.Open()
-		
+
 	def Close(self):
 		self.__dbcon.close()
 		self.__dbcon = None
-			
+
 	def CloseAndSecure(self):
 		self.Close()
 		cs = Checksum()
-		cs.CalculateChecksum(self.__dbfile)
-		cs.WriteToFile(self.__sigfile)
-	
+		cs.CalculateChecksum(self.__dbFile)
+		cs.WriteToFile(self.__sgFile)
+
 	def IsOpen(self):
 		return not self.__dbcon == None
-	
+
 	def Reset(self):
 		# close if it was open
 		wasOpen = self.IsOpen()
 		if wasOpen:
 			self.Close()
 		# delete files if existing
-		if os.path.exists(self.__dbfile):
-			os.remove(self.__dbfile)
-		if os.path.exists(self.__sigfile):
-			os.remove(self.__sigfile)
+		if os.path.exists(self.__dbFile):
+			os.remove(self.__dbFile)
+		if os.path.exists(self.__sgFile):
+			os.remove(self.__sgFile)
 		# create database
 		self.Open()
 		self.__dbcon.execute('create table nodes (' + DatabaseCreateString + ')')
@@ -173,18 +247,73 @@ class Database:
 		if wasOpen:
 			self.CheckAndOpen()
 
+	def GetRootNode(self, node = None):
+		pass
+
+	def Fetch(self, node):
+		pass
+
+	def GetChildren(self, node):
+		pass
 
 
-class Main:
 
-	def __init__(self, path):
-		self.__rootDir = path
-		self.__metaDir = os.path.join(self.__rootDir, '.' + ProgramName)
-		self.__db = Database(os.path.join(self.__metaDir, 'base'))
+class Filesystem:
+
+	def __init__(self, rootDir, metaDir):
+		if not os.path.isdir(metaDir):
+			raise MyException('Given root directory is not a directory.', 3)
+		self.__rootDir = rootDir
+		self.__metaDir = metaDir
 
 	def Reset(self):
 		if not os.path.exists(self.__metaDir):
 			os.mkdir(self.__metaDir)
+
+	def GetRootNode(self, node = None):
+		if node == None:
+			node = Node()
+		node.path = self.__rootDir
+		self.Fetch(node)
+		return node
+
+	def Fetch(self, node):
+		node.fsInfo = NodeInfo()
+		node.fsInfo.isdir = os.path.isdir(node.path)
+		node.fsInfo.size = os.path.getsize(node.path)
+		# this conversion from unix time stamp to local date/time might fail after year 2038...
+		node.fsInfo.ctime = datetime.datetime.fromtimestamp(os.path.getctime(node.path))
+		node.fsInfo.atime = datetime.datetime.fromtimestamp(os.path.getatime(node.path))
+		node.fsInfo.mtime = datetime.datetime.fromtimestamp(os.path.getmtime(node.path))
+		if not node.fsInfo.isdir:
+			cs = Checksum()
+			cs.CalculateChecksum(node.path)
+			node.fsInfo.checksum = cs.GetChecksum()
+
+	def GetChildren(self, node):
+		result = []
+		for e in os.listdir(node.path):
+			childpath = os.path.join(node.path, e)
+			if childpath == self.__metaDir:
+				continue
+			child = Node()
+			child.path = childpath
+			self.Fetch(child)
+			result.append(child)
+
+
+
+class Main:
+
+	def __init__(self, rootDir):
+		if not os.path.isdir(rootDir):
+			raise MyException('Given root directory is not a directory.', 3)
+		metaDir = os.path.join(rootDir, '.' + ProgramName)
+		self.__fs = Filesystem(rootDir, metaDir)
+		self.__db = Database(metaDir)
+
+	def Reset(self):
+		self.__fs.Reset()
 		self.__db.Reset()
 
 	def Open(self):
@@ -193,11 +322,17 @@ class Main:
 	def Close(self):
 		self.__db.CloseAndSecure()
 
+	def Import(self):
+		n = self.__fs.GetRootNode()
+		self.__fs.GetChildren(n)
+
+
 
 
 m = Main('/home/roebrocp/Projects/dtint-example')
 m.Reset()
 m.Open()
+m.Import()
 m.Close()	
 		
 		
