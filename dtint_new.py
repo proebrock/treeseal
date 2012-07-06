@@ -80,6 +80,7 @@ class Checksum:
 class MyException(Exception):
 
 	def __init__(self, message, level):
+		super(MyException, self).__init__(message)
 		self.__message = message
 		self.__level = level
 
