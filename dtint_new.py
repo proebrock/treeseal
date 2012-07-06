@@ -179,8 +179,17 @@ class Node:
 
 
 
-class NodeList(list):
-	
+class NodeList:
+
+	def __init__(self):
+		self.__dict = {}
+
+	def append(self, node):
+		self.__dict[node.name] = node
+
+	def __iter__(self):
+		return self.__dict.itervalues()
+
 	def Print(self):
 		for node in self:
 			node.Print()
