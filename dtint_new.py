@@ -215,6 +215,27 @@ class NodeTree(NodeContainer):
 
 
 
+class Tree:
+
+	def Reset(self):
+		raise MyException('Not implemented.', 3)
+
+	def GetRootNode(self):
+		raise MyException('Not implemented.', 3)
+
+	def Fetch(self, node):
+		raise MyException('Not implemented.', 3)
+
+	def GetChildren(self, node):
+		raise MyException('Not implemented.', 3)
+
+	def GetParent(self, node):
+		raise MyException('Not implemented.', 3)
+
+	def GetNodeByPath(self, path):
+		raise MyException('Not implemented.', 3)
+
+
 
 # --- SQL strings for database access ---
 # Always keep in sync with Node and NodeInfo classes!
@@ -237,7 +258,7 @@ DatabaseUpdateString = '=?,'.join(DatabaseVarNames[1:]) + '=?'
 
 
 
-class Database:
+class Database(Tree):
 
 	def __init__(self, dbfile, sgfile):
 		self.__dbFile = dbfile
@@ -304,6 +325,7 @@ class Database:
 		cursor.execute('select ' + DatabaseSelectString + \
 			' from nodes where parent is null')
 		self.Fetch(node, cursor.fetchone())
+		node.path = ''
 		cursor.close()
 		return node
 
@@ -342,6 +364,35 @@ class Database:
 		self.Fetch(parent, cursor.fetchone())
 		cursor.close()
 		return parent
+
+	def GetNodeByPath(self, path):
+		if path == '':
+			node = self.GetRootNode()
+			node.path = ''
+			return node
+		# split path into list of names
+		namelist = []
+		p = path
+		while not p == '':
+			s = os.path.split(p)
+			namelist.append(s[1])
+			p = s[0]
+		# traverse through tree until last but one entry
+		cursor = self.__dbcon.cursor()
+		cursor.execute('select nodeid from nodes where parent is null')
+		nodeid = cursor.fetchone()[0]
+		while len(namelist) > 1:
+			cursor.execute('select nodeid from nodes where parent=? and name=?', \
+				(nodeid, namelist.pop()))
+			nodeid = cursor.fetchone()[0]
+		# get last entry and fetch its information
+		cursor.execute('select ' + DatabaseSelectString + \
+			' from nodes where parent=? and name=?', (nodeid, namelist.pop()))
+		node = Node()
+		self.Fetch(node, cursor.fetchone())
+		node.path = path
+		cursor.close()
+		return node
 
 	def GetPath(self, node):
 		n = node
@@ -389,7 +440,7 @@ class Database:
 
 
 
-class Filesystem:
+class Filesystem(Tree):
 
 	def __init__(self, rootDir, metaDir):
 		if not os.path.exists(rootDir):
@@ -409,13 +460,15 @@ class Filesystem:
 
 	def GetRootNode(self):
 		node = Node()
-		node.name = ''
 		node.path = ''
 		self.Fetch(node)
 		return node
 
 	def Fetch(self, node):
 		fullpath = os.path.join(self.__rootDir, node.path)
+		if not os.path.exists(fullpath):
+			raise MyException('Cannot fetch data for non-existing path.', 3)
+		node.name = os.path.split(node.path)[1]
 		node.isdir = os.path.isdir(fullpath)
 		node.size = os.path.getsize(fullpath)
 		# this conversion from unix time stamp to local date/time might fail after year 2038...
@@ -433,7 +486,6 @@ class Filesystem:
 			if os.path.samefile(os.path.join(self.__rootDir, childpath), self.__metaDir):
 				continue
 			child = Node()
-			child.name = childname
 			child.path = childpath
 			child.parentid = node.nodeid # important when importing nodes into the db
 			self.Fetch(child)
@@ -447,6 +499,14 @@ class Filesystem:
 		parent.path = os.path.split(node.path)[0]
 		self.Fetch(parent)
 		return parent
+
+	def GetNodeByPath(self, path):
+		if not os.path.join(self.__rootDir, path):
+			return None
+		node = Node()
+		node.path = path
+		self.Fetch(node)
+		return node
 
 
 
@@ -500,12 +560,13 @@ class Instance:
 	def Test(self):
 		#t = self.GetTree()
 		#t.Print()
-		cs = Checksum()
-		#cs.SetString('97e5bc626f1d771ed0c1db494b5a21db004517d52b8a18ec545508e38aef47c9')
-		cs.SetString('042494e1a352e5e8b930060095950eeffa7f094f21b2dafcb0b5ce49c744defa')
-		n = self.__db.GetNodesWithSameChecksum(cs)
-		self.__db.GetPath(n[0])
-		self.__db.GetPath(n[1])
+		#n = self.__fs.GetRootNode()
+		#n.Print()
+		#m = self.__fs.GetChildren(n)
+		#m.Print()
+		n = self.__fs.GetRootNode()
+		n.Print()
+		n = self.__db.GetRootNode()
 		n.Print()
 
 
