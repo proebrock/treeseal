@@ -313,7 +313,9 @@ class Database:
 		node.ctime = row[5]
 		node.atime = row[6]
 		node.mtime = row[7]
-		node.checksum = row[8]
+		if not node.isdir:
+			node.checksum = Checksum()
+			node.checksum.SetBinary(row[8])
 	
 	def GetChildren(self, node):
 		result = NodeTree()
