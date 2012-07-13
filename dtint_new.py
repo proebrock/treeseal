@@ -235,6 +235,18 @@ class Tree:
 	def GetNodeByPath(self, path):
 		raise MyException('Not implemented.', 3)
 
+	def GetTreeRecurse(self, nodetree):
+		for node in nodetree:
+			if node.isdir:
+				node.children = self.GetChildren(node)
+				self.GetTreeRecurse(node.children)
+
+	def GetTree(self):
+		nodetree = NodeTree()
+		nodetree.append(self.GetRootNode())
+		self.GetTreeRecurse(nodetree)
+		return nodetree
+
 
 
 # --- SQL strings for database access ---
@@ -545,29 +557,9 @@ class Instance:
 		self.ImportRecurse(nodelist)
 		self.__db.Commit()
 
-	def GetTreeRecurse(self, nodetree, skipValids):
-		for node in nodetree:
-			if node.isdir:
-				node.children = self.__fs.GetChildren(node)
-				self.GetTreeRecurse(node.children, skipValids)
-
-	def GetTree(self, skipValids=True):
-		nodetree = NodeTree()
-		nodetree.append(self.__fs.GetRootNode())
-		self.GetTreeRecurse(nodetree, skipValids)
-		return nodetree
-
 	def Test(self):
-		#t = self.GetTree()
-		#t.Print()
-		#n = self.__fs.GetRootNode()
-		#n.Print()
-		#m = self.__fs.GetChildren(n)
-		#m.Print()
-		n = self.__fs.GetRootNode()
-		n.Print()
-		n = self.__db.GetRootNode()
-		n.Print()
+		t = self.__db.GetTree()
+		t.Print()
 
 
 
