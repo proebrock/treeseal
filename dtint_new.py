@@ -35,9 +35,10 @@ def SizeToString(size):
 class Checksum:
 
 	def __init__(self):
-		self.__checksum = None
+		self.__checksum = None # is of type 'buffer'
+		self.__checksumbits = 256
 
-	def CalculateChecksum(self, path):
+	def Calculate(self, path):
 		checksum = hashlib.sha256()
 		buffersize = 2**20
 		f = open(path,'rb')
@@ -49,13 +50,20 @@ class Checksum:
 		f.close()
 		self.__checksum = buffer(checksum.digest())
 
-	def SetChecksum(self, checksum):
+	def SetBinary(self, checksum):
+		if not len(checksum) == self.__checksumbits/8:
+			raise MyException('Wrong checksum size.', 3)
 		self.__checksum = checksum
 
-	def GetChecksum(self):
+	def GetBinary(self):
 		return self.__checksum
 
-	def GetChecksumString(self, short=False):
+	def SetString(self, checksum):
+		if not len(checksum) == 2*self.__checksumbits/8:
+			raise MyException('Wrong checksum size.', 3)
+		self.__checksum = binascii.unhexlify(checksum)
+
+	def GetString(self, short=False):
 		if self.__checksum == None:
 			return '<none>'
 		else:
@@ -66,14 +74,20 @@ class Checksum:
 
 	def WriteToFile(self, path):
 		f = open(path, 'w')
-		f.write(self.GetChecksumString())
+		f.write(self.GetString())
 		f.close()
 		
 	def IsValid(self, path):
 		f = open(path, 'r')
 		csum = f.read()
 		f.close()
-		return csum == self.GetChecksumString()
+		return csum == self.GetString()
+
+	def Print(self):
+		print(self.GetString())
+
+	def IsEqual(self, other):
+		return self.GetString() == other.GetString()
 
 
 
