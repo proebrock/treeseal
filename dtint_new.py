@@ -175,14 +175,31 @@ class Node:
 		if self.checksum == None:
 			print('{0:s}checksum            <unknown>'.format(prefix))
 		else:
-			cs = Checksum()
-			cs.SetChecksum(self.checksum)
 			print('{0:s}checksum            {1:s}'.\
-				format(prefix, cs.GetChecksumString(True)))
+				format(prefix, self.checksum.GetString()))
 
 
 
-class NodeTree:
+class NodeContainer:
+
+	def PrintRecurse(self, nodes, depth):
+		for n in nodes:
+			n.Print(depth * '    ')
+			#print((depth * '    ') + n.name)
+			if not n.children == None:
+				self.PrintRecurse(n.children, depth + 1)
+
+	def Print(self):
+		self.PrintRecurse(self, 0)
+
+
+
+class NodeList(NodeContainer, list):
+	pass
+
+
+
+class NodeTree(NodeContainer):
 
 	def __init__(self):
 		self.__dict = {}
@@ -196,15 +213,6 @@ class NodeTree:
 	def __getitem__(self, key):
 		return self.__dict.values().__getitem__(key)
 
-	def PrintRecurse(self, nodelist, depth):
-		for node in nodelist:
-			node.Print(depth * '    ')
-			#print((depth * '    ') + node.name)
-			if not node.children == None:
-				self.PrintRecurse(node.children, depth + 1)
-
-	def Print(self):
-		self.PrintRecurse(self, 0)
 
 
 
@@ -231,13 +239,9 @@ DatabaseUpdateString = '=?,'.join(DatabaseVarNames[1:]) + '=?'
 
 class Database:
 
-	def __init__(self, metaDir):
-		if not os.path.exists(metaDir):
-			raise MyException('Given meta data directory does not exist.', 3)
-		if not os.path.isdir(metaDir):
-			raise MyException('Given meta data directory is not a directory.', 3)
-		self.__dbFile = os.path.join(metaDir, 'base.sqlite3')
-		self.__sgFile = os.path.join(metaDir, 'base.signature')
+	def __init__(self, dbfile, sgfile):
+		self.__dbFile = dbfile
+		self.__sgFile = sgfile
 		self.__dbcon = None
 
 	def __del__(self):
@@ -257,7 +261,7 @@ class Database:
 
 	def CheckAndOpen(self):
 		cs = Checksum()
-		cs.CalculateChecksum(self.__dbFile)
+		cs.Calculate(self.__dbFile)
 		if not cs.IsValid(self.__sgFile):
 			raise MyException('The internal database has been corrupted.', 3)
 		self.Open()
@@ -269,7 +273,7 @@ class Database:
 	def CloseAndSecure(self):
 		self.Close()
 		cs = Checksum()
-		cs.CalculateChecksum(self.__dbFile)
+		cs.Calculate(self.__dbFile)
 		cs.WriteToFile(self.__sgFile)
 
 	def IsOpen(self):
@@ -288,21 +292,20 @@ class Database:
 		# create database
 		self.Open()
 		self.__dbcon.execute('create table nodes (' + DatabaseCreateString + ')')
+		self.__dbcon.execute('create index checksumindex on nodes (checksum)')
 		self.CloseAndSecure()
 		# reopen if necessary
 		if wasOpen:
 			self.CheckAndOpen()
 
-	def GetRootNodeList(self):
+	def GetRootNode(self):
 		node = Node()
 		cursor = self.__dbcon.cursor()
 		cursor.execute('select ' + DatabaseSelectString + \
 			' from nodes where parent is null')
 		self.Fetch(node, cursor.fetchone())
 		cursor.close()
-		result = NodeTree()
-		result.append(node)
-		return result
+		return node
 
 	def Fetch(self, node, row):
 		node.nodeid = row[0]
@@ -327,17 +330,56 @@ class Database:
 			self.Fetch(child, row)
 			result.append(child)
 		cursor.close()
-		return result	
-		
+		return result
+
+	def GetParent(self, node):
+		if node.parentid == None:
+			return None
+		cursor = self.__dbcon.cursor()
+		cursor.execute('select ' + DatabaseSelectString + \
+			' from nodes where nodeid=?', (node.parentid,))
+		parent = Node()
+		self.Fetch(parent, cursor.fetchone())
+		cursor.close()
+		return parent
+
+	def GetPath(self, node):
+		n = node
+		namelist = []
+		while True:
+			if n == None:
+				break;
+			else:
+				namelist.append(n.name)
+			n = self.GetParent(n)
+		namelist.reverse()
+		node.path = reduce(lambda x, y: os.path.join(x, y), namelist)
+
+	def GetNodesWithSameChecksum(self, checksum):
+		result = NodeList()
+		cursor = self.__dbcon.cursor()
+		cursor.execute('select ' + DatabaseSelectString + \
+			' from nodes where checksum=X\'{0:s}\''.format(checksum.GetString()))
+		for row in cursor:
+			child = Node()
+			self.Fetch(child, row)
+			result.append(child)
+		cursor.close()
+		return result
+
 	def InsertNode(self, node):
 		if not node.nodeid == None:
 			raise MyException('Node already contains a valid node id, ' + \
 				'so maybe you want to update instead of insert?', 3)
 		cursor = self.__dbcon.cursor()
+		if node.checksum == None:
+			checksum = None
+		else:
+			checksum = node.checksum.GetBinary()
 		cursor.execute('insert into nodes (' + DatabaseInsertVars + \
 			') values (' + DatabaseInsertQMarks + ')', \
 			(node.parentid, node.name, node.isdir, node.size, \
-			node.ctime, node.atime, node.mtime, node.checksum))
+			node.ctime, node.atime, node.mtime, checksum))
 		node.nodeid = cursor.lastrowid
 		cursor.close()
 		
@@ -365,40 +407,46 @@ class Filesystem:
 		if not os.path.exists(self.__metaDir):
 			os.mkdir(self.__metaDir)
 
-	def GetRootNodeList(self):
+	def GetRootNode(self):
 		node = Node()
 		node.name = ''
-		node.path = self.__rootDir
+		node.path = ''
 		self.Fetch(node)
-		result = NodeTree()
-		result.append(node)
-		return result
+		return node
 
 	def Fetch(self, node):
-		node.isdir = os.path.isdir(node.path)
-		node.size = os.path.getsize(node.path)
+		fullpath = os.path.join(self.__rootDir, node.path)
+		node.isdir = os.path.isdir(fullpath)
+		node.size = os.path.getsize(fullpath)
 		# this conversion from unix time stamp to local date/time might fail after year 2038...
-		node.ctime = datetime.datetime.fromtimestamp(os.path.getctime(node.path))
-		node.atime = datetime.datetime.fromtimestamp(os.path.getatime(node.path))
-		node.mtime = datetime.datetime.fromtimestamp(os.path.getmtime(node.path))
+		node.ctime = datetime.datetime.fromtimestamp(os.path.getctime(fullpath))
+		node.atime = datetime.datetime.fromtimestamp(os.path.getatime(fullpath))
+		node.mtime = datetime.datetime.fromtimestamp(os.path.getmtime(fullpath))
 		if not node.isdir:
-			cs = Checksum()
-			cs.CalculateChecksum(node.path)
-			node.checksum = cs.GetChecksum()
+			node.checksum = Checksum()
+			node.checksum.Calculate(fullpath)
 
 	def GetChildren(self, node):
 		result = NodeTree()
-		for childname in os.listdir(node.path):
+		for childname in os.listdir(os.path.join(self.__rootDir, node.path)):
 			childpath = os.path.join(node.path, childname)
-			if childpath == self.__metaDir:
+			if os.path.samefile(os.path.join(self.__rootDir, childpath), self.__metaDir):
 				continue
 			child = Node()
 			child.name = childname
 			child.path = childpath
-			child.parentid = node.nodeid
+			child.parentid = node.nodeid # important when importing nodes into the db
 			self.Fetch(child)
 			result.append(child)
 		return result
+
+	def GetParent(self, node):
+		if node.path == '':
+			return None
+		parent = Node()
+		parent.path = os.path.split(node.path)[0]
+		self.Fetch(parent)
+		return parent
 
 
 
@@ -411,7 +459,9 @@ class Instance:
 			raise MyException('Given root directory is not a directory.', 3)
 		metaDir = os.path.join(rootDir, '.' + ProgramName)
 		self.__fs = Filesystem(rootDir, metaDir)
-		self.__db = Database(metaDir)
+		dbfile = os.path.join(metaDir, 'base.sqlite3')
+		sgfile = os.path.join(metaDir, 'base.signature')
+		self.__db = Database(dbfile, sgfile)
 
 	def Reset(self):
 		self.__fs.Reset()
@@ -430,7 +480,9 @@ class Instance:
 				self.ImportRecurse(self.__fs.GetChildren(node))
 
 	def Import(self):
-		self.ImportRecurse(self.__fs.GetRootNodeList())
+		nodelist = NodeTree()
+		nodelist.append(self.__fs.GetRootNode())
+		self.ImportRecurse(nodelist)
 		self.__db.Commit()
 
 	def GetTreeRecurse(self, nodetree, skipValids):
@@ -440,9 +492,21 @@ class Instance:
 				self.GetTreeRecurse(node.children, skipValids)
 
 	def GetTree(self, skipValids=True):
-		nodetree = self.__fs.GetRootNodeList()
+		nodetree = NodeTree()
+		nodetree.append(self.__fs.GetRootNode())
 		self.GetTreeRecurse(nodetree, skipValids)
 		return nodetree
+
+	def Test(self):
+		#t = self.GetTree()
+		#t.Print()
+		cs = Checksum()
+		#cs.SetString('97e5bc626f1d771ed0c1db494b5a21db004517d52b8a18ec545508e38aef47c9')
+		cs.SetString('042494e1a352e5e8b930060095950eeffa7f094f21b2dafcb0b5ce49c744defa')
+		n = self.__db.GetNodesWithSameChecksum(cs)
+		self.__db.GetPath(n[0])
+		self.__db.GetPath(n[1])
+		n.Print()
 
 
 
@@ -450,6 +514,5 @@ inst = Instance('../dtint-example')
 inst.Reset()
 inst.Open()
 inst.Import()
-t = inst.GetTree(False)
-t.Print()
+inst.Test()
 inst.Close()
