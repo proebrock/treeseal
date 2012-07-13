@@ -101,9 +101,13 @@ class MyException(Exception):
 
 
 
-class NodeInfo:
+class Node:
 
 	def __init__(self):
+		self.nodeid = None
+		self.parentid = None
+		self.name = None
+		self.path = None
 		self.isdir = None
 		self.size = None
 		self.ctime = None
@@ -111,7 +115,26 @@ class NodeInfo:
 		self.mtime = None
 		self.checksum = None
 
+		self.children = None
+		self.similar = None
+
 	def Print(self, prefix=''):
+		if self.nodeid == None:
+			print('{0:s}nodeid              <unknown>'.format(prefix))
+		else:
+			print('{0:s}nodeid              {1:d}'.format(prefix, self.nodeid))
+		if self.parentid == None:
+			print('{0:s}parentid            <unknown>'.format(prefix))
+		else:
+			print('{0:s}parentid            {1:d}'.format(prefix, self.parentid))
+		if self.name == None:
+			print('{0:s}name                <unknown>'.format(prefix))
+		else:
+			print('{0:s}name                {1:s}'.format(prefix, self.name))
+		if self.path == None:
+			print('{0:s}path                <unknown>'.format(prefix))
+		else:
+			print('{0:s}path                {1:s}'.format(prefix, self.path))
 		if self.isdir == None:
 			print('{0:s}isdir               <unknown>'. format(prefix))
 		else:
@@ -142,43 +165,6 @@ class NodeInfo:
 			cs.SetChecksum(self.checksum)
 			print('{0:s}checksum            {1:s}'.\
 				format(prefix, cs.GetChecksumString(True)))
-
-class Node:
-
-	def __init__(self):
-		# unique identifiers in filesystem and database
-		self.name = None
-		self.path = None
-		self.nodeid = None
-		# data
-		self.fsInfo = None
-		self.dbInfo = None
-		# container of type NodeTree to keep child nodes (all or selected ones)
-		self.children = None
-
-	def Print(self, prefix=''):
-		if self.name == None:
-			print('{0:s}name                <unknown>'.format(prefix))
-		else:
-			print('{0:s}name                {1:s}'.format(prefix, self.name))
-		if self.path == None:
-			print('{0:s}path                <unknown>'.format(prefix))
-		else:
-			print('{0:s}path                {1:s}'.format(prefix, self.path))
-		if self.nodeid == None:
-			print('{0:s}nodeid              <unknown>'.format(prefix))
-		else:
-			print('{0:s}nodeid              {1:d}'.format(prefix, self.nodeid))
-		print('{0:s}info in filesystem:'.format(prefix))
-		if self.fsInfo == None:
-			print('{0:s}<unknown>'.format(prefix + '  '))
-		else:
-			self.fsInfo.Print(prefix + '  ')
-		print('{0:s}info in database:'.format(prefix))
-		if self.dbInfo == None:
-			print('{0:s}<unknown>'.format(prefix + '  '))
-		else:
-			self.dbInfo.Print(prefix + '  ')
 
 
 
@@ -293,27 +279,27 @@ class Database:
 		if wasOpen:
 			self.CheckAndOpen()
 
-	def GetRootNode(self):
+	def GetRootNodeList(self):
 		node = Node()
 		cursor = self.__dbcon.cursor()
 		cursor.execute('select ' + DatabaseSelectString + \
 			' from nodes where parent is null')
 		self.Fetch(node, cursor.fetchone())
 		cursor.close()
-		return node
-
+		result = NodeTree()
+		result.append(node)
+		return result
 
 	def Fetch(self, node, row):
 		node.nodeid = row[0]
-		# ignore parentid in row[1]
+		node.parentid = row[1]
 		node.name = row[2]
-		node.dbInfo = NodeInfo()
-		node.dbInfo.isdir = row[3]
-		node.dbInfo.size = row[4]
-		node.dbInfo.ctime = row[5]
-		node.dbInfo.atime = row[6]
-		node.dbInfo.mtime = row[7]
-		node.dbInfo.checksum = row[8]
+		node.isdir = row[3]
+		node.size = row[4]
+		node.ctime = row[5]
+		node.atime = row[6]
+		node.mtime = row[7]
+		node.checksum = row[8]
 	
 	def GetChildren(self, node):
 		result = NodeTree()
@@ -327,31 +313,21 @@ class Database:
 		cursor.close()
 		return result	
 		
-	def InsertNode(self, node, parentnode=None):
-		if node.dbInfo == None:
-			raise MyException('Cannot write an empty node to database.', 3)
+	def InsertNode(self, node):
 		if not node.nodeid == None:
 			raise MyException('Node already contains a valid node id, ' + \
 				'so maybe you want to update instead of insert?', 3)
-		if parentnode == None:
-			parentid = None
-		else:
-			parentid = parentnode.nodeid
 		cursor = self.__dbcon.cursor()
 		cursor.execute('insert into nodes (' + DatabaseInsertVars + \
 			') values (' + DatabaseInsertQMarks + ')', \
-			(parentid, node.name, node.dbInfo.isdir, node.dbInfo.size, \
-			node.dbInfo.ctime, node.dbInfo.atime, node.dbInfo.mtime, \
-			node.dbInfo.checksum))
+			(node.parentid, node.name, node.isdir, node.size, \
+			node.ctime, node.atime, node.mtime, node.checksum))
 		node.nodeid = cursor.lastrowid
 		cursor.close()
 		
 	def Commit(self):
 		self.__dbcon.commit()
 		self.__dbcon.execute('vacuum')
-
-	def MergeInfo(self, nodelist):
-		pass
 
 
 
@@ -373,25 +349,26 @@ class Filesystem:
 		if not os.path.exists(self.__metaDir):
 			os.mkdir(self.__metaDir)
 
-	def GetRootNode(self):
+	def GetRootNodeList(self):
 		node = Node()
 		node.name = ''
 		node.path = self.__rootDir
 		self.Fetch(node)
-		return node
+		result = NodeTree()
+		result.append(node)
+		return result
 
 	def Fetch(self, node):
-		node.fsInfo = NodeInfo()
-		node.fsInfo.isdir = os.path.isdir(node.path)
-		node.fsInfo.size = os.path.getsize(node.path)
+		node.isdir = os.path.isdir(node.path)
+		node.size = os.path.getsize(node.path)
 		# this conversion from unix time stamp to local date/time might fail after year 2038...
-		node.fsInfo.ctime = datetime.datetime.fromtimestamp(os.path.getctime(node.path))
-		node.fsInfo.atime = datetime.datetime.fromtimestamp(os.path.getatime(node.path))
-		node.fsInfo.mtime = datetime.datetime.fromtimestamp(os.path.getmtime(node.path))
-		if not node.fsInfo.isdir:
+		node.ctime = datetime.datetime.fromtimestamp(os.path.getctime(node.path))
+		node.atime = datetime.datetime.fromtimestamp(os.path.getatime(node.path))
+		node.mtime = datetime.datetime.fromtimestamp(os.path.getmtime(node.path))
+		if not node.isdir:
 			cs = Checksum()
 			cs.CalculateChecksum(node.path)
-			node.fsInfo.checksum = cs.GetChecksum()
+			node.checksum = cs.GetChecksum()
 
 	def GetChildren(self, node):
 		result = NodeTree()
@@ -402,6 +379,7 @@ class Filesystem:
 			child = Node()
 			child.name = childname
 			child.path = childpath
+			child.parentid = node.nodeid
 			self.Fetch(child)
 			result.append(child)
 		return result
@@ -429,29 +407,24 @@ class Instance:
 	def Close(self):
 		self.__db.CloseAndSecure()
 		
-	def ImportRecurse(self, nodelist, parentnode):
+	def ImportRecurse(self, nodelist):
 		for node in nodelist:
-			node.dbInfo = node.fsInfo
-			self.__db.InsertNode(node, parentnode)
-			if node.fsInfo.isdir:
-				self.ImportRecurse(self.__fs.GetChildren(node), node)
+			self.__db.InsertNode(node)
+			if node.isdir:
+				self.ImportRecurse(self.__fs.GetChildren(node))
 
 	def Import(self):
-		nodelist = NodeTree()
-		nodelist.append(self.__fs.GetRootNode())
-		self.ImportRecurse(nodelist, None)
+		self.ImportRecurse(self.__fs.GetRootNodeList())
 		self.__db.Commit()
 
 	def GetTreeRecurse(self, nodetree, skipValids):
-		self.__db.MergeInfo(nodetree)
 		for node in nodetree:
-			if node.fsInfo.isdir:
+			if node.isdir:
 				node.children = self.__fs.GetChildren(node)
 				self.GetTreeRecurse(node.children, skipValids)
 
 	def GetTree(self, skipValids=True):
-		nodetree = NodeTree()
-		nodetree.append(self.__fs.GetRootNode())
+		nodetree = self.__fs.GetRootNodeList()
 		self.GetTreeRecurse(nodetree, skipValids)
 		return nodetree
 
