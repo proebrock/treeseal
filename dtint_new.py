@@ -719,6 +719,7 @@ class ListControlPanel(wx.Panel):
 
 		# start with empty node tree
 		self.nodestack = []
+		self.namestack = []
 
 		# one pseudo boxer with the listctrl filling the whole panel
 		sizer = wx.BoxSizer(wx.VERTICAL)
@@ -757,24 +758,29 @@ class ListControlPanel(wx.Panel):
 			self.list.SetStringItem(0, 2, '..')
 		for node in self.nodestack[-1]:
 			self.AppendNode(node)
-
+		path = reduce(lambda x, y: os.path.join(x, y), self.namestack)
+		self.GetParent().SetAddressLine(path)
 
 	def ShowNodeTree(self, nodetree):
 		self.list.SetFocus()
 		self.nodestack = []
 		self.nodestack.append(nodetree[0].children)
+		self.namestack = []
+		self.namestack.append('')
 		self.RefreshTree()
 
 	def OnItemActivated(self, event):
 		index = event.m_itemIndex
 		if (not self.IsRoot()) and index == 0:
 			self.nodestack.pop()
+			self.namestack.pop()
 			self.RefreshTree()
 			return
 		pythonid = self.list.GetItemData(index)
 		node = self.nodestack[-1].GetByPythonID(pythonid)
 		if node.isdir:
 			self.nodestack.append(node.children)
+			self.namestack.append(node.name)
 			self.RefreshTree()
 
 
@@ -802,7 +808,6 @@ class MainFrame(wx.Frame):
 
 		# main window consists of address line and directory listing
 		self.address = wx.TextCtrl(self, -1, style=wx.TE_READONLY)
-		self.address.SetValue('/home/phil/Data')
 		self.list = ListControlPanel(self)
 
 		# initialize local attributes
@@ -816,6 +821,9 @@ class MainFrame(wx.Frame):
 		self.CreateStatusBar()
 
 		self.Show(True)
+
+	def SetAddressLine(self, path):
+		self.address.SetValue(path)
 
 	def OnOpen(self, event):
 		 # ask user with dir select dialog
