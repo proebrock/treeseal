@@ -361,7 +361,7 @@ class Database(Tree):
 
 	def __del__(self):
 		if self.IsOpen():
-			self.CloseAndSecure()
+			self.Close()
 
 	def Open(self):
 		cs = Checksum()
