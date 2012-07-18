@@ -7,6 +7,7 @@ import os
 import sqlite3
 import sys
 import wx
+import wx.lib.mixins.listctrl as listmix
 
 
 
@@ -452,7 +453,7 @@ class Database(Tree):
 		namelist = []
 		while True:
 			if n == None:
-				break;
+				break
 			else:
 				namelist.append(n.name)
 			n = self.GetParent(n)
@@ -610,28 +611,53 @@ class Instance:
 
 
 
-class ListControl(wx.ListCtrl):
+class ListControl(wx.ListCtrl, listmix.ListCtrlAutoWidthMixin):
 
-	def __init__(self, parent, ID=wx.ID_ANY, pos=wx.DefaultPosition, \
-		size=wx.DefaultSize, style=0):
-		wx.ListCtrl.__init__(self, parent, ID, pos, size, style)
+	def __init__(self, parent):
+		wx.ListCtrl.__init__(self, parent, style=wx.LC_REPORT | wx.LC_SORT_ASCENDING)
+
+		self.coldefs = \
+			[ \
+				('', 32), \
+				('Name', 200), \
+				('Dir', 32), \
+				('Size', 130), \
+				('CTime', 142), \
+				('ATime', 142), \
+				('MTime', 142), \
+				('Checksum', 132)
+			]
+
+		index = 0
+		for coldef in self.coldefs:
+			self.InsertColumn(index, coldef[0])
+			self.SetColumnWidth(index, coldef[1])
+			index = index + 1
+
+		listmix.ListCtrlAutoWidthMixin.__init__(self)
+		self.setResizeColumn(2)
+
+	def AppendNode(self, node):
+		index = self.GetItemCount()
+		self.InsertStringItem(index, 'OK')
+		self.SetStringItem(index, 1, node.name)
+		self.SetStringItem(index, 2, node.GetIsDirString())
+		self.SetStringItem(index, 3, node.GetSizeString())
+		self.SetStringItem(index, 4, node.GetCTimeString())
+		self.SetStringItem(index, 5, node.GetATimeString())
+		self.SetStringItem(index, 6, node.GetMTimeString())
+		self.SetStringItem(index, 7, node.GetChecksumString())
+		self.SetItemData(index, node.GetPythonID())
 
 
 
 class ListControlPanel(wx.Panel):
+
 	def __init__(self, parent):
 		wx.Panel.__init__(self, parent, -1, style=wx.WANTS_CHARS)
 
-		self.list = ListControl(self, size=(-1,100), style=wx.LC_REPORT | wx.LC_SORT_ASCENDING)
+		self.list = ListControl(self)
 		self.list.Bind(wx.EVT_LIST_ITEM_SELECTED, self.OnItemSelected)
-		self.list.InsertColumn(0, 'Status')
-		self.list.InsertColumn(1, 'Name')
-		self.list.InsertColumn(2, 'IsDir')
-		self.list.InsertColumn(3, 'Size')
-		self.list.InsertColumn(4, 'CTime')
-		self.list.InsertColumn(5, 'ATime')
-		self.list.InsertColumn(6, 'MTime')
-		self.list.InsertColumn(7, 'Checksum')
 
 		self.nodetree = None
 
@@ -639,23 +665,11 @@ class ListControlPanel(wx.Panel):
 		sizer.Add(self.list, 1, wx.ALL | wx.EXPAND, 5)
 		self.SetSizer(sizer)
 
-	def AppendNode(self, node):
-		index = self.list.GetItemCount()
-		self.list.InsertStringItem(index, 'OK')
-		self.list.SetStringItem(index, 1, node.name)
-		self.list.SetStringItem(index, 2, node.GetIsDirString())
-		self.list.SetStringItem(index, 3, node.GetSizeString())
-		self.list.SetStringItem(index, 4, node.GetCTimeString())
-		self.list.SetStringItem(index, 5, node.GetATimeString())
-		self.list.SetStringItem(index, 6, node.GetMTimeString())
-		self.list.SetStringItem(index, 7, node.GetChecksumString())
-		self.list.SetItemData(index, node.GetPythonID())
-
 	def ShowNodeTree(self, nodetree):
 		self.list.DeleteAllItems()
 		self.nodetree = nodetree
 		for node in self.nodetree:
-			self.AppendNode(node)
+			self.list.AppendNode(node)
 
 	def OnItemSelected(self, event):
 		index = event.m_itemIndex
@@ -667,7 +681,7 @@ class ListControlPanel(wx.Panel):
 
 class MainFrame(wx.Frame):
 	def __init__(self, parent):
-		wx.Frame.__init__(self, parent, title='dtint', size=(800,600))
+		wx.Frame.__init__(self, parent, title='dtint', size=(1024,768))
 
 		# main menue definition
 		fileMenu = wx.Menu()
@@ -687,7 +701,7 @@ class MainFrame(wx.Frame):
 
 		# main window consists of address line and directory listing
 		self.address = wx.TextCtrl(self, -1, style=wx.TE_READONLY)
-		self.address.SetValue('/home/phil/Data');
+		self.address.SetValue('/home/phil/Data')
 		self.list = ListControlPanel(self)
 
 		sizer = wx.BoxSizer(wx.VERTICAL)
