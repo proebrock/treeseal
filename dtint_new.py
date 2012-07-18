@@ -249,6 +249,9 @@ class NodeTree(NodeContainer):
 		self.__dictByID.clear()
 		self.__dictByName.clear()
 
+	def GetPythonIDDictionary(self):
+		return self.__dictByID
+
 	def GetByPythonID(self, pythonid):
 		return self.__dictByID[pythonid]
 
@@ -613,8 +616,17 @@ class Instance:
 
 class ListControl(wx.ListCtrl, listmix.ListCtrlAutoWidthMixin):
 
+	def __init__(self, parent, ID=wx.ID_ANY, pos=wx.DefaultPosition, \
+		size=wx.DefaultSize, style=0):
+		wx.ListCtrl.__init__(self, parent, ID, pos, size, style)
+		listmix.ListCtrlAutoWidthMixin.__init__(self)
+
+
+
+class ListControlPanel(wx.Panel): #, listmix.ColumnSorterMixin):
+
 	def __init__(self, parent):
-		wx.ListCtrl.__init__(self, parent, style=wx.LC_REPORT | wx.LC_SORT_ASCENDING)
+		wx.Panel.__init__(self, parent, -1, style=wx.WANTS_CHARS)
 
 		self.coldefs = \
 			[ \
@@ -628,48 +640,55 @@ class ListControl(wx.ListCtrl, listmix.ListCtrlAutoWidthMixin):
 				('Checksum', 132)
 			]
 
-		index = 0
-		for coldef in self.coldefs:
-			self.InsertColumn(index, coldef[0])
-			self.SetColumnWidth(index, coldef[1])
-			index = index + 1
-
-		listmix.ListCtrlAutoWidthMixin.__init__(self)
-		self.setResizeColumn(2)
-
-	def AppendNode(self, node):
-		index = self.GetItemCount()
-		self.InsertStringItem(index, 'OK')
-		self.SetStringItem(index, 1, node.name)
-		self.SetStringItem(index, 2, node.GetIsDirString())
-		self.SetStringItem(index, 3, node.GetSizeString())
-		self.SetStringItem(index, 4, node.GetCTimeString())
-		self.SetStringItem(index, 5, node.GetATimeString())
-		self.SetStringItem(index, 6, node.GetMTimeString())
-		self.SetStringItem(index, 7, node.GetChecksumString())
-		self.SetItemData(index, node.GetPythonID())
-
-
-
-class ListControlPanel(wx.Panel):
-
-	def __init__(self, parent):
-		wx.Panel.__init__(self, parent, -1, style=wx.WANTS_CHARS)
-
-		self.list = ListControl(self)
+		self.list = self.list = ListControl(self, size=(-1,100), style=wx.LC_REPORT | wx.LC_SORT_ASCENDING)
 		self.list.Bind(wx.EVT_LIST_ITEM_SELECTED, self.OnItemSelected)
 
-		self.nodetree = None
+		index = 0
+		for coldef in self.coldefs:
+			self.list.InsertColumn(index, coldef[0])
+			self.list.SetColumnWidth(index, coldef[1])
+			index = index + 1
+
+		# for listmix.ListCtrlAutoWidthMixin
+		self.list.setResizeColumn(2)
+
+		# for listmix.ColumnSorterMixin
+		#listmix.ColumnSorterMixin.__init__(self, 8)
+		#self.Bind(wx.EVT_LIST_COL_CLICK, self.OnColumnClick, self.list)
+
+		self.ShowNodeTree(NodeTree())
 
 		sizer = wx.BoxSizer(wx.VERTICAL)
 		sizer.Add(self.list, 1, wx.ALL | wx.EXPAND, 5)
 		self.SetSizer(sizer)
 
+	def GetListCtrl(self):
+		# used by listmix.ColumnSorterMixin
+		return self.list
+
+	def OnColumnClick(self, event):
+		# used by listmix.ColumnSorterMixin
+		event.Skip()
+
+	def AppendNode(self, node):
+		index = self.list.GetItemCount()
+		self.list.InsertStringItem(index, 'OK')
+		self.list.SetStringItem(index, 1, node.name)
+		self.list.SetStringItem(index, 2, node.GetIsDirString())
+		self.list.SetStringItem(index, 3, node.GetSizeString())
+		self.list.SetStringItem(index, 4, node.GetCTimeString())
+		self.list.SetStringItem(index, 5, node.GetATimeString())
+		self.list.SetStringItem(index, 6, node.GetMTimeString())
+		self.list.SetStringItem(index, 7, node.GetChecksumString())
+		self.list.SetItemData(index, node.GetPythonID())
+
 	def ShowNodeTree(self, nodetree):
 		self.list.DeleteAllItems()
 		self.nodetree = nodetree
 		for node in self.nodetree:
-			self.list.AppendNode(node)
+			self.AppendNode(node)
+		# used by listmix.ColumnSorterMixin
+		#self.itemDataMap = self.nodetree.GetPythonIDDictionary()
 
 	def OnItemSelected(self, event):
 		index = event.m_itemIndex
