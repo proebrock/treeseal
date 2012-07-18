@@ -104,6 +104,7 @@ class MyException(Exception):
 class Node:
 
 	def __init__(self):
+		self.status = None
 		self.pythonid = id(self)
 		self.nodeid = None
 		self.parentid = None
@@ -124,6 +125,22 @@ class Node:
 	def GetPythonID(self):
 		return self.pythonid
 
+	def GetStatusString(self):
+		if self.status == None:
+			return self.NoneString
+		elif self.status == 0:
+			return 'OK'
+		elif self.status == 1:
+			return 'New'
+		elif self.status == 2:
+			return 'Missing'
+		elif self.status == 3:
+			return 'Warning'
+		elif self.status == 4:
+			return 'Error'
+		else:
+			raise Exception('Unknown node status {0:d}'.format(self.status))
+
 	def GetNodeIDString(self):
 		if self.nodeid == None:
 			return self.NoneString
@@ -142,6 +159,9 @@ class Node:
 		else:
 			return self.name
 
+	def GetSortDirNameString(self):
+		return '{0:b}{1:s}'.format(not self.isdir, self.name)
+
 	def GetPathString(self):
 		if self.path == None:
 			return self.NoneString
@@ -159,19 +179,19 @@ class Node:
 			return self.NoneString
 		else:
 			if self.size < 1000:
-				sizestr = '{0:d}'.format(self.size)
+				sizestr = '{0:d} '.format(self.size)
 			elif self.size < 1000**2:
-				sizestr = '{0:.1f}K'.format(self.size/1000)
+				sizestr = '{0:.1f} K'.format(self.size/1000)
 			elif self.size < 1000**3:
-				sizestr = '{0:.1f}M'.format(self.size/1000**2)
+				sizestr = '{0:.1f} M'.format(self.size/1000**2)
 			elif self.size < 1000**4:
-				sizestr = '{0:.1f}G'.format(self.size/1000**3)
+				sizestr = '{0:.1f} G'.format(self.size/1000**3)
 			elif self.size < 1000**5:
-				sizestr = '{0:.1f}T'.format(self.size/1000**4)
+				sizestr = '{0:.1f} T'.format(self.size/1000**4)
 			elif self.size < 1000**6:
-				sizestr = '{0:.1f}P'.format(self.size/1000**5)
+				sizestr = '{0:.1f} P'.format(self.size/1000**5)
 			else:
-				sizestr = '{0:.1f}E'.format(self.size/1000**6)
+				sizestr = '{0:.1f} E'.format(self.size/1000**6)
 			return sizestr + 'B'
 
 	def GetCTimeString(self):
@@ -235,35 +255,36 @@ class NodeTree(NodeContainer):
 
 	def __init__(self):
 		self.__dictByID = {}
-		self.__dictByName = {}
+		self.__dictBySortedDirName = {}
 
 	def append(self, node):
 		self.__dictByID[node.GetPythonID()] = node
-		self.__dictByName[node.name] = node
+		self.__dictBySortedDirName[node.GetSortDirNameString()] = node
 
 	def __iter__(self):
-		return self.__dictByID.itervalues()
+		for key in sorted(self.__dictBySortedDirName.keys()):
+			yield self.__dictBySortedDirName[key]
 
 	def __getitem__(self, key):
 		return self.__dictByID.values().__getitem__(key)
 
 	def clear(self):
 		self.__dictByID.clear()
-		self.__dictByName.clear()
+		self.__dictBySortedDirName.clear()
 
 	def GetByPythonID(self, pythonid):
 		return self.__dictByID[pythonid]
 
 	def GetByName(self, name):
-		return self.__dictByName[name]
+		return self.__dictBySortedDirName[name]
 
 	def DebugPrint(self):
 		print('__dictByID ({0:d} entries):'.format(len(self.__dictByID)))
 		for key in self.__dictByID.keys():
 			print('    {0:d} -> \'{1:s}\''.format(key, self.__dictByID[key].name))
-		print('__dictByName ({0:d} entries):'.format(len(self.__dictByName)))
-		for key in self.__dictByName.keys():
-			print('    \'{0:s}\' -> \'{1:s}\''.format(key, self.__dictByName[key].name))
+		print('__dictBySortedDirName ({0:d} entries):'.format(len(self.__dictBySortedDirName)))
+		for key in self.__dictBySortedDirName.keys():
+			print('    \'{0:s}\' -> \'{1:s}\''.format(key, self.__dictBySortedDirName[key].name))
 
 
 
@@ -679,8 +700,8 @@ class ListControlPanel(wx.Panel):
 		self.coldefs = \
 			[ \
 				('', 22), \
+				('', 22), \
 				('Name', 150), \
-				('Dir', 32), \
 				('Size', 130), \
 				('CTime', 142), \
 				('ATime', 142), \
@@ -694,7 +715,7 @@ class ListControlPanel(wx.Panel):
 			index = index + 1
 
 		# for listmix.ListCtrlAutoWidthMixin
-		self.list.setResizeColumn(2)
+		self.list.setResizeColumn(3)
 
 		# start with empty node tree
 		self.nodestack = []
@@ -716,8 +737,9 @@ class ListControlPanel(wx.Panel):
 	def AppendNode(self, node):
 		index = self.list.GetItemCount()
 		self.list.InsertImageItem(index, self.iconOk)
-		self.list.SetStringItem(index, 1, node.name)
-		self.list.SetStringItem(index, 2, node.GetIsDirString())
+		if node.isdir:
+			self.list.SetStringItem(index, 1, ' > ')
+		self.list.SetStringItem(index, 2, node.name)
 		self.list.SetStringItem(index, 3, node.GetSizeString())
 		self.list.SetStringItem(index, 4, node.GetCTimeString())
 		self.list.SetStringItem(index, 5, node.GetATimeString())
@@ -726,24 +748,26 @@ class ListControlPanel(wx.Panel):
 		self.list.SetItemData(index, node.GetPythonID())
 
 	def IsRoot(self):
-		return len(self.nodestack) > 1
+		return len(self.nodestack) <= 1
 
 	def RefreshTree(self):
 		self.list.DeleteAllItems()
-		if self.IsRoot():
+		if not self.IsRoot():
 			self.list.InsertStringItem(0, '')
-			self.list.SetStringItem(0, 1, '..')
+			self.list.SetStringItem(0, 2, '..')
 		for node in self.nodestack[-1]:
 			self.AppendNode(node)
 
+
 	def ShowNodeTree(self, nodetree):
+		self.list.SetFocus()
 		self.nodestack = []
-		self.nodestack.append(nodetree.GetByName('').children)
+		self.nodestack.append(nodetree[0].children)
 		self.RefreshTree()
 
 	def OnItemActivated(self, event):
 		index = event.m_itemIndex
-		if self.IsRoot() and index == 0:
+		if (not self.IsRoot()) and index == 0:
 			self.nodestack.pop()
 			self.RefreshTree()
 			return
@@ -757,7 +781,8 @@ class ListControlPanel(wx.Panel):
 
 class MainFrame(wx.Frame):
 	def __init__(self, parent):
-		wx.Frame.__init__(self, parent, title=ProgramName, size=(1024,768))
+		self.baseTitle = ProgramName + ' ' + ProgramVersion
+		wx.Frame.__init__(self, parent, title=self.baseTitle, size=(1024,300))
 
 		# main menue definition
 		fileMenu = wx.Menu()
@@ -807,11 +832,11 @@ class MainFrame(wx.Frame):
 			pass
 			#self.srcInstance.Open()
 
-		self.Title = ProgramName + ' - ' + self.srcInstance.GetRootDir()
+		self.Title = self.baseTitle + ' - ' + self.srcInstance.GetRootDir()
 
-		self.srcInstance.Reset() # TESTING
+		#self.srcInstance.Reset() # TESTING
 		self.srcInstance.Open()
-		self.srcInstance.Import() # TESTING
+		#self.srcInstance.Import() # TESTING
 		self.list.ShowNodeTree(self.srcInstance.GetStatusTree())
 		self.srcInstance.Close()
 
