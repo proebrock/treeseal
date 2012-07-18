@@ -8,27 +8,10 @@ import sqlite3
 import sys
 import wx
 
+
+
 ProgramName = 'dtint'
-ProgramVersion = '2.0'
-
-
-
-def SizeToString(size):
-	if size < 1000:
-		sizestr = '{0:d}'.format(size)
-	elif size < 1000**2:
-		sizestr = '{0:.1f}K'.format(size/1000)
-	elif size < 1000**3:
-		sizestr = '{0:.1f}M'.format(size/1000**2)
-	elif size < 1000**4:
-		sizestr = '{0:.1f}G'.format(size/1000**3)
-	elif size < 1000**5:
-		sizestr = '{0:.1f}T'.format(size/1000**4)
-	elif size < 1000**6:
-		sizestr = '{0:.1f}P'.format(size/1000**5)
-	else:
-		sizestr = '{0:.1f}E'.format(size/1000**6)
-	return sizestr + 'B'
+ProgramVersion = '3.0'
 
 
 
@@ -132,51 +115,93 @@ class Node:
 		self.children = None
 		self.similar = None
 
-	def Print(self, prefix=''):
+		self.NoneString = ''
+
+	def GetNodeIDString(self):
 		if self.nodeid == None:
-			print('{0:s}nodeid              <unknown>'.format(prefix))
+			return self.NoneString
 		else:
-			print('{0:s}nodeid              {1:d}'.format(prefix, self.nodeid))
+			return '{0:d}'.format(self.nodeid)
+
+	def GetParentIDString(self):
 		if self.parentid == None:
-			print('{0:s}parentid            <unknown>'.format(prefix))
+			return self.NoneString
 		else:
-			print('{0:s}parentid            {1:d}'.format(prefix, self.parentid))
+			return '{0:d}'.format(self.parentid)
+
+	def GetNameString(self):
 		if self.name == None:
-			print('{0:s}name                <unknown>'.format(prefix))
+			return self.NoneString
 		else:
-			print('{0:s}name                {1:s}'.format(prefix, self.name))
+			return self.name
+
+	def GetPathString(self):
 		if self.path == None:
-			print('{0:s}path                <unknown>'.format(prefix))
+			return self.NoneString
 		else:
-			print('{0:s}path                {1:s}'.format(prefix, self.path))
+			return self.path
+
+	def GetIsDirString(self):
 		if self.isdir == None:
-			print('{0:s}isdir               <unknown>'. format(prefix))
+			return self.NoneString
 		else:
-			print('{0:s}isdir               {1:b}'.format(prefix, self.isdir))
+			return '{0:b}'.format(self.isdir)
+
+	def GetSizeString(self):
 		if self.size == None:
-			print('{0:s}size                <unknown>'. format(prefix))
+			return self.NoneString
 		else:
-			print('{0:s}size                {1:s}'.format(prefix, SizeToString(self.size)))
+			if self.size < 1000:
+				sizestr = '{0:d}'.format(self.size)
+			elif self.size < 1000**2:
+				sizestr = '{0:.1f}K'.format(self.size/1000)
+			elif self.size < 1000**3:
+				sizestr = '{0:.1f}M'.format(self.size/1000**2)
+			elif self.size < 1000**4:
+				sizestr = '{0:.1f}G'.format(self.size/1000**3)
+			elif self.size < 1000**5:
+				sizestr = '{0:.1f}T'.format(self.size/1000**4)
+			elif self.size < 1000**6:
+				sizestr = '{0:.1f}P'.format(self.size/1000**5)
+			else:
+				sizestr = '{0:.1f}E'.format(self.size/1000**6)
+			return sizestr + 'B'
+
+	def GetCTimeString(self):
 		if self.ctime == None:
-			print('{0:s}creation time       <unknown>'.format(prefix))
+			return self.NoneString
 		else:
-			print('{0:s}creation time       {1:s}'.\
-				format(prefix, self.ctime.strftime('%Y-%m-%d %H:%M:%S')))
+			return self.ctime.strftime('%Y-%m-%d %H:%M:%S')
+
+	def GetATimeString(self):
 		if self.atime == None:
-			print('{0:s}access time         <unknown>'.format(prefix))
+			return self.NoneString
 		else:
-			print('{0:s}access time         {1:s}'.\
-				format(prefix, self.atime.strftime('%Y-%m-%d %H:%M:%S')))
+			return self.atime.strftime('%Y-%m-%d %H:%M:%S')
+
+	def GetMTimeString(self):
 		if self.mtime == None:
-			print('{0:s}modification time   <unknown>'.format(prefix))
+			return self.NoneString
 		else:
-			print('{0:s}modification time   {1:s}'.\
-				format(prefix, self.mtime.strftime('%Y-%m-%d %H:%M:%S')))
+			return self.mtime.strftime('%Y-%m-%d %H:%M:%S')
+
+	def GetChecksumString(self):
 		if self.checksum == None:
-			print('{0:s}checksum            <unknown>'.format(prefix))
+			return self.NoneString
 		else:
-			print('{0:s}checksum            {1:s}'.\
-				format(prefix, self.checksum.GetString()))
+			return self.checksum.GetString(True)
+
+	def Print(self, prefix=''):
+		print('{0:s}nodeid              {1:s}'.format(prefix, self.GetNodeIDString()))
+		print('{0:s}parentid            {1:s}'.format(prefix, self.GetParentIDString()))
+		print('{0:s}name                {1:s}'.format(prefix, self.GetNameString()))
+		print('{0:s}path                {1:s}'.format(prefix, self.GetPathString()))
+		print('{0:s}isdir               {1:s}'.format(prefix, self.GetIsDirString()))
+		print('{0:s}size                {1:s}'.format(prefix, self.GetSizeString()))
+		print('{0:s}creation time       {1:s}'.format(prefix, self.GetCTimeString()))
+		print('{0:s}access time         {1:s}'.format(prefix, self.GetATimeString()))
+		print('{0:s}modification time   {1:s}'.format(prefix, self.GetMTimeString()))
+		print('{0:s}checksum            {1:s}'.format(prefix, self.GetChecksumString()))
 
 
 
@@ -558,14 +583,119 @@ class Instance:
 		self.__db.Commit()
 
 	def Test(self):
-		t = self.__db.GetTree()
-		t.Print()
+		n = self.__fs.GetRootNode()
+		return self.__fs.GetChildren(n)
 
 
 
-inst = Instance('../dtint-example')
-inst.Reset()
-inst.Open()
-inst.Import()
-inst.Test()
-inst.Close()
+###########################################
+################### GUI ###################
+###########################################
+
+
+
+class ListControl(wx.ListCtrl):
+
+	def __init__(self, parent, ID=wx.ID_ANY, pos=wx.DefaultPosition, \
+		size=wx.DefaultSize, style=0):
+		wx.ListCtrl.__init__(self, parent, ID, pos, size, style)
+
+
+
+class ListControlPanel(wx.Panel):
+	def __init__(self, parent):
+		wx.Panel.__init__(self, parent, -1, style=wx.WANTS_CHARS)
+
+		self.list = ListControl(self, size=(-1,100), style=wx.LC_REPORT | wx.LC_SORT_ASCENDING)
+		self.list.InsertColumn(0, 'Status')
+		self.list.InsertColumn(1, 'Name')
+		self.list.InsertColumn(2, 'IsDir')
+		self.list.InsertColumn(3, 'Size')
+		self.list.InsertColumn(4, 'CTime')
+		self.list.InsertColumn(5, 'ATime')
+		self.list.InsertColumn(6, 'MTime')
+		self.list.InsertColumn(7, 'Checksum')
+
+		sizer = wx.BoxSizer(wx.VERTICAL)
+		sizer.Add(self.list, 1, wx.ALL | wx.EXPAND, 5)
+		self.SetSizer(sizer)
+
+	def AppendNode(self, node):
+		index = self.list.GetItemCount()
+		self.list.InsertStringItem(index, 'OK')
+		self.list.SetStringItem(index, 1, node.name)
+		self.list.SetStringItem(index, 2, node.GetIsDirString())
+		self.list.SetStringItem(index, 3, node.GetSizeString())
+		self.list.SetStringItem(index, 4, node.GetCTimeString())
+		self.list.SetStringItem(index, 5, node.GetATimeString())
+		self.list.SetStringItem(index, 6, node.GetMTimeString())
+		self.list.SetStringItem(index, 7, node.GetChecksumString())
+
+	def ShowNodeTree(self, nodetree):
+		for node in nodetree:
+			self.AppendNode(node)
+
+	def GetListCtrl(self):
+		return self.list
+
+	def OnColClick(self, event):
+		event.Skip()
+
+
+
+class MainFrame(wx.Frame):
+	def __init__(self, parent):
+		wx.Frame.__init__(self, parent, title='dtint', size=(800,600))
+
+		# main menue definition
+		fileMenu = wx.Menu()
+		menuOpen = fileMenu.Append(wx.ID_OPEN, 'Open', 'Open Directory')
+		self.Bind(wx.EVT_MENU, self.OnOpen, menuOpen)
+		fileMenu.AppendSeparator()
+		menuExit = fileMenu.Append(wx.ID_EXIT, 'E&xit', 'Terminate Program')
+		self.Bind(wx.EVT_MENU, self.OnExit, menuExit)
+		helpMenu = wx.Menu()
+		menuAbout = helpMenu.Append(wx.ID_ABOUT, 'About', 'Information about this program')
+		self.Bind(wx.EVT_MENU, self.OnAbout, menuAbout)
+		# assemble menu
+		menuBar = wx.MenuBar()
+		menuBar.Append(fileMenu, '&File')
+		menuBar.Append(helpMenu, 'Help')
+		self.SetMenuBar(menuBar)
+
+		# main window consists of address line and directory listing
+		self.address = wx.TextCtrl(self, -1, style=wx.TE_READONLY)
+		self.address.SetValue('/home/phil/Data');
+		self.list = ListControlPanel(self)
+
+		sizer = wx.BoxSizer(wx.VERTICAL)
+		sizer.Add(self.address, 0, wx.ALL | wx.EXPAND, 5)
+		sizer.Add(self.list, 1, wx.ALL | wx.EXPAND, 5)
+		self.SetSizer(sizer)
+
+		self.CreateStatusBar()
+
+		self.Show(True)
+
+	def OnOpen(self, e):
+		inst = Instance('../dtint-example')
+		inst.Reset()
+		inst.Open()
+		inst.Import()
+		n = inst.Test()
+		self.list.ShowNodeTree(n)
+		inst.Close()
+
+	def OnExit(self, e):
+		self.Close(True)
+
+	def OnAbout(self, e):
+		pass
+
+
+
+if __name__ == '__main__':
+	app = wx.App(False)
+	frame = MainFrame(None)
+	frame.Show()
+	app.MainLoop()
