@@ -763,6 +763,10 @@ class ListControlPanel(wx.Panel):
 
 	def ShowNodeTree(self, nodetree):
 		self.list.SetFocus()
+		if nodetree[0].children == None:
+			self.list.InsertStringItem(0, '')
+			self.list.SetStringItem(0, 2, '<empty>')
+			return
 		self.nodestack = []
 		self.nodestack.append(nodetree[0].children)
 		self.namestack = []
