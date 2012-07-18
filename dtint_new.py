@@ -251,9 +251,6 @@ class NodeTree(NodeContainer):
 		self.__dictByID.clear()
 		self.__dictByName.clear()
 
-	def GetPythonIDDictionary(self):
-		return self.__dictByID
-
 	def GetByPythonID(self, pythonid):
 		return self.__dictByID[pythonid]
 
@@ -578,11 +575,6 @@ class Filesystem(Tree):
 		self.Fetch(node)
 		return node
 
-	def SearchRootDir(path):
-		if not os.path.exists(path):
-			raise MyException('Cannot search for root directory in non-existing path.', 3)
-		# TODO
-
 
 
 class Instance:
@@ -592,10 +584,27 @@ class Instance:
 			raise MyException('Given root directory does not exist.', 3)
 		if not os.path.isdir(rootDir):
 			raise MyException('Given root directory is not a directory.', 3)
+
+		self.__metaName = '.' + ProgramName
 		self.__rootDir = rootDir
-		self.__metaDir = os.path.join(self.__rootDir, '.' + ProgramName)
+		while True:
+			self.__metaDir = os.path.join(self.__rootDir, self.__metaName)
+			if os.path.exists(self.__metaDir):
+				self.__foundExistingRoot = True
+				break
+			self.__rootDir = os.path.split(self.__rootDir)[0]
+			if self.__rootDir == '':
+				self.__foundExistingRoot = False
+				return
+
 		self.__fs = Filesystem(self.__rootDir, self.__metaDir)
 		self.__db = Database(self.__rootDir, self.__metaDir)
+
+	def FoundExistingRoot(self):
+		return self.__foundExistingRoot
+
+	def GetRootDir(self):
+		return self.__rootDir
 
 	def Open(self):
 		self.__fs.Open()
@@ -649,7 +658,7 @@ class ListControlPanel(wx.Panel):
 
 		# setup listctrl and columns
 		self.list = self.list = ListControl(self, size=(-1,100), style=wx.LC_REPORT | wx.LC_SORT_ASCENDING)
-		self.list.Bind(wx.EVT_LIST_ITEM_SELECTED, self.OnItemSelected)
+		self.list.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.OnItemSelected)
 		self.coldefs = \
 			[ \
 				('', 22), \
@@ -714,7 +723,7 @@ class ListControlPanel(wx.Panel):
 
 class MainFrame(wx.Frame):
 	def __init__(self, parent):
-		wx.Frame.__init__(self, parent, title='dtint', size=(1024,768))
+		wx.Frame.__init__(self, parent, title=ProgramName, size=(1024,768))
 
 		# main menue definition
 		fileMenu = wx.Menu()
@@ -737,6 +746,9 @@ class MainFrame(wx.Frame):
 		self.address.SetValue('/home/phil/Data')
 		self.list = ListControlPanel(self)
 
+		# initialize local attributes
+		self.srcInstance = None
+
 		sizer = wx.BoxSizer(wx.VERTICAL)
 		sizer.Add(self.address, 0, wx.ALL | wx.EXPAND, 5)
 		sizer.Add(self.list, 1, wx.ALL | wx.EXPAND, 5)
@@ -747,14 +759,28 @@ class MainFrame(wx.Frame):
 		self.Show(True)
 
 	def OnOpen(self, event):
-		path = '../dtint-example' # TODO: ask user
-		inst = Instance(path)
-		inst.Reset()
-		inst.Open()
-		inst.Import()
-		n = inst.Test()
+		 # ask user with dir select dialog
+		userPath = '../dtint-example/images'
+		self.srcInstance = Instance(userPath)
+
+		if not self.srcInstance.FoundExistingRoot():
+			# offer user to reset+import, otherwise exit
+			#self.srcInstance.Reset()
+			#self.srcInstance.Import()
+			#self.srcInstance.Open()
+			return
+		else:
+			pass
+			#self.srcInstance.Open()
+
+		self.Title = ProgramName + ' - ' + self.srcInstance.GetRootDir()
+
+		self.srcInstance.Reset() # TESTING
+		self.srcInstance.Open()
+		self.srcInstance.Import() # TESTING
+		n = self.srcInstance.Test()
 		self.list.ShowNodeTree(n)
-		inst.Close()
+		self.srcInstance.Close()
 
 	def OnExit(self, event):
 		self.Close(True)
