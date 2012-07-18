@@ -264,6 +264,15 @@ class NodeTree(NodeContainer):
 
 class Tree:
 
+	def Open(self):
+		raise MyException('Not implemented.', 3)
+
+	def Close(self):
+		raise MyException('Not implemented.', 3)
+
+	def IsOpen(self):
+		raise MyException('Not implemented.', 3)
+
 	def Reset(self):
 		raise MyException('Not implemented.', 3)
 
@@ -319,9 +328,9 @@ DatabaseUpdateString = '=?,'.join(DatabaseVarNames[1:]) + '=?'
 
 class Database(Tree):
 
-	def __init__(self, dbfile, sgfile):
-		self.__dbFile = dbfile
-		self.__sgFile = sgfile
+	def __init__(self, rootDir, metaDir):
+		self.__dbFile = os.path.join(metaDir, 'base.sqlite3')
+		self.__sgFile = os.path.join(metaDir, 'base.signature')
 		self.__dbcon = None
 
 	def __del__(self):
@@ -329,29 +338,14 @@ class Database(Tree):
 			self.CloseAndSecure()
 
 	def Open(self):
-		self.__dbcon = sqlite3.connect(self.__dbFile, \
-			# necessary for proper retrival of datetime objects from the database,
-			# otherwise the cursor will return string values with the timestamps
-			detect_types=sqlite3.PARSE_DECLTYPES)
-		# stores strings as ascii strings in the database, not as unicodes
-		# makes program easily compatible with python 2.X but introduces
-		# problems when file system supports unicode... :-(
-		if sys.version[0] == '2':
-			self.__dbcon.text_factory = str
-
-	def CheckAndOpen(self):
 		cs = Checksum()
 		cs.Calculate(self.__dbFile)
 		if not cs.IsValid(self.__sgFile):
 			raise MyException('The internal database has been corrupted.', 3)
-		self.Open()
+		self.DBOpen()
 
 	def Close(self):
-		self.__dbcon.close()
-		self.__dbcon = None
-
-	def CloseAndSecure(self):
-		self.Close()
+		self.DBClose()
 		cs = Checksum()
 		cs.Calculate(self.__dbFile)
 		cs.WriteToFile(self.__sgFile)
@@ -363,20 +357,20 @@ class Database(Tree):
 		# close if it was open
 		wasOpen = self.IsOpen()
 		if wasOpen:
-			self.Close()
+			self.DBClose()
 		# delete files if existing
 		if os.path.exists(self.__dbFile):
 			os.remove(self.__dbFile)
 		if os.path.exists(self.__sgFile):
 			os.remove(self.__sgFile)
 		# create database
-		self.Open()
+		self.DBOpen()
 		self.__dbcon.execute('create table nodes (' + DatabaseCreateString + ')')
 		self.__dbcon.execute('create index checksumindex on nodes (checksum)')
-		self.CloseAndSecure()
+		self.Close()
 		# reopen if necessary
 		if wasOpen:
-			self.CheckAndOpen()
+			self.Open()
 
 	def GetRootNode(self):
 		node = Node()
@@ -453,6 +447,21 @@ class Database(Tree):
 		cursor.close()
 		return node
 
+	def DBOpen(self):
+		self.__dbcon = sqlite3.connect(self.__dbFile, \
+			# necessary for proper retrival of datetime objects from the database,
+			# otherwise the cursor will return string values with the timestamps
+			detect_types=sqlite3.PARSE_DECLTYPES)
+		# stores strings as ascii strings in the database, not as unicodes
+		# makes program easily compatible with python 2.X but introduces
+		# problems when file system supports unicode... :-(
+		if sys.version[0] == '2':
+			self.__dbcon.text_factory = str
+
+	def DBClose(self):
+		self.__dbcon.close()
+		self.__dbcon = None
+
 	def GetPath(self, node):
 		n = node
 		namelist = []
@@ -502,16 +511,18 @@ class Database(Tree):
 class Filesystem(Tree):
 
 	def __init__(self, rootDir, metaDir):
-		if not os.path.exists(rootDir):
-			raise MyException('Given root directory does not exist.', 3)
-		if not os.path.isdir(rootDir):
-			raise MyException('Given root directory is not a directory.', 3)
 		self.__rootDir = rootDir
-		if not os.path.exists(metaDir):
-			raise MyException('Given meta data directory does not exist.', 3)
-		if not os.path.isdir(metaDir):
-			raise MyException('Given meta data directory is not a directory.', 3)
 		self.__metaDir = metaDir
+		self.isOpen = False
+
+	def Open(self):
+		self.isOpen = True
+
+	def Close(self):
+		self.isOpen = False
+
+	def IsOpen(self):
+		return self.isOpen
 
 	def Reset(self):
 		if not os.path.exists(self.__metaDir):
@@ -567,6 +578,11 @@ class Filesystem(Tree):
 		self.Fetch(node)
 		return node
 
+	def SearchRootDir(path):
+		if not os.path.exists(path):
+			raise MyException('Cannot search for root directory in non-existing path.', 3)
+		# TODO
+
 
 
 class Instance:
@@ -576,21 +592,22 @@ class Instance:
 			raise MyException('Given root directory does not exist.', 3)
 		if not os.path.isdir(rootDir):
 			raise MyException('Given root directory is not a directory.', 3)
-		metaDir = os.path.join(rootDir, '.' + ProgramName)
-		self.__fs = Filesystem(rootDir, metaDir)
-		dbfile = os.path.join(metaDir, 'base.sqlite3')
-		sgfile = os.path.join(metaDir, 'base.signature')
-		self.__db = Database(dbfile, sgfile)
+		self.__rootDir = rootDir
+		self.__metaDir = os.path.join(self.__rootDir, '.' + ProgramName)
+		self.__fs = Filesystem(self.__rootDir, self.__metaDir)
+		self.__db = Database(self.__rootDir, self.__metaDir)
+
+	def Open(self):
+		self.__fs.Open()
+		self.__db.Open()
+
+	def Close(self):
+		self.__fs.Close()
+		self.__db.Close()
 
 	def Reset(self):
 		self.__fs.Reset()
 		self.__db.Reset()
-
-	def Open(self):
-		self.__db.CheckAndOpen()
-
-	def Close(self):
-		self.__db.CloseAndSecure()
 
 	def ImportRecurse(self, nodelist):
 		for node in nodelist:
@@ -730,7 +747,8 @@ class MainFrame(wx.Frame):
 		self.Show(True)
 
 	def OnOpen(self, event):
-		inst = Instance('../dtint-example')
+		path = '../dtint-example' # TODO: ask user
+		inst = Instance(path)
 		inst.Reset()
 		inst.Open()
 		inst.Import()
