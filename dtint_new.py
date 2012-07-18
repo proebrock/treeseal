@@ -257,6 +257,14 @@ class NodeTree(NodeContainer):
 	def GetByName(self, name):
 		return self.__dictByName[name]
 
+	def DebugPrint(self):
+		print('__dictByID ({0:d} entries):'.format(len(self.__dictByID)))
+		for key in self.__dictByID.keys():
+			print('    {0:d} -> \'{1:s}\''.format(key, self.__dictByID[key].name))
+		print('__dictByName ({0:d} entries):'.format(len(self.__dictByName)))
+		for key in self.__dictByName.keys():
+			print('    \'{0:s}\' -> \'{1:s}\''.format(key, self.__dictByName[key].name))
+
 
 
 class Tree:
@@ -630,9 +638,18 @@ class Instance:
 		self.ImportRecurse(nodelist)
 		self.__db.Commit()
 
-	def Test(self):
-		n = self.__fs.GetRootNode()
-		return self.__fs.GetChildren(n)
+	def GetStatusTreeRecurse(self, nodetree):
+		for node in nodetree:
+			if node.isdir:
+				node.children = self.__fs.GetChildren(node)
+				self.GetStatusTreeRecurse(node.children)
+
+
+	def GetStatusTree(self):
+		nodetree = NodeTree()
+		nodetree.append(self.__fs.GetRootNode())
+		self.GetStatusTreeRecurse(nodetree)
+		return nodetree
 
 
 
@@ -658,7 +675,7 @@ class ListControlPanel(wx.Panel):
 
 		# setup listctrl and columns
 		self.list = self.list = ListControl(self, size=(-1,100), style=wx.LC_REPORT | wx.LC_SORT_ASCENDING)
-		self.list.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.OnItemSelected)
+		self.list.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.OnItemActivated)
 		self.coldefs = \
 			[ \
 				('', 22), \
@@ -679,7 +696,8 @@ class ListControlPanel(wx.Panel):
 		# for listmix.ListCtrlAutoWidthMixin
 		self.list.setResizeColumn(2)
 
-		self.ShowNodeTree(NodeTree())
+		# start with empty node tree
+		self.nodestack = []
 
 		# one pseudo boxer with the listctrl filling the whole panel
 		sizer = wx.BoxSizer(wx.VERTICAL)
@@ -707,17 +725,33 @@ class ListControlPanel(wx.Panel):
 		self.list.SetStringItem(index, 7, node.GetChecksumString())
 		self.list.SetItemData(index, node.GetPythonID())
 
-	def ShowNodeTree(self, nodetree):
+	def IsRoot(self):
+		return len(self.nodestack) > 1
+
+	def RefreshTree(self):
 		self.list.DeleteAllItems()
-		self.nodetree = nodetree
-		for node in self.nodetree:
+		if self.IsRoot():
+			self.list.InsertStringItem(0, '')
+			self.list.SetStringItem(0, 1, '..')
+		for node in self.nodestack[-1]:
 			self.AppendNode(node)
 
-	def OnItemSelected(self, event):
+	def ShowNodeTree(self, nodetree):
+		self.nodestack = []
+		self.nodestack.append(nodetree.GetByName('').children)
+		self.RefreshTree()
+
+	def OnItemActivated(self, event):
 		index = event.m_itemIndex
+		if self.IsRoot() and index == 0:
+			self.nodestack.pop()
+			self.RefreshTree()
+			return
 		pythonid = self.list.GetItemData(index)
-		node = self.nodetree.GetByPythonID(pythonid)
-		print(node.name)
+		node = self.nodestack[-1].GetByPythonID(pythonid)
+		if node.isdir:
+			self.nodestack.append(node.children)
+			self.RefreshTree()
 
 
 
@@ -778,8 +812,7 @@ class MainFrame(wx.Frame):
 		self.srcInstance.Reset() # TESTING
 		self.srcInstance.Open()
 		self.srcInstance.Import() # TESTING
-		n = self.srcInstance.Test()
-		self.list.ShowNodeTree(n)
+		self.list.ShowNodeTree(self.srcInstance.GetStatusTree())
 		self.srcInstance.Close()
 
 	def OnExit(self, event):
