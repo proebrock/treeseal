@@ -9,6 +9,8 @@ import sys
 import wx
 import wx.lib.mixins.listctrl as listmix
 
+import icons
+
 
 
 ProgramName = 'dtint'
@@ -623,15 +625,18 @@ class ListControl(wx.ListCtrl, listmix.ListCtrlAutoWidthMixin):
 
 
 
-class ListControlPanel(wx.Panel): #, listmix.ColumnSorterMixin):
+class ListControlPanel(wx.Panel):
 
 	def __init__(self, parent):
 		wx.Panel.__init__(self, parent, -1, style=wx.WANTS_CHARS)
 
+		# setup listctrl and columns
+		self.list = self.list = ListControl(self, size=(-1,100), style=wx.LC_REPORT | wx.LC_SORT_ASCENDING)
+		self.list.Bind(wx.EVT_LIST_ITEM_SELECTED, self.OnItemSelected)
 		self.coldefs = \
 			[ \
-				('', 32), \
-				('Name', 200), \
+				('', 22), \
+				('Name', 150), \
 				('Dir', 32), \
 				('Size', 130), \
 				('CTime', 142), \
@@ -639,10 +644,6 @@ class ListControlPanel(wx.Panel): #, listmix.ColumnSorterMixin):
 				('MTime', 142), \
 				('Checksum', 132)
 			]
-
-		self.list = self.list = ListControl(self, size=(-1,100), style=wx.LC_REPORT | wx.LC_SORT_ASCENDING)
-		self.list.Bind(wx.EVT_LIST_ITEM_SELECTED, self.OnItemSelected)
-
 		index = 0
 		for coldef in self.coldefs:
 			self.list.InsertColumn(index, coldef[0])
@@ -652,27 +653,25 @@ class ListControlPanel(wx.Panel): #, listmix.ColumnSorterMixin):
 		# for listmix.ListCtrlAutoWidthMixin
 		self.list.setResizeColumn(2)
 
-		# for listmix.ColumnSorterMixin
-		#listmix.ColumnSorterMixin.__init__(self, 8)
-		#self.Bind(wx.EVT_LIST_COL_CLICK, self.OnColumnClick, self.list)
-
 		self.ShowNodeTree(NodeTree())
 
+		# one pseudo boxer with the listctrl filling the whole panel
 		sizer = wx.BoxSizer(wx.VERTICAL)
 		sizer.Add(self.list, 1, wx.ALL | wx.EXPAND, 5)
 		self.SetSizer(sizer)
 
-	def GetListCtrl(self):
-		# used by listmix.ColumnSorterMixin
-		return self.list
-
-	def OnColumnClick(self, event):
-		# used by listmix.ColumnSorterMixin
-		event.Skip()
+		# prepare image list
+		self.imagelist = wx.ImageList(16, 16)
+		self.iconError = self.imagelist.Add(icons.IconError.GetBitmap())
+		self.iconMissing = self.imagelist.Add(icons.IconMissing.GetBitmap())
+		self.iconNew = self.imagelist.Add(icons.IconNew.GetBitmap())
+		self.iconOk = self.imagelist.Add(icons.IconOk.GetBitmap())
+		self.iconWarning = self.imagelist.Add(icons.IconWarning.GetBitmap())
+		self.list.SetImageList(self.imagelist, wx.IMAGE_LIST_SMALL)
 
 	def AppendNode(self, node):
 		index = self.list.GetItemCount()
-		self.list.InsertStringItem(index, 'OK')
+		self.list.InsertImageItem(index, self.iconOk)
 		self.list.SetStringItem(index, 1, node.name)
 		self.list.SetStringItem(index, 2, node.GetIsDirString())
 		self.list.SetStringItem(index, 3, node.GetSizeString())
@@ -687,8 +686,6 @@ class ListControlPanel(wx.Panel): #, listmix.ColumnSorterMixin):
 		self.nodetree = nodetree
 		for node in self.nodetree:
 			self.AppendNode(node)
-		# used by listmix.ColumnSorterMixin
-		#self.itemDataMap = self.nodetree.GetPythonIDDictionary()
 
 	def OnItemSelected(self, event):
 		index = event.m_itemIndex

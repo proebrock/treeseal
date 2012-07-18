@@ -9,14 +9,16 @@ from wx.tools import img2py
 
 
 icondir = 'set01'
-outfile = 'icons.py'
+outfile = '../icons.py'
 firstparam = '-F -i -n'
 otherparam = '-a -F -n'
 
 
 
 first = True
-for entry in os.listdir(icondir):
+dirlist = os.listdir(icondir)
+dirlist.sort()
+for entry in dirlist:
 	path = os.path.join(icondir, entry)
 	# skip if path
 	if os.path.isdir(path):
@@ -32,7 +34,7 @@ for entry in os.listdir(icondir):
 	else:
 		param = otherparam
 	# run converter
-	variablename = 'icon_' + name 
+	variablename = 'Icon' + name[0].upper() + name[1:].lower()
 	cmdline = param + ' ' + variablename + ' ' + path + ' ' + outfile
 	args = cmdline.split()
 	img2py.main(args)
