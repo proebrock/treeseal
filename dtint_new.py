@@ -317,6 +317,9 @@ class Tree:
 	def GetNodeByPath(self, path):
 		raise MyException('Not implemented.', 3)
 
+	def GetNodeByChecksum(self, checksum):
+		raise MyException('Not implemented.', 3)
+
 	def GetTreeRecurse(self, nodetree):
 		for node in nodetree:
 			if node.isdir:
@@ -328,6 +331,20 @@ class Tree:
 		nodetree.append(self.GetRootNode())
 		self.GetTreeRecurse(nodetree)
 		return nodetree
+
+	def GetDiffTreeRecurse(self, other, selfnodes, othernodes, removeEquals):
+		for node in selfnodes:
+			if node.isdir:
+				node.children = self.GetChildren(node)
+				self.GetTreeRecurse(node.children)
+
+	def GetDiffTree(self, other, removeEquals=False):
+		selfnodes = NodeTree()
+		selfnodes.append(self.GetRootNode())
+		othernodes = NodeTree()
+		othernodes.append(other.GetRootNode())
+		self.GetDiffTreeRecurse(other, selfnodes, othernodes, removeEquals)
+		return selfnodes
 
 
 
@@ -473,6 +490,18 @@ class Database(Tree):
 		cursor.close()
 		return node
 
+	def GetNodeByChecksum(self, checksum):
+		result = NodeList()
+		cursor = self.__dbcon.cursor()
+		cursor.execute('select ' + DatabaseSelectString + \
+			' from nodes where checksum=X\'{0:s}\''.format(checksum.GetString()))
+		for row in cursor:
+			child = Node()
+			self.Fetch(child, row)
+			result.append(child)
+		cursor.close()
+		return result
+
 	def DBOpen(self):
 		self.__dbcon = sqlite3.connect(self.__dbFile, \
 			# necessary for proper retrival of datetime objects from the database,
@@ -499,18 +528,6 @@ class Database(Tree):
 			n = self.GetParent(n)
 		namelist.reverse()
 		node.path = reduce(lambda x, y: os.path.join(x, y), namelist)
-
-	def GetNodesWithSameChecksum(self, checksum):
-		result = NodeList()
-		cursor = self.__dbcon.cursor()
-		cursor.execute('select ' + DatabaseSelectString + \
-			' from nodes where checksum=X\'{0:s}\''.format(checksum.GetString()))
-		for row in cursor:
-			child = Node()
-			self.Fetch(child, row)
-			result.append(child)
-		cursor.close()
-		return result
 
 	def InsertNode(self, node):
 		if not node.nodeid == None:
@@ -604,6 +621,9 @@ class Filesystem(Tree):
 		self.Fetch(node)
 		return node
 
+	def GetNodeByChecksum(self, checksum):
+		pass # TODO: must be implemented using local dict: csum -> path
+
 
 
 class Instance:
@@ -659,18 +679,11 @@ class Instance:
 		self.ImportRecurse(nodelist)
 		self.__db.Commit()
 
-	def GetStatusTreeRecurse(self, nodetree):
-		for node in nodetree:
-			if node.isdir:
-				node.children = self.__fs.GetChildren(node)
-				self.GetStatusTreeRecurse(node.children)
-
-
-	def GetStatusTree(self):
-		nodetree = NodeTree()
-		nodetree.append(self.__fs.GetRootNode())
-		self.GetStatusTreeRecurse(nodetree)
-		return nodetree
+	def GetDiffTree(self):
+		#return self.__fs.GetTree()
+		#return self.__db.GetTree()
+		return self.__fs.GetDiffTree(self.__db)
+		#return self.__db.GetDiffTree(self.__fs)
 
 
 
@@ -849,7 +862,7 @@ class MainFrame(wx.Frame):
 		#self.srcInstance.Reset() # TESTING
 		self.srcInstance.Open()
 		#self.srcInstance.Import() # TESTING
-		self.list.ShowNodeTree(self.srcInstance.GetStatusTree())
+		self.list.ShowNodeTree(self.srcInstance.GetDiffTree())
 		self.srcInstance.Close()
 
 	def OnExit(self, event):
