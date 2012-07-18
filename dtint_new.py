@@ -59,7 +59,7 @@ class Checksum:
 		f = open(path, 'w')
 		f.write(self.GetString())
 		f.close()
-		
+
 	def IsValid(self, path):
 		f = open(path, 'r')
 		csum = f.read()
@@ -101,6 +101,7 @@ class MyException(Exception):
 class Node:
 
 	def __init__(self):
+		self.pythonid = id(self)
 		self.nodeid = None
 		self.parentid = None
 		self.name = None
@@ -116,6 +117,9 @@ class Node:
 		self.similar = None
 
 		self.NoneString = ''
+
+	def GetPythonID(self):
+		return self.pythonid
 
 	def GetNodeIDString(self):
 		if self.nodeid == None:
@@ -227,16 +231,28 @@ class NodeList(NodeContainer, list):
 class NodeTree(NodeContainer):
 
 	def __init__(self):
-		self.__dict = {}
+		self.__dictByID = {}
+		self.__dictByName = {}
 
 	def append(self, node):
-		self.__dict[node.name] = node
+		self.__dictByID[node.GetPythonID()] = node
+		self.__dictByName[node.name] = node
 
 	def __iter__(self):
-		return self.__dict.itervalues()
+		return self.__dictByID.itervalues()
 
 	def __getitem__(self, key):
-		return self.__dict.values().__getitem__(key)
+		return self.__dictByID.values().__getitem__(key)
+
+	def clear(self):
+		self.__dictByID.clear()
+		self.__dictByName.clear()
+
+	def GetByPythonID(self, pythonid):
+		return self.__dictByID[pythonid]
+
+	def GetByName(self, name):
+		return self.__dictByName[name]
 
 
 
@@ -378,7 +394,7 @@ class Database(Tree):
 		if not node.isdir:
 			node.checksum = Checksum()
 			node.checksum.SetBinary(row[8])
-	
+
 	def GetChildren(self, node):
 		result = NodeTree()
 		cursor = self.__dbcon.cursor()
@@ -470,7 +486,7 @@ class Database(Tree):
 			node.ctime, node.atime, node.mtime, checksum))
 		node.nodeid = cursor.lastrowid
 		cursor.close()
-		
+
 	def Commit(self):
 		self.__dbcon.commit()
 		self.__dbcon.execute('vacuum')
@@ -569,7 +585,7 @@ class Instance:
 
 	def Close(self):
 		self.__db.CloseAndSecure()
-		
+
 	def ImportRecurse(self, nodelist):
 		for node in nodelist:
 			self.__db.InsertNode(node)
@@ -607,6 +623,7 @@ class ListControlPanel(wx.Panel):
 		wx.Panel.__init__(self, parent, -1, style=wx.WANTS_CHARS)
 
 		self.list = ListControl(self, size=(-1,100), style=wx.LC_REPORT | wx.LC_SORT_ASCENDING)
+		self.list.Bind(wx.EVT_LIST_ITEM_SELECTED, self.OnItemSelected)
 		self.list.InsertColumn(0, 'Status')
 		self.list.InsertColumn(1, 'Name')
 		self.list.InsertColumn(2, 'IsDir')
@@ -615,6 +632,8 @@ class ListControlPanel(wx.Panel):
 		self.list.InsertColumn(5, 'ATime')
 		self.list.InsertColumn(6, 'MTime')
 		self.list.InsertColumn(7, 'Checksum')
+
+		self.nodetree = None
 
 		sizer = wx.BoxSizer(wx.VERTICAL)
 		sizer.Add(self.list, 1, wx.ALL | wx.EXPAND, 5)
@@ -630,16 +649,19 @@ class ListControlPanel(wx.Panel):
 		self.list.SetStringItem(index, 5, node.GetATimeString())
 		self.list.SetStringItem(index, 6, node.GetMTimeString())
 		self.list.SetStringItem(index, 7, node.GetChecksumString())
+		self.list.SetItemData(index, node.GetPythonID())
 
 	def ShowNodeTree(self, nodetree):
-		for node in nodetree:
+		self.list.DeleteAllItems()
+		self.nodetree = nodetree
+		for node in self.nodetree:
 			self.AppendNode(node)
 
-	def GetListCtrl(self):
-		return self.list
-
-	def OnColClick(self, event):
-		event.Skip()
+	def OnItemSelected(self, event):
+		index = event.m_itemIndex
+		pythonid = self.list.GetItemData(index)
+		node = self.nodetree.GetByPythonID(pythonid)
+		print(node.name)
 
 
 
@@ -677,7 +699,7 @@ class MainFrame(wx.Frame):
 
 		self.Show(True)
 
-	def OnOpen(self, e):
+	def OnOpen(self, event):
 		inst = Instance('../dtint-example')
 		inst.Reset()
 		inst.Open()
@@ -686,10 +708,10 @@ class MainFrame(wx.Frame):
 		self.list.ShowNodeTree(n)
 		inst.Close()
 
-	def OnExit(self, e):
+	def OnExit(self, event):
 		self.Close(True)
 
-	def OnAbout(self, e):
+	def OnAbout(self, event):
 		pass
 
 
