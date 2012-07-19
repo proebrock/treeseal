@@ -101,6 +101,16 @@ class MyException(Exception):
 
 
 
+class NodeStatus:
+
+	OK = 0
+	New = 1
+	Missing = 2
+	Warn = 3
+	Error = 4
+
+
+
 class Node:
 
 	def __init__(self):
@@ -125,21 +135,41 @@ class Node:
 	def GetPythonID(self):
 		return self.pythonid
 
+	def SetStatus(self, status):
+		self.status = status
+
 	def GetStatusString(self):
 		if self.status == None:
 			return self.NoneString
-		elif self.status == 0:
+		elif self.status == NodeStatus.OK:
 			return 'OK'
-		elif self.status == 1:
+		elif self.status == NodeStatus.New:
 			return 'New'
-		elif self.status == 2:
+		elif self.status == NodeStatus.Missing:
 			return 'Missing'
-		elif self.status == 3:
+		elif self.status == NodeStatus.Warn:
 			return 'Warning'
-		elif self.status == 4:
+		elif self.status == NodeStatus.Error:
 			return 'Error'
 		else:
 			raise Exception('Unknown node status {0:d}'.format(self.status))
+
+	def CompareEqualAndSetStatus(self, other):
+		if not (self.name == other.name and self.isdir == other.isdir):
+			raise Exception('Nodes are not equal.')
+		if self.size == other.size and \
+			self.ctime == other.ctime and \
+			self.atime == other.atime and \
+			self.mtime == other.mtime:
+			if self.isdir:
+				self.status = NodeStatus.OK
+			else:
+				if self.checksum.IsEqual(other.checksum):
+					self.status = NodeStatus.OK
+				else:
+					self.status = NodeStatus.Error
+		else:
+			self.status = NodeStatus.Warn
 
 	def GetNodeIDString(self):
 		if self.nodeid == None:
@@ -219,6 +249,7 @@ class Node:
 			return self.checksum.GetString(True)
 
 	def Print(self, prefix=''):
+		print('{0:s}status              {1:s}'.format(prefix, self.GetStatusString()))
 		print('{0:s}nodeid              {1:s}'.format(prefix, self.GetNodeIDString()))
 		print('{0:s}parentid            {1:s}'.format(prefix, self.GetParentIDString()))
 		print('{0:s}name                {1:s}'.format(prefix, self.GetNameString()))
@@ -233,6 +264,15 @@ class Node:
 
 
 class NodeContainer:
+
+	def ApplyRecurse(self, nodes, func):
+		for n in nodes:
+			func(n)
+			if not n.children == None:
+				self.ApplyRecurse(n.children, func)
+
+	def Apply(self, func):
+		self.ApplyRecurse(self, func)
 
 	def PrintRecurse(self, nodes, depth):
 		for n in nodes:
@@ -272,19 +312,22 @@ class NodeTree(NodeContainer):
 		self.__dictByID.clear()
 		self.__dictBySortedDirName.clear()
 
+	def update(self, other):
+		self.__dictByID.update(other.__dictByID)
+		self.__dictBySortedDirName.update(other.__dictBySortedDirName)
+
 	def GetByPythonID(self, pythonid):
 		return self.__dictByID[pythonid]
 
-	def GetByName(self, name):
+	def GetBySortDirNameString(self, name):
+		if name not in self.__dictBySortedDirName:
+			return None
 		return self.__dictBySortedDirName[name]
 
-	def DebugPrint(self):
-		print('__dictByID ({0:d} entries):'.format(len(self.__dictByID)))
-		for key in self.__dictByID.keys():
-			print('    {0:d} -> \'{1:s}\''.format(key, self.__dictByID[key].name))
-		print('__dictBySortedDirName ({0:d} entries):'.format(len(self.__dictBySortedDirName)))
-		for key in self.__dictBySortedDirName.keys():
-			print('    \'{0:s}\' -> \'{1:s}\''.format(key, self.__dictBySortedDirName[key].name))
+	def DelBySortDirNameString(self, name):
+		node = self.__dictBySortedDirName[name]
+		del self.__dictByID[node.GetPythonID()]
+		del self.__dictBySortedDirName[node.GetSortDirNameString()]
 
 
 
@@ -333,10 +376,31 @@ class Tree:
 		return nodetree
 
 	def GetDiffTreeRecurse(self, other, selfnodes, othernodes, removeEquals):
-		for node in selfnodes:
-			if node.isdir:
-				node.children = self.GetChildren(node)
-				self.GetTreeRecurse(node.children)
+		for snode in selfnodes:
+			onode = othernodes.GetBySortDirNameString(snode.GetSortDirNameString())
+			if not onode == None:
+				# nodes existing in selfnodes and othernodes: already known nodes
+				snode.CompareEqualAndSetStatus(onode)
+				if snode.isdir:
+					snode.children = self.GetChildren(snode)
+					onode.children = other.GetChildren(onode)
+					self.GetDiffTreeRecurse(other, snode.children, onode.children, removeEquals)
+				othernodes.DelBySortDirNameString(onode.GetSortDirNameString())
+			else:
+				# nodes existing in selfnodes but not in othernodes: new nodes
+				snode.status = NodeStatus.New
+				if snode.isdir:
+					snode.children = self.GetChildren(snode)
+					self.GetTreeRecurse(snode.children)
+					snode.children.Apply(lambda n: n.SetStatus(NodeStatus.New))
+		# nodes existing in othernodes but not in selfnodes: missing nodes
+		for onode in othernodes:
+			onode.status = NodeStatus.Missing
+			if onode.isdir:
+				onode.children = other.GetChildren(onode)
+				other.GetTreeRecurse(onode.children)
+				onode.children.Apply(lambda n: n.SetStatus(NodeStatus.Missing))
+		selfnodes.update(othernodes)
 
 	def GetDiffTree(self, other, removeEquals=False):
 		selfnodes = NodeTree()
@@ -750,7 +814,20 @@ class ListControlPanel(wx.Panel):
 
 	def AppendNode(self, node):
 		index = self.list.GetItemCount()
-		self.list.InsertImageItem(index, self.iconOk)
+		if node.status == None:
+			raise Exception('Node status is \'None\'.')
+		elif node.status == NodeStatus.OK:
+			self.list.InsertImageItem(index, self.iconOk)
+		elif node.status == NodeStatus.New:
+			self.list.InsertImageItem(index, self.iconNew)
+		elif node.status == NodeStatus.Missing:
+			self.list.InsertImageItem(index, self.iconMissing)
+		elif node.status == NodeStatus.Warn:
+			self.list.InsertImageItem(index, self.iconWarning)
+		elif node.status == NodeStatus.Error:
+			self.list.InsertImageItem(index, self.iconError)
+		else:
+			raise Exception('Unknown node status {0:d}'.format(node.status))
 		if node.isdir:
 			self.list.SetStringItem(index, 1, ' > ')
 		self.list.SetStringItem(index, 2, node.name)
@@ -844,7 +921,7 @@ class MainFrame(wx.Frame):
 
 	def OnOpen(self, event):
 		 # ask user with dir select dialog
-		userPath = '../dtint-example/images'
+		userPath = '../dtint-example'
 		self.srcInstance = Instance(userPath)
 
 		if not self.srcInstance.FoundExistingRoot():
