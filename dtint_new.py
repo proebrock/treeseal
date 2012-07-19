@@ -308,6 +308,9 @@ class NodeTree(NodeContainer):
 	def __getitem__(self, key):
 		return self.__dictByID.values().__getitem__(key)
 
+	def __len__(self):
+		return len(self.__dictByID)
+
 	def clear(self):
 		self.__dictByID.clear()
 		self.__dictBySortedDirName.clear()
@@ -375,7 +378,8 @@ class Tree:
 		self.GetTreeRecurse(nodetree)
 		return nodetree
 
-	def GetDiffTreeRecurse(self, other, selfnodes, othernodes, removeEquals):
+	def GetDiffTreeRecurse(self, other, selfnodes, othernodes, removeOkNodes):
+		okNodes = []
 		for snode in selfnodes:
 			onode = othernodes.GetBySortDirNameString(snode.GetSortDirNameString())
 			if not onode == None:
@@ -383,8 +387,13 @@ class Tree:
 				snode.CompareEqualAndSetStatus(onode)
 				if snode.isdir:
 					snode.children = self.GetChildren(snode)
-					onode.children = other.GetChildren(onode)
-					self.GetDiffTreeRecurse(other, snode.children, onode.children, removeEquals)
+					onode_children = other.GetChildren(onode)
+					self.GetDiffTreeRecurse(other, snode.children, onode_children, removeOkNodes)
+					if snode.status == NodeStatus.OK and len(snode.children) == 0:
+						okNodes.append(snode.GetSortDirNameString())
+				else:
+					if snode.status == NodeStatus.OK:
+						okNodes.append(snode.GetSortDirNameString())
 				othernodes.DelBySortDirNameString(onode.GetSortDirNameString())
 			else:
 				# nodes existing in selfnodes but not in othernodes: new nodes
@@ -393,6 +402,10 @@ class Tree:
 					snode.children = self.GetChildren(snode)
 					self.GetTreeRecurse(snode.children)
 					snode.children.Apply(lambda n: n.SetStatus(NodeStatus.New))
+		# file nodes marked as ok or dir nodes with only ok descentants
+		if removeOkNodes:
+			for s in okNodes:
+				selfnodes.DelBySortDirNameString(s)
 		# nodes existing in othernodes but not in selfnodes: missing nodes
 		for onode in othernodes:
 			onode.status = NodeStatus.Missing
@@ -402,12 +415,15 @@ class Tree:
 				onode.children.Apply(lambda n: n.SetStatus(NodeStatus.Missing))
 		selfnodes.update(othernodes)
 
-	def GetDiffTree(self, other, removeEquals=False):
+	def GetDiffTree(self, other, removeOkNodes=True):
 		selfnodes = NodeTree()
 		selfnodes.append(self.GetRootNode())
 		othernodes = NodeTree()
 		othernodes.append(other.GetRootNode())
-		self.GetDiffTreeRecurse(other, selfnodes, othernodes, removeEquals)
+		self.GetDiffTreeRecurse(other, selfnodes, othernodes, removeOkNodes)
+		if len(selfnodes) == 0:
+			# keep housekeeping root node if removed by removeOkNodes feature
+			selfnodes.append(self.GetRootNode())
 		return selfnodes
 
 
