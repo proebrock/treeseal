@@ -857,13 +857,14 @@ class ListControlPanel(wx.Panel):
 		self.iconMissing = self.imagelist.Add(icons.IconMissing.GetBitmap())
 		self.iconNew = self.imagelist.Add(icons.IconNew.GetBitmap())
 		self.iconOk = self.imagelist.Add(icons.IconOk.GetBitmap())
+		self.iconUnknown = self.imagelist.Add(icons.IconUnknown.GetBitmap())
 		self.iconWarning = self.imagelist.Add(icons.IconWarning.GetBitmap())
 		self.list.SetImageList(self.imagelist, wx.IMAGE_LIST_SMALL)
 
 	def AppendNode(self, node):
 		index = self.list.GetItemCount()
 		if node.status is None:
-			raise Exception('Node status is \'None\'.')
+			self.list.InsertImageItem(index, self.iconUnknown)
 		elif node.status == NodeStatus.OK:
 			self.list.InsertImageItem(index, self.iconOk)
 		elif node.status == NodeStatus.New:
