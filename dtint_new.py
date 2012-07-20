@@ -369,6 +369,9 @@ class Tree:
 	def fetch(self, node):
 		raise MyException('Not implemented.', 3)
 
+	def transferUniqueInformation(self, destNode, srcNode):
+		raise MyException('Not implemented.', 3)
+
 	def getChildren(self, node):
 		raise MyException('Not implemented.', 3)
 
@@ -415,6 +418,7 @@ class Tree:
 			if not onode is None:
 				# nodes existing in selfnodes and othernodes: already known nodes
 				snode.compareEqualNodesAndSetStatus(onode)
+				other.transferUniqueInformation(snode, onode)
 				if snode.isdir:
 					snode.children = self.getChildren(snode)
 					onode_children = other.getChildren(onode)
@@ -545,6 +549,10 @@ class Database(Tree):
 		if not node.isdir:
 			node.checksum = Checksum()
 			node.checksum.setBinary(row[8])
+
+	def transferUniqueInformation(self, destNode, srcNode):
+		destNode.nodeid = srcNode.nodeid
+		destNode.parentid = srcNode.parentid
 
 	def getChildren(self, node):
 		result = NodeDict()
@@ -701,6 +709,9 @@ class Filesystem(Tree):
 		if not node.isdir:
 			node.checksum = Checksum()
 			node.checksum.calculateForFile(fullpath)
+
+	def transferUniqueInformation(self, destNode, srcNode):
+		destNode.path = srcNode.path
 
 	def getChildren(self, node):
 		result = NodeDict()
