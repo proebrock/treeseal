@@ -859,19 +859,18 @@ class ListControlPanel(wx.Panel):
 		self.list.SetImageList(self.imagelist, wx.IMAGE_LIST_SMALL)
 
 	def AppendNode(self, node):
-		index = self.list.GetItemCount()
 		if node.status is None:
-			self.list.InsertImageItem(index, self.iconUnknown)
+			index = self.list.InsertImageItem(sys.maxint, self.iconUnknown)
 		elif node.status == NodeStatus.OK:
-			self.list.InsertImageItem(index, self.iconOk)
+			index = self.list.InsertImageItem(sys.maxint, self.iconOk)
 		elif node.status == NodeStatus.New:
-			self.list.InsertImageItem(index, self.iconNew)
+			index = self.list.InsertImageItem(sys.maxint, self.iconNew)
 		elif node.status == NodeStatus.Missing:
-			self.list.InsertImageItem(index, self.iconMissing)
+			index = self.list.InsertImageItem(sys.maxint, self.iconMissing)
 		elif node.status == NodeStatus.Warn:
-			self.list.InsertImageItem(index, self.iconWarning)
+			index = self.list.InsertImageItem(sys.maxint, self.iconWarning)
 		elif node.status == NodeStatus.Error:
-			self.list.InsertImageItem(index, self.iconError)
+			index = self.list.InsertImageItem(sys.maxint, self.iconError)
 		else:
 			raise Exception('Unknown node status {0:d}'.format(node.status))
 		if node.isdir:
