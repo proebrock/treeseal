@@ -751,8 +751,6 @@ class Instance:
 		else:
 			self.foundExistingRoot = True
 		self.__metaDir = os.path.join(self.__rootDir, self.__metaName)
-		print(self.__rootDir)
-		print(self.__metaDir)
 		# initialize two Trees, the filesystem and the database
 		self.__fs = Filesystem(self.__rootDir, self.__metaDir)
 		self.__db = Database(self.__rootDir, self.__metaDir)
@@ -763,7 +761,6 @@ class Instance:
 		# metadir
 		rootDir = os.path.abspath(path)
 		while True:
-			print(rootDir)
 			metaDir = os.path.join(rootDir, self.__metaName)
 			if os.path.exists(metaDir):
 				return rootDir
