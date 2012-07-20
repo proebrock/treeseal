@@ -280,24 +280,24 @@ class Node:
 
 class NodeContainer:
 
-	def __recursiveApply(self, nodes, func):
+	def __apply(self, nodes, func):
 		for n in nodes:
 			func(n)
 			if not n.children is None:
-				self.__recursiveApply(n.children, func)
+				self.__apply(n.children, func)
 
-	def recursiveApply(self, func):
-		self.__recursiveApply(self, func)
+	def apply(self, func):
+		self.__apply(self, func)
 
-	def __recursivePrettyPrint(self, nodes, depth):
+	def __prettyPrint(self, nodes, depth):
 		for n in nodes:
 			n.prettyPrint(depth * '    ')
 			#print((depth * '    ') + n.name)
 			if not n.children is None:
-				self.__recursivePrettyPrint(n.children, depth + 1)
+				self.__prettyPrint(n.children, depth + 1)
 
-	def recursivePrettyPrint(self):
-		self.__recursivePrettyPrint(self, 0)
+	def prettyPrint(self):
+		self.__prettyPrint(self, 0)
 
 
 
@@ -411,6 +411,21 @@ class Tree:
 		self.__recursiveCopy(dest, nodelist)
 		dest.commit()
 
+	def __recursiveGetStatistics(self, node, statistics):
+		for child in self.getChildren(node):
+			if not child.isdir:
+				statistics[0] += 1
+				statistics[1] += child.size
+			else:
+				statistics[2] += 1
+				statistics[3] += child.size
+				self.__recursiveGetStatistics(child, statistics)
+
+	def getStatistics(self, node):
+		statistics = [ 0, 0, 0, 0 ]
+		self.__recursiveGetStatistics(node, statistics)
+		return statistics
+
 	def __recursiveGetDiffTree(self, other, selfnodes, othernodes, removeOkNodes):
 		okNodes = []
 		for snode in selfnodes:
@@ -435,7 +450,7 @@ class Tree:
 				if snode.isdir:
 					snode.children = self.getChildren(snode)
 					self.__recursiveGetTree(snode.children)
-					snode.children.recursiveApply(lambda n: n.setStatus(NodeStatus.New))
+					snode.children.apply(lambda n: n.setStatus(NodeStatus.New))
 		# file nodes marked as ok or dir nodes with only ok descentants
 		if removeOkNodes:
 			for s in okNodes:
@@ -446,7 +461,7 @@ class Tree:
 			if onode.isdir:
 				onode.children = other.getChildren(onode)
 				other.__recursiveGetTree(onode.children)
-				onode.children.recursiveApply(lambda n: n.setStatus(NodeStatus.Missing))
+				onode.children.apply(lambda n: n.setStatus(NodeStatus.Missing))
 		selfnodes.update(othernodes)
 
 	def recursiveGetDiffTree(self, other, removeOkNodes=True):
@@ -717,8 +732,7 @@ class Filesystem(Tree):
 		result = NodeDict()
 		for childname in os.listdir(os.path.join(self.__rootDir, node.path)):
 			childpath = os.path.join(node.path, childname)
-			# skip the metadir, we do not want to add that to the database
-			if os.path.join(self.__rootDir, childpath) == self.__metaDir:
+			if self.__isOnBlacklist(os.path.join(self.__rootDir, childpath)):
 				continue
 			child = Node()
 			child.path = childpath
@@ -743,7 +757,13 @@ class Filesystem(Tree):
 		self.fetch(node)
 		return node
 
+	### following methods are Database specific and not from Tree
 
+	def __isOnBlacklist(self, path):
+		# skip the metadir, we do not want to add that to the database
+		if path == self.__metaDir:
+			return True
+		return False
 
 class Instance:
 
@@ -800,6 +820,8 @@ class Instance:
 		#self.__db.recursiveCopy(self.__fs)
 
 	def getDiffTree(self):
+		#print(self.__fs.getStatistics(self.__fs.getRootNode()))
+		#print(self.__db.getStatistics(self.__db.getRootNode()))
 		#return self.__fs.recursiveGetTree()
 		#return self.__db.recursiveGetTree()
 		return self.__fs.recursiveGetDiffTree(self.__db)
