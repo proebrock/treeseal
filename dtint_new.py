@@ -736,26 +736,41 @@ class Filesystem(Tree):
 
 class Instance:
 
-	def __init__(self, rootDir):
-		if not os.path.exists(rootDir):
+	def __init__(self, path):
+		# check if specified root dir exists
+		if not os.path.exists(path):
 			raise MyException('Given root directory does not exist.', 3)
-		if not os.path.isdir(rootDir):
+		if not os.path.isdir(path):
 			raise MyException('Given root directory is not a directory.', 3)
-
+		# get rootdir (full path) and metadir
 		self.__metaName = '.' + ProgramName
-		self.__rootDir = rootDir
-		while True:
-			self.__metaDir = os.path.join(self.__rootDir, self.__metaName)
-			if os.path.exists(self.__metaDir):
-				self.foundExistingRoot = True
-				break
-			self.__rootDir = os.path.split(self.__rootDir)[0]
-			if self.__rootDir == '':
-				self.foundExistingRoot = False
-				return
-
+		self.__rootDir = self.findRoot(path)
+		if self.__rootDir is None:
+			self.__rootDir = path
+			self.foundExistingRoot = False
+		else:
+			self.foundExistingRoot = True
+		self.__metaDir = os.path.join(self.__rootDir, self.__metaName)
+		print(self.__rootDir)
+		print(self.__metaDir)
+		# initialize two Trees, the filesystem and the database
 		self.__fs = Filesystem(self.__rootDir, self.__metaDir)
 		self.__db = Database(self.__rootDir, self.__metaDir)
+
+	def findRoot(self, path):
+		# try to find a metadir in rootdir, then go further up in the
+		# directory tree until you reach the root looking for an existing
+		# metadir
+		rootDir = os.path.abspath(path)
+		while True:
+			print(rootDir)
+			metaDir = os.path.join(rootDir, self.__metaName)
+			if os.path.exists(metaDir):
+				return rootDir
+			newRoot = os.path.split(rootDir)[0]
+			if newRoot == rootDir:
+				return None
+			rootDir = newRoot
 
 	def getRootDir(self):
 		return self.__rootDir
