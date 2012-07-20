@@ -445,7 +445,7 @@ class Tree:
 				onode.children.recursiveApply(lambda n: n.setStatus(NodeStatus.Missing))
 		selfnodes.update(othernodes)
 
-	def recursiveGetDiffTree(self, other, removeOkNodes=False):
+	def recursiveGetDiffTree(self, other, removeOkNodes=True):
 		selfnodes = NodeDict()
 		selfnodes.append(self.getRootNode())
 		othernodes = NodeDict()
@@ -818,7 +818,10 @@ class ListControlPanel(wx.Panel):
 
 		# setup listctrl and columns
 		self.list = self.list = ListControl(self, size=(-1,100), style=wx.LC_REPORT | wx.LC_SORT_ASCENDING)
+		self.list.Bind(wx.EVT_LIST_ITEM_SELECTED, self.OnItemSelected)
 		self.list.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.OnItemActivated)
+		self.list.Bind(wx.EVT_COMMAND_RIGHT_CLICK, self.OnRightClick) # for wxMSW
+		self.list.Bind(wx.EVT_RIGHT_UP, self.OnRightClick) # for wxGTK
 		self.coldefs = \
 			[ \
 				('', 22), \
@@ -836,12 +839,16 @@ class ListControlPanel(wx.Panel):
 			self.list.SetColumnWidth(index, coldef[1])
 			index = index + 1
 
-		# for listmix.ListCtrlAutoWidthMixin
+		# for listmix.ListCtrlAutoWidthMixin, auto extend name column
 		self.list.setResizeColumn(3)
 
 		# start with empty node tree
 		self.nodestack = []
 		self.namestack = []
+
+		# some constants
+		self.__emptyNameString = '<empty>'
+		self.__parentNameString = '..'
 
 		# one pseudo boxer with the listctrl filling the whole panel
 		sizer = wx.BoxSizer(wx.VERTICAL)
@@ -890,7 +897,7 @@ class ListControlPanel(wx.Panel):
 		self.list.DeleteAllItems()
 		if not self.IsRoot():
 			self.list.InsertStringItem(0, '')
-			self.list.SetStringItem(0, 2, '..')
+			self.list.SetStringItem(0, 2, self.__parentNameString)
 		for node in self.nodestack[-1]:
 			self.AppendNode(node)
 		path = reduce(lambda x, y: os.path.join(x, y), self.namestack)
@@ -898,9 +905,10 @@ class ListControlPanel(wx.Panel):
 
 	def ShowNodeTree(self, nodetree):
 		self.list.SetFocus()
+		# of nodetree is empty, show pseudo node
 		if nodetree[0].children is None:
 			self.list.InsertStringItem(0, '')
-			self.list.SetStringItem(0, 2, '<empty>')
+			self.list.SetStringItem(0, 2, self.__emptyNameString)
 			return
 		self.nodestack = []
 		self.nodestack.append(nodetree[0].children)
@@ -908,9 +916,17 @@ class ListControlPanel(wx.Panel):
 		self.namestack.append('')
 		self.RefreshTree()
 
+	def OnItemSelected(self, event):
+		index = event.m_itemIndex
+		namecol = self.list.GetItem(index, 2).GetText()
+		if namecol == self.__parentNameString or namecol == self.__emptyNameString:
+			self.list.SetItemState(index, 0, wx.LIST_STATE_SELECTED)
+		event.Skip()
+
 	def OnItemActivated(self, event):
 		index = event.m_itemIndex
-		if (not self.IsRoot()) and index == 0:
+		namecol = self.list.GetItem(index, 2).GetText()
+		if namecol == self.__parentNameString:
 			self.nodestack.pop()
 			self.namestack.pop()
 			self.RefreshTree()
@@ -921,6 +937,40 @@ class ListControlPanel(wx.Panel):
 			self.nodestack.append(node.children)
 			self.namestack.append(node.name)
 			self.RefreshTree()
+
+	def OnRightClick(self, event):
+		index = self.list.GetFirstSelected()
+		if index == -1:
+			event.Skip()
+			return
+
+		# only do this part the first time so the events are only bound once
+		if not hasattr(self, "popupID1"):
+			self.popupIdRefresh = wx.NewId()
+			self.popupIdUpdateDB = wx.NewId()
+
+			self.Bind(wx.EVT_MENU, self.OnPopupRefresh, id=self.popupIdRefresh)
+			self.Bind(wx.EVT_MENU, self.OnPopupUpdateDB, id=self.popupIdUpdateDB)
+
+			menu = wx.Menu()
+			menu.Append(self.popupIdRefresh, "Refresh")
+			menu.Append(self.popupIdUpdateDB, "Update DB")
+
+			# Popup the menu.  If an item is selected then its handler
+			# will be called before PopupMenu returns.
+			self.PopupMenu(menu)
+			menu.Destroy()
+
+	def OnPopupRefresh(self, event):
+		index = self.list.GetFirstSelected()
+		while not index == -1:
+			pythonid = self.list.GetItemData(index)
+			node = self.nodestack[-1].getByPythonID(pythonid)
+			print(node.name) # some something useful here
+			index = self.list.GetNextSelected(index)
+
+	def OnPopupUpdateDB(self, event):
+		pass
 
 
 
