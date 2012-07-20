@@ -706,7 +706,8 @@ class Filesystem(Tree):
 		result = NodeDict()
 		for childname in os.listdir(os.path.join(self.__rootDir, node.path)):
 			childpath = os.path.join(node.path, childname)
-			if os.path.samefile(os.path.join(self.__rootDir, childpath), self.__metaDir):
+			# skip the metadir, we do not want to add that to the database
+			if os.path.join(self.__rootDir, childpath) == self.__metaDir:
 				continue
 			child = Node()
 			child.path = childpath
