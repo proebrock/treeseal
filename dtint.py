@@ -1144,7 +1144,7 @@ class ListControlPanel(wx.Panel):
 		else:
 			raise Exception('Unknown node status {0:d}'.format(node.status))
 		if node.isdir:
-			self.list.SetStringItem(index, 1, ' > ')
+			self.list.SetStringItem(index, 1, '>')
 		self.list.SetStringItem(index, 2, node.name)
 		self.list.SetStringItem(index, 3, node.getSizeString())
 		self.list.SetStringItem(index, 4, node.getCTimeString())
@@ -1162,8 +1162,8 @@ class ListControlPanel(wx.Panel):
 	def RefreshTree(self):
 		self.Clear()
 		if not self.IsRoot():
-			self.list.InsertStringItem(0, '')
-			self.list.SetStringItem(0, 2, self.__parentNameString)
+			index = self.list.InsertStringItem(sys.maxint, '')
+			self.list.SetStringItem(index, 2, self.__parentNameString)
 		for node in self.nodestack[-1]:
 			self.AppendNode(node)
 		path = reduce(lambda x, y: os.path.join(x, y), self.namestack)
@@ -1173,8 +1173,8 @@ class ListControlPanel(wx.Panel):
 		self.list.SetFocus()
 		# of nodetree is empty, show pseudo node
 		if nodetree[0].children is None:
-			self.list.InsertStringItem(0, '')
-			self.list.SetStringItem(0, 2, self.__emptyNameString)
+			index = self.list.InsertStringItem(sys.maxint, '')
+			self.list.SetStringItem(index, 2, self.__emptyNameString)
 			return
 		self.nodestack = []
 		self.nodestack.append(nodetree[0].children)
