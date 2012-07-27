@@ -37,7 +37,7 @@ def sizeToString(size):
 
 
 
-class Checksum:
+class Checksum(object):
 
 	def __init__(self):
 		self.__checksum = None # is of type 'buffer'
@@ -76,17 +76,21 @@ class Checksum:
 			else:
 				return binascii.hexlify(self.__checksum).decode('utf-8')
 
-	def calculateForFile(self, path):
+	def calculateForFile(self, path, signalBytesDone=None):
 		checksum = hashlib.sha256()
-		buffersize = 2**20
+		buffersize = 2**24
 		f = open(path,'rb')
 		while True:
 			data = f.read(buffersize)
 			if not data:
 				break
+			if signalBytesDone is not None:
+				if signalBytesDone(len(data)):
+					return True
 			checksum.update(data)
 		f.close()
 		self.__checksum = buffer(checksum.digest())
+		return False
 
 	def saveToFile(self, path):
 		f = open(path, 'w')
@@ -135,7 +139,7 @@ class NodeStatus:
 
 
 
-class Node:
+class Node(object):
 
 	def __init__(self):
 		self.status = None
@@ -285,7 +289,10 @@ class Node:
 
 
 
-class NodeContainer:
+class NodeContainer(object):
+
+	def __init__(self):
+		pass
 
 	def __apply(self, nodes, func):
 		for n in nodes:
@@ -309,13 +316,16 @@ class NodeContainer:
 
 
 class NodeList(NodeContainer, list):
-	pass
+
+	def __init__(self):
+		super(NodeList, self).__init__()
 
 
 
 class NodeDict(NodeContainer):
 
 	def __init__(self):
+		super(NodeDict, self).__init__()
 		self.__dictByUniqueID = {}
 		self.__dictByPythonID = {}
 
@@ -361,7 +371,11 @@ class NodeDict(NodeContainer):
 
 
 
-class Tree:
+class Tree(object):
+
+	def __init__(self):
+		self.signalNewFile = None
+		self.signalBytesDone = None
 
 	def open(self):
 		raise MyException('Not implemented.', 3)
@@ -402,6 +416,10 @@ class Tree:
 	def commit(self):
 		raise MyException('Not implemented.', 3)
 
+	def registerHandlers(self, signalNewFile, signalBytesDone):
+		self.signalNewFile = signalNewFile
+		self.signalBytesDone = signalBytesDone
+
 	def __recursiveGetTree(self, nodetree):
 		for node in nodetree:
 			self.calculate(node)
@@ -417,10 +435,16 @@ class Tree:
 
 	def __recursiveCopy(self, dest, nodelist):
 		for node in nodelist:
-			self.calculate(node)
+			if self.signalNewFile is not None:
+				if self.signalNewFile(node.path, node.size):
+					return True
+			if self.calculate(node):
+				return True
 			dest.insertNode(node)
 			if node.isdir:
-				self.__recursiveCopy(dest, self.getChildren(node))
+				if self.__recursiveCopy(dest, self.getChildren(node)):
+					return True
+		return False
 
 	def recursiveCopy(self, dest):
 		nodelist = NodeDict()
@@ -428,19 +452,21 @@ class Tree:
 		self.__recursiveCopy(dest, nodelist)
 		dest.commit()
 
-	def __recursiveGetStatistics(self, node, statistics):
-		for child in self.getChildren(node):
-			if not child.isdir:
+	def __recursiveGetStatistics(self, nodelist, statistics):
+		for node in nodelist:
+			if not node.isdir:
 				statistics[0] += 1
-				statistics[1] += child.size
+				statistics[1] += node.size
 			else:
 				statistics[2] += 1
-				statistics[3] += child.size
-				self.__recursiveGetStatistics(child, statistics)
+				statistics[3] += node.size
+				self.__recursiveGetStatistics(self.getChildren(node), statistics)
 
 	def getStatistics(self, node):
 		statistics = [ 0, 0, 0, 0 ]
-		self.__recursiveGetStatistics(node, statistics)
+		nodelist = NodeDict()
+		nodelist.append(node)
+		self.__recursiveGetStatistics(nodelist, statistics)
 		return statistics
 
 	def __recursiveGetDiffTree(self, other, selfnodes, othernodes, removeOkNodes):
@@ -507,6 +533,7 @@ class Tree:
 class Database(Tree):
 
 	def __init__(self, rootDir, metaDir):
+		super(Database, self).__init__()
 		self.__dbFile = os.path.join(metaDir, 'base.sqlite3')
 		self.__sgFile = os.path.join(metaDir, 'base.signature')
 		self.__dbcon = None
@@ -593,7 +620,9 @@ class Database(Tree):
 			node.checksum.setBinary(row[8])
 
 	def calculate(self, node):
-		pass # nothing to calculate, checksum is loaded from db in fetch
+		# nothing to do, just signal that the job is done if necessary
+		if self.signalBytesDone is not None:
+			return self.signalBytesDone(node.size)
 
 	def transferUniqueInformation(self, destNode, srcNode):
 		destNode.nodeid = srcNode.nodeid
@@ -717,6 +746,7 @@ class Database(Tree):
 class Filesystem(Tree):
 
 	def __init__(self, rootDir, metaDir):
+		super(Filesystem, self).__init__()
 		self.__rootDir = rootDir
 		self.__metaDir = metaDir
 		self.isOpen = False
@@ -753,10 +783,13 @@ class Filesystem(Tree):
 		node.mtime = datetime.datetime.fromtimestamp(os.path.getmtime(fullpath))
 
 	def calculate(self, node):
+		if node.isdir:
+			if self.signalBytesDone is not None:
+				return self.signalBytesDone(node.size)
 		if not node.isdir:
 			fullpath = os.path.join(self.__rootDir, node.path)
 			node.checksum = Checksum()
-			node.checksum.calculateForFile(fullpath)
+			return node.checksum.calculateForFile(fullpath, self.signalBytesDone)
 
 	def transferUniqueInformation(self, destNode, srcNode):
 		destNode.path = srcNode.path
@@ -807,13 +840,8 @@ class Instance:
 		if not os.path.isdir(path):
 			raise MyException('Given root directory is not a directory.', 3)
 		# get rootdir (full path) and metadir
+		self.__rootDir = path
 		self.__metaName = '.' + ProgramName
-		self.__rootDir = self.findRoot(path)
-		if self.__rootDir is None:
-			self.__rootDir = path
-			self.foundExistingRoot = False
-		else:
-			self.foundExistingRoot = True
 		self.__metaDir = os.path.join(self.__rootDir, self.__metaName)
 		# initialize two Trees, the filesystem and the database
 		self.__fs = Filesystem(self.__rootDir, self.__metaDir)
@@ -848,17 +876,22 @@ class Instance:
 		self.__fs.reset()
 		self.__db.reset()
 
-	def importTree(self):
+	def importTree(self, signalNewFile, signalBytesDone):
+		self.__fs.registerHandlers(signalNewFile, signalBytesDone)
 		self.__fs.recursiveCopy(self.__db)
-		#self.__db.recursiveCopy(self.__fs)
+		self.__fs.registerHandlers(None, None)
 
 	def getStatistics(self):
 		return self.__fs.getStatistics(self.__fs.getRootNode())
 		#return self.__db.getStatistics(self.__db.getRootNode())
 
+	def getFilesystemTree(self):
+		return self.__fs.recursiveGetTree()
+
+	def getDatabaseTree(self):
+		return self.__db.recursiveGetTree()
+
 	def getDiffTree(self):
-		#return self.__fs.recursiveGetTree()
-		#return self.__db.recursiveGetTree()
 		return self.__fs.recursiveGetDiffTree(self.__db)
 		#return self.__db.recursiveGetDiffTree(self.__fs)
 
@@ -872,23 +905,23 @@ class FileProcessingProgressDialog(wx.Dialog):
 
 	def __init__(self, parent, title):
 		wx.Dialog.__init__(self, parent, title=title, size=(500,350), \
-			style=wx.CAPTION | wx.RESIZE_BORDER)
+			style=wx.CAPTION | wx.RESIZE_BORDER | wx.STAY_ON_TOP)
 
-		self.currentPath = None
 		self.currentBytesDone = None
 		self.currentBytesAll = None
 		self.totalFilesDone = None
 		self.totalFilesAll = None
 		self.totalBytesDone = None
 		self.totalBytesAll = None
+		self.cancelRequest = False
 
 		border = 5
 
-		self.processingText = wx.StaticText(self)
-		self.currentPathText = wx.StaticText(self)
+		self.processingText = wx.StaticText(self, label='Initializing ...')
+		self.currentPathText = wx.StaticText(self, label='')
 		processingSizer = wx.BoxSizer(wx.VERTICAL)
-		processingSizer.Add(self.processingText, 0, wx.ALL | wx.ALIGN_CENTRE, border)
-		processingSizer.Add(self.currentPathText, 0, wx.BOTTOM | wx.ALIGN_CENTRE, border+25)
+		processingSizer.Add(self.processingText, 0, wx.ALL | wx.EXPAND, border)
+		processingSizer.Add(self.currentPathText, 0, wx.BOTTOM | wx.EXPAND, border+25)
 
 		self.currentBytesHeader = wx.StaticText(self)
 		self.currentBytesGauge = wx.Gauge(self)
@@ -911,21 +944,29 @@ class FileProcessingProgressDialog(wx.Dialog):
 		totalBytesSizer.Add(self.totalBytesGauge, 1, wx.ALL | wx.EXPAND, border)
 		totalBytesSizer.Add(self.totalBytesGaugeText, 0, wx.ALL | wx.ALIGN_CENTRE, border)
 
-		cancelButton = wx.Button(self, wx.ID_CANCEL)
-
-		self.RePaint()
+		self.button = wx.Button(self, label='Cancel')
+		self.button.SetFocus()
+		self.Bind(wx.EVT_BUTTON, self.OnClick, self.button)
 
 		sizer = wx.BoxSizer(wx.VERTICAL)
-		sizer.Add(processingSizer, 0, wx.ALL | wx.ALIGN_CENTRE, border)
-		sizer.Add(self.currentBytesHeader, 0, wx.ALL | wx.ALIGN_CENTRE, border)
+		sizer.Add(processingSizer, 0, wx.ALL | wx.EXPAND, border)
+		sizer.Add(self.currentBytesHeader, 1, wx.ALL | wx.EXPAND, border)
 		sizer.Add(currentBytesSizer, 1, wx.ALL | wx.EXPAND, border)
-		sizer.Add(self.totalFilesHeader, 0, wx.ALL | wx.ALIGN_CENTRE, border)
+		sizer.Add(self.totalFilesHeader, 1, wx.ALL | wx.EXPAND, border)
 		sizer.Add(totalFilesSizer, 1, wx.ALL | wx.EXPAND, border)
-		sizer.Add(self.totalBytesHeader, 0, wx.ALL | wx.ALIGN_CENTRE, border)
+		sizer.Add(self.totalBytesHeader, 1, wx.ALL | wx.EXPAND, border)
 		sizer.Add(totalBytesSizer, 1, wx.ALL | wx.EXPAND, border)
-		sizer.Add(cancelButton, 0, wx.ALL | wx.ALIGN_CENTER, border)
+		sizer.Add(self.button, 0, wx.ALL | wx.ALIGN_CENTER, border)
 		self.SetSizer(sizer)
 		self.CenterOnScreen()
+
+		self.OnPaint()
+
+	def OnClick(self, event):
+		if self.button.GetLabel() == 'OK':
+			self.Destroy()
+		else:
+			self.cancelRequest = True
 
 	def Init(self, totalFiles, totalSize):
 		self.totalFilesDone = 0
@@ -934,24 +975,52 @@ class FileProcessingProgressDialog(wx.Dialog):
 		self.totalBytesDone = 0
 		self.totalBytesAll = totalSize
 		self.totalBytesGauge.SetRange(totalSize)
-		self.RePaint()
+		self.OnPaint()
 
-	def InitFile(self, path, size):
-		self.currentPath = path
+	def SignalNewFile(self, path, size):
+		if not self.currentBytesDone == self.currentBytesAll:
+			raise MyException('Signaled a new file but the old one is not done yet.', 3)
+		if self.totalBytesDone == 0:
+			self.processingText.SetLabel('Processing ...')
+		self.currentPathText.SetLabel(path)
 		self.currentBytesDone = 0
 		self.currentBytesAll = size
 		self.currentBytesGauge.SetRange(size)
-		self.RePaint()
+		self.OnPaint()
+		return self.cancelRequest
 
-	def RePaint(self):
-		if self.currentPath is not None:
-			self.processingText.SetLabel('Processing ...')
-			self.currentPathText.SetLabel(self.currentPath)
+	def SignalBytesDone(self, bytesDone):
+		# update current bytes
+		self.currentBytesDone += bytesDone
+		if self.currentBytesDone > self.currentBytesAll:
+			print(self)
+			raise MyException('Signaled current size larger than full size.', 3)
+		elif self.currentBytesDone == self.currentBytesAll:
+			# file is complete
+			self.totalFilesDone += 1
+			if self.totalFilesDone > self.totalFilesAll:
+				print(self)
+				raise MyException('Signaled number of files larger than full size.', 3)
+		# update total bytes
+		self.totalBytesDone += bytesDone
+		if self.totalBytesDone > self.totalBytesAll:
+			raise MyException('Signaled total size larger than full size.', 3)
+		self.OnPaint()
+		return self.cancelRequest
+
+	def SignalFinished(self):
+		self.button.SetLabel('OK')
+		if self.cancelRequest:
+			self.processingText.SetLabel('Canceled by user.')
 		else:
-			self.processingText.SetLabel('Initializing ...')
-			self.currentPathText.SetLabel('')
+			self.processingText.SetLabel('All files successfully processed.')
+		self.currentPathText.SetLabel('')
+		self.ShowModal()
+		return self.cancelRequest
+
+	def OnPaint(self):
 		if self.currentBytesDone is not None and self.currentBytesAll is not None:
-			self.currentBytesHeader.SetLabel('Current File {0:d}/{1:d}'.format( \
+			self.currentBytesHeader.SetLabel('Current File {0:s}/{1:s}'.format( \
 				sizeToString(self.currentBytesDone), sizeToString(self.currentBytesAll)))
 			self.currentBytesGauge.SetValue(self.currentBytesDone)
 			self.currentBytesGaugeText.SetLabel('{0:d} %'.format((100 * self.currentBytesDone) / self.currentBytesAll))
@@ -971,12 +1040,16 @@ class FileProcessingProgressDialog(wx.Dialog):
 		if self.totalBytesDone is not None and self.totalBytesAll is not None:
 			self.totalBytesHeader.SetLabel('Total Size {0:s}/{1:s}'.format( \
 				sizeToString(self.totalBytesDone), sizeToString(self.totalBytesAll)))
-			self.totalBytesGauge.SetValue(self.totalFilesDone)
+			self.totalBytesGauge.SetValue(self.totalBytesDone)
 			self.totalBytesGaugeText.SetLabel('{0:d} %'.format((100 * self.totalBytesDone) / self.totalBytesAll))
 		else:
 			self.totalBytesHeader.SetLabel('Total Size -/-')
 			self.totalBytesGauge.SetValue(0)
 			self.totalBytesGaugeText.SetLabel('--- %')
+		# force a repaint of the dialog
+		self.Update()
+		# allow wx to process events like for the cancel button
+		wx.YieldIfNeeded()
 
 
 
@@ -1071,8 +1144,11 @@ class ListControlPanel(wx.Panel):
 	def IsRoot(self):
 		return len(self.nodestack) <= 1
 
-	def RefreshTree(self):
+	def Clear(self):
 		self.list.DeleteAllItems()
+
+	def RefreshTree(self):
+		self.Clear()
 		if not self.IsRoot():
 			self.list.InsertStringItem(0, '')
 			self.list.SetStringItem(0, 2, self.__parentNameString)
@@ -1159,8 +1235,10 @@ class MainFrame(wx.Frame):
 
 		# main menue definition
 		fileMenu = wx.Menu()
-		menuOpen = fileMenu.Append(wx.ID_OPEN, 'Open', 'Open Directory')
-		self.Bind(wx.EVT_MENU, self.OnOpen, menuOpen)
+		menuImport = fileMenu.Append(wx.ID_FILE1, 'Import', 'Import Directory')
+		self.Bind(wx.EVT_MENU, self.OnImport, menuImport)
+		menuCheck = fileMenu.Append(wx.ID_FILE2, 'Check', 'Check Directory')
+		self.Bind(wx.EVT_MENU, self.OnCheck, menuCheck)
 		fileMenu.AppendSeparator()
 		menuExit = fileMenu.Append(wx.ID_EXIT, 'E&xit', 'Terminate Program')
 		self.Bind(wx.EVT_MENU, self.OnExit, menuExit)
@@ -1177,9 +1255,6 @@ class MainFrame(wx.Frame):
 		self.address = wx.TextCtrl(self, -1, style=wx.TE_READONLY)
 		self.list = ListControlPanel(self)
 
-		# initialize local attributes
-		self.srcInstance = None
-
 		sizer = wx.BoxSizer(wx.VERTICAL)
 		sizer.Add(self.address, 0, wx.ALL | wx.EXPAND, 5)
 		sizer.Add(self.list, 1, wx.ALL | wx.EXPAND, 5)
@@ -1192,41 +1267,46 @@ class MainFrame(wx.Frame):
 	def SetAddressLine(self, path):
 		self.address.SetValue(path)
 
-	def OnOpen(self, event):
-		 # ask user with dir select dialog
-		userPath = '../dtint-example'
-		self.srcInstance = Instance(userPath)
-
-		if not self.srcInstance.foundExistingRoot:
-			# offer user to reset+import, otherwise exit
-			#self.srcInstance.reset()
-			#self.srcInstance.importTree()
-			#self.srcInstance.open()
+	def OnImport(self, event):
+		# get path from user
+		dirDialog = wx.DirDialog(self, "Choose a directory for import:", \
+			style=wx.DD_DEFAULT_STYLE)
+		dirDialog.SetPath('../dtint-example') # TESTING
+		if dirDialog.ShowModal() == wx.ID_OK:
+			userPath = dirDialog.GetPath()
+		else:
 			return
+		self.Title = self.baseTitle + ' - ' + userPath
+
+		# create and reset instance
+		instance = Instance(userPath)
+		instance.reset()
+		instance.open()
+
+		# create progress dialog
+		progressDialog = FileProcessingProgressDialog(self, 'Importing ' + userPath)
+		progressDialog.Show()
+		stats = instance.getStatistics()
+		progressDialog.Init(stats[0] + stats[2], stats[1] + stats[3])
+
+		# do the importing
+		instance.importTree(progressDialog.SignalNewFile, \
+			progressDialog.SignalBytesDone)
+
+		# signal that we have returned from calculation, either
+		# after it is done or after progressDialog signalled that the
+		# user stopped the calcuation using the cancel button
+		if progressDialog.SignalFinished():
+			self.list.Clear()
 		else:
-			pass
-			#self.srcInstance.open()
+			tree = instance.getDatabaseTree()
+			tree.apply(lambda n: n.setStatus(NodeStatus.OK))
+			self.list.ShowNodeTree(tree)
 
-		self.Title = self.baseTitle + ' - ' + self.srcInstance.getRootDir()
+		instance.close()
 
-		#self.srcInstance.reset() # TESTING
-		self.srcInstance.open()
-
-
-		dlg = FileProcessingProgressDialog(self, 'title')
-
-		stats = self.srcInstance.getStatistics()
-		dlg.Init(stats[0] + stats[2], stats[1] + stats[3])
-		val = dlg.ShowModal()
-		if val == wx.ID_OK:
-			print('OK')
-		else:
-			print('Cancel')
-		dlg.Destroy()
-
-		#self.srcInstance.importTree() # TESTING
-		#self.list.ShowNodeTree(self.srcInstance.getDiffTree())
-		self.srcInstance.close()
+	def OnCheck(self, event):
+		pass
 
 	def OnExit(self, event):
 		self.Close(True)
