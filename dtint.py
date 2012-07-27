@@ -18,6 +18,25 @@ ProgramVersion = '3.0'
 
 
 
+def sizeToString(size):
+	if size < 1000:
+		sizestr = '{0:d} '.format(size)
+	elif size < 1000**2:
+		sizestr = '{0:.1f} K'.format(size/1000)
+	elif size < 1000**3:
+		sizestr = '{0:.1f} M'.format(size/1000**2)
+	elif size < 1000**4:
+		sizestr = '{0:.1f} G'.format(size/1000**3)
+	elif size < 1000**5:
+		sizestr = '{0:.1f} T'.format(size/1000**4)
+	elif size < 1000**6:
+		sizestr = '{0:.1f} P'.format(size/1000**5)
+	else:
+		sizestr = '{0:.1f} E'.format(size/1000**6)
+	return sizestr + 'B'
+
+
+
 class Checksum:
 
 	def __init__(self):
@@ -208,21 +227,7 @@ class Node:
 		if self.size is None:
 			return self.NoneString
 		else:
-			if self.size < 1000:
-				sizestr = '{0:d} '.format(self.size)
-			elif self.size < 1000**2:
-				sizestr = '{0:.1f} K'.format(self.size/1000)
-			elif self.size < 1000**3:
-				sizestr = '{0:.1f} M'.format(self.size/1000**2)
-			elif self.size < 1000**4:
-				sizestr = '{0:.1f} G'.format(self.size/1000**3)
-			elif self.size < 1000**5:
-				sizestr = '{0:.1f} T'.format(self.size/1000**4)
-			elif self.size < 1000**6:
-				sizestr = '{0:.1f} P'.format(self.size/1000**5)
-			else:
-				sizestr = '{0:.1f} E'.format(self.size/1000**6)
-			return sizestr + 'B'
+			return sizeToString(self.size)
 
 	def getCTimeString(self):
 		if self.ctime is None:
@@ -338,6 +343,11 @@ class NodeDict(NodeContainer):
 
 	def getByPythonID(self, pythonid):
 		return self.__dictByPythonID[pythonid]
+
+	def delByPythonID(self, pythonid):
+		node = self.__dictByPythonID[pythonid]
+		del self.__dictByUniqueID[node.getUniqueKey()]
+		del self.__dictByPythonID[node.pythonid]
 
 	def getByUniqueID(self, uniqueid):
 		if uniqueid not in self.__dictByUniqueID:
@@ -858,6 +868,116 @@ class Instance:
 ################### GUI ###################
 ###########################################
 
+class FileProcessingProgressDialog(wx.Dialog):
+
+	def __init__(self, parent, title):
+		wx.Dialog.__init__(self, parent, title=title, size=(500,350), \
+			style=wx.CAPTION | wx.RESIZE_BORDER)
+
+		self.currentPath = None
+		self.currentBytesDone = None
+		self.currentBytesAll = None
+		self.totalFilesDone = None
+		self.totalFilesAll = None
+		self.totalBytesDone = None
+		self.totalBytesAll = None
+
+		border = 5
+
+		self.processingText = wx.StaticText(self)
+		self.currentPathText = wx.StaticText(self)
+		processingSizer = wx.BoxSizer(wx.VERTICAL)
+		processingSizer.Add(self.processingText, 0, wx.ALL | wx.ALIGN_CENTRE, border)
+		processingSizer.Add(self.currentPathText, 0, wx.BOTTOM | wx.ALIGN_CENTRE, border+25)
+
+		self.currentBytesHeader = wx.StaticText(self)
+		self.currentBytesGauge = wx.Gauge(self)
+		self.currentBytesGaugeText = wx.StaticText(self, size=(40,-1))
+		currentBytesSizer = wx.BoxSizer(wx.HORIZONTAL)
+		currentBytesSizer.Add(self.currentBytesGauge, 1, wx.ALL | wx.EXPAND, border)
+		currentBytesSizer.Add(self.currentBytesGaugeText, 0, wx.ALL | wx.ALIGN_CENTRE, border)
+
+		self.totalFilesHeader = wx.StaticText(self)
+		self.totalFilesGauge = wx.Gauge(self)
+		self.totalFilesGaugeText = wx.StaticText(self, size=(40,-1))
+		totalFilesSizer = wx.BoxSizer(wx.HORIZONTAL)
+		totalFilesSizer.Add(self.totalFilesGauge, 1, wx.ALL | wx.EXPAND, border)
+		totalFilesSizer.Add(self.totalFilesGaugeText, 0, wx.ALL | wx.ALIGN_CENTRE, border)
+
+		self.totalBytesHeader = wx.StaticText(self)
+		self.totalBytesGauge = wx.Gauge(self)
+		self.totalBytesGaugeText = wx.StaticText(self, size=(40,-1))
+		totalBytesSizer = wx.BoxSizer(wx.HORIZONTAL)
+		totalBytesSizer.Add(self.totalBytesGauge, 1, wx.ALL | wx.EXPAND, border)
+		totalBytesSizer.Add(self.totalBytesGaugeText, 0, wx.ALL | wx.ALIGN_CENTRE, border)
+
+		cancelButton = wx.Button(self, wx.ID_CANCEL)
+
+		self.RePaint()
+
+		sizer = wx.BoxSizer(wx.VERTICAL)
+		sizer.Add(processingSizer, 0, wx.ALL | wx.ALIGN_CENTRE, border)
+		sizer.Add(self.currentBytesHeader, 0, wx.ALL | wx.ALIGN_CENTRE, border)
+		sizer.Add(currentBytesSizer, 1, wx.ALL | wx.EXPAND, border)
+		sizer.Add(self.totalFilesHeader, 0, wx.ALL | wx.ALIGN_CENTRE, border)
+		sizer.Add(totalFilesSizer, 1, wx.ALL | wx.EXPAND, border)
+		sizer.Add(self.totalBytesHeader, 0, wx.ALL | wx.ALIGN_CENTRE, border)
+		sizer.Add(totalBytesSizer, 1, wx.ALL | wx.EXPAND, border)
+		sizer.Add(cancelButton, 0, wx.ALL | wx.ALIGN_CENTER, border)
+		self.SetSizer(sizer)
+		self.CenterOnScreen()
+
+	def Init(self, totalFiles, totalSize):
+		self.totalFilesDone = 0
+		self.totalFilesAll = totalFiles
+		self.totalFilesGauge.SetRange(totalFiles)
+		self.totalBytesDone = 0
+		self.totalBytesAll = totalSize
+		self.totalBytesGauge.SetRange(totalSize)
+		self.RePaint()
+
+	def InitFile(self, path, size):
+		self.currentPath = path
+		self.currentBytesDone = 0
+		self.currentBytesAll = size
+		self.currentBytesGauge.SetRange(size)
+		self.RePaint()
+
+	def RePaint(self):
+		if self.currentPath is not None:
+			self.processingText.SetLabel('Processing ...')
+			self.currentPathText.SetLabel(self.currentPath)
+		else:
+			self.processingText.SetLabel('Initializing ...')
+			self.currentPathText.SetLabel('')
+		if self.currentBytesDone is not None and self.currentBytesAll is not None:
+			self.currentBytesHeader.SetLabel('Current File {0:d}/{1:d}'.format( \
+				sizeToString(self.currentBytesDone), sizeToString(self.currentBytesAll)))
+			self.currentBytesGauge.SetValue(self.currentBytesDone)
+			self.currentBytesGaugeText.SetLabel('{0:d} %'.format((100 * self.currentBytesDone) / self.currentBytesAll))
+		else:
+			self.currentBytesHeader.SetLabel('Current File -/-')
+			self.currentBytesGauge.SetValue(0)
+			self.currentBytesGaugeText.SetLabel('--- %')
+		if self.totalFilesDone is not None and self.totalFilesAll is not None:
+			self.totalFilesHeader.SetLabel('Total Number of Files {0:d}/{1:d}'.format( \
+				self.totalFilesDone, self.totalFilesAll))
+			self.totalFilesGauge.SetValue(self.totalFilesDone)
+			self.totalFilesGaugeText.SetLabel('{0:d} %'.format((100 * self.totalFilesDone) / self.totalFilesAll))
+		else:
+			self.totalFilesHeader.SetLabel('Total Number of Files -/-')
+			self.totalFilesGauge.SetValue(0)
+			self.totalFilesGaugeText.SetLabel('--- %')
+		if self.totalBytesDone is not None and self.totalBytesAll is not None:
+			self.totalBytesHeader.SetLabel('Total Size {0:s}/{1:s}'.format( \
+				sizeToString(self.totalBytesDone), sizeToString(self.totalBytesAll)))
+			self.totalBytesGauge.SetValue(self.totalFilesDone)
+			self.totalBytesGaugeText.SetLabel('{0:d} %'.format((100 * self.totalBytesDone) / self.totalBytesAll))
+		else:
+			self.totalBytesHeader.SetLabel('Total Size -/-')
+			self.totalBytesGauge.SetValue(0)
+			self.totalBytesGaugeText.SetLabel('--- %')
+
 
 
 class ListControl(wx.ListCtrl, listmix.ListCtrlAutoWidthMixin):
@@ -1091,8 +1211,21 @@ class MainFrame(wx.Frame):
 
 		#self.srcInstance.reset() # TESTING
 		self.srcInstance.open()
+
+
+		dlg = FileProcessingProgressDialog(self, 'title')
+
+		stats = self.srcInstance.getStatistics()
+		dlg.Init(stats[0] + stats[2], stats[1] + stats[3])
+		val = dlg.ShowModal()
+		if val == wx.ID_OK:
+			print('OK')
+		else:
+			print('Cancel')
+		dlg.Destroy()
+
 		#self.srcInstance.importTree() # TESTING
-		self.list.ShowNodeTree(self.srcInstance.getDiffTree())
+		#self.list.ShowNodeTree(self.srcInstance.getDiffTree())
 		self.srcInstance.close()
 
 	def OnExit(self, event):
