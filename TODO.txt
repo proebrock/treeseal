@@ -19,6 +19,8 @@
 * Preferences menu and saving in rc file:
   - Hide valid nodes in diff view: on/off
   - Default dir for opening directories: path
+* Unicode support for filenames
+* Continuously check and keep portability (Linux, Win, Mac)
 
 * Copying from instance to instance
   - What can you trust, how paranoid do you have to be?
