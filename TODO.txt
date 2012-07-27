@@ -1,0 +1,28 @@
+* Progress bar on diff calculation
+* Right-Click menu
+  - Dependent on previous action, e.g. import, check, ...)
+  - Working with multi-select
+  - Functions: Refresh (diff of sub-tree), Accept (update db), Compare
+    (side-by-side comparison (gridview?), colored differences,
+    Database (previous state) vs. Filesystem (current state))
+* Double-Click on nodes (dir: change to, file: compare)
+* Key navigation of listview (including multiselect and background menu)
+* Split program into multiple files/modules (check Meld as example)
+* Program name and artwork (icon, splash screen)
+* Help Github, in-program (HTML viewer) and About dialog
+* Global resolving issues (Accept all, accept all added, accept all deleted,
+  accept all renamed, ...)
+* Much more clever diffs using global checksum database (rm, mv, cp)
+  (a new file can have no/one/multiple origins in terms of its checksum,
+  each can still exist (cp) or no longer exist (mv) in current fs; dirs are
+  handled by their contents)
+* Preferences menu and saving in rc file:
+  - Hide valid nodes in diff view: on/off
+  - Default dir for opening directories: path
+
+* Copying from instance to instance
+  - What can you trust, how paranoid do you have to be?
+* Advertise program (Friends, Heise?, Linux-Magazine?)
+* Sign database contents using gpg instead of just using a checksum
+* Client-server architecture for copying, using rsync technology
+  (e.g. with rolling checksums)
