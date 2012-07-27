@@ -1080,7 +1080,7 @@ class ListControlPanel(wx.Panel):
 		wx.Panel.__init__(self, parent, -1, style=wx.WANTS_CHARS)
 
 		# setup listctrl and columns
-		self.list = self.list = ListControl(self, size=(-1,100), style=wx.LC_REPORT | wx.LC_SORT_ASCENDING)
+		self.list = self.list = ListControl(self, size=(-1,100), style=wx.LC_REPORT)
 		self.list.Bind(wx.EVT_LIST_ITEM_SELECTED, self.OnItemSelected)
 		self.list.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.OnItemActivated)
 		self.list.Bind(wx.EVT_COMMAND_RIGHT_CLICK, self.OnRightClick) # for wxMSW
