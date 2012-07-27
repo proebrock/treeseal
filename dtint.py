@@ -28,6 +28,8 @@ class Checksum:
 		return self.getString()
 
 	def __eq__(self, other):
+		if other is None:
+			return False
 		return self.getString() == other.getString()
 
 	def __ne__(self, other):
@@ -369,6 +371,9 @@ class Tree:
 	def fetch(self, node):
 		raise MyException('Not implemented.', 3)
 
+	def calculate(self, node):
+		raise MyException('Not implemented.', 3)
+
 	def transferUniqueInformation(self, destNode, srcNode):
 		raise MyException('Not implemented.', 3)
 
@@ -389,6 +394,7 @@ class Tree:
 
 	def __recursiveGetTree(self, nodetree):
 		for node in nodetree:
+			self.calculate(node)
 			if node.isdir:
 				node.children = self.getChildren(node)
 				self.__recursiveGetTree(node.children)
@@ -401,6 +407,7 @@ class Tree:
 
 	def __recursiveCopy(self, dest, nodelist):
 		for node in nodelist:
+			self.calculate(node)
 			dest.insertNode(node)
 			if node.isdir:
 				self.__recursiveCopy(dest, self.getChildren(node))
@@ -435,12 +442,22 @@ class Tree:
 				snode.compareEqualNodesAndSetStatus(onode)
 				other.transferUniqueInformation(snode, onode)
 				if snode.isdir:
+					# get children
 					snode.children = self.getChildren(snode)
 					onode_children = other.getChildren(onode)
+					# do calculations (this takes time...)
+					for n in snode.children:
+						self.calculate(n)
+					for n in onode_children:
+						other.calculate(n)
+					# recurse
 					self.__recursiveGetDiffTree(other, snode.children, onode_children, removeOkNodes)
+					# collect nodes that are okay or have no descendants
+					# (or only descendants that are okay and those have been removed)
 					if snode.status == NodeStatus.OK and len(snode.children) == 0:
 						okNodes.append(snode.getUniqueKey())
 				else:
+					# collect nodes that are okay
 					if snode.status == NodeStatus.OK:
 						okNodes.append(snode.getUniqueKey())
 				othernodes.delByUniqueID(onode.getUniqueKey())
@@ -451,7 +468,7 @@ class Tree:
 					snode.children = self.getChildren(snode)
 					self.__recursiveGetTree(snode.children)
 					snode.children.apply(lambda n: n.setStatus(NodeStatus.New))
-		# file nodes marked as ok or dir nodes with only ok descentants
+		# remove nodes marked as ok
 		if removeOkNodes:
 			for s in okNodes:
 				selfnodes.delByUniqueID(s)
@@ -564,6 +581,9 @@ class Database(Tree):
 		if not node.isdir:
 			node.checksum = Checksum()
 			node.checksum.setBinary(row[8])
+
+	def calculate(self, node):
+		pass # nothing to calculate, checksum is loaded from db in fetch
 
 	def transferUniqueInformation(self, destNode, srcNode):
 		destNode.nodeid = srcNode.nodeid
@@ -721,7 +741,10 @@ class Filesystem(Tree):
 		node.ctime = datetime.datetime.fromtimestamp(os.path.getctime(fullpath))
 		node.atime = datetime.datetime.fromtimestamp(os.path.getatime(fullpath))
 		node.mtime = datetime.datetime.fromtimestamp(os.path.getmtime(fullpath))
+
+	def calculate(self, node):
 		if not node.isdir:
+			fullpath = os.path.join(self.__rootDir, node.path)
 			node.checksum = Checksum()
 			node.checksum.calculateForFile(fullpath)
 
@@ -819,9 +842,11 @@ class Instance:
 		self.__fs.recursiveCopy(self.__db)
 		#self.__db.recursiveCopy(self.__fs)
 
+	def getStatistics(self):
+		return self.__fs.getStatistics(self.__fs.getRootNode())
+		#return self.__db.getStatistics(self.__db.getRootNode())
+
 	def getDiffTree(self):
-		#print(self.__fs.getStatistics(self.__fs.getRootNode()))
-		#print(self.__db.getStatistics(self.__db.getRootNode()))
 		#return self.__fs.recursiveGetTree()
 		#return self.__db.recursiveGetTree()
 		return self.__fs.recursiveGetDiffTree(self.__db)
