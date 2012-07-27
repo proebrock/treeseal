@@ -1023,7 +1023,11 @@ class FileProcessingProgressDialog(wx.Dialog):
 			self.currentBytesHeader.SetLabel('Current File {0:s}/{1:s}'.format( \
 				sizeToString(self.currentBytesDone), sizeToString(self.currentBytesAll)))
 			self.currentBytesGauge.SetValue(self.currentBytesDone)
-			self.currentBytesGaugeText.SetLabel('{0:d} %'.format((100 * self.currentBytesDone) / self.currentBytesAll))
+			if self.currentBytesAll == 0:
+				self.currentBytesGaugeText.SetLabel('100 %')
+			else:
+				self.currentBytesGaugeText.SetLabel('{0:d} %'.format( \
+				(100 * self.currentBytesDone) / self.currentBytesAll))
 		else:
 			self.currentBytesHeader.SetLabel('Current File -/-')
 			self.currentBytesGauge.SetValue(0)
@@ -1032,7 +1036,11 @@ class FileProcessingProgressDialog(wx.Dialog):
 			self.totalFilesHeader.SetLabel('Total Number of Files {0:d}/{1:d}'.format( \
 				self.totalFilesDone, self.totalFilesAll))
 			self.totalFilesGauge.SetValue(self.totalFilesDone)
-			self.totalFilesGaugeText.SetLabel('{0:d} %'.format((100 * self.totalFilesDone) / self.totalFilesAll))
+			if self.totalFilesAll == 0:
+				self.totalFilesGaugeText.SetLabel('100 %')
+			else:
+				self.totalFilesGaugeText.SetLabel('{0:d} %'.format( \
+				(100 * self.totalFilesDone) / self.totalFilesAll))
 		else:
 			self.totalFilesHeader.SetLabel('Total Number of Files -/-')
 			self.totalFilesGauge.SetValue(0)
@@ -1041,7 +1049,11 @@ class FileProcessingProgressDialog(wx.Dialog):
 			self.totalBytesHeader.SetLabel('Total Size {0:s}/{1:s}'.format( \
 				sizeToString(self.totalBytesDone), sizeToString(self.totalBytesAll)))
 			self.totalBytesGauge.SetValue(self.totalBytesDone)
-			self.totalBytesGaugeText.SetLabel('{0:d} %'.format((100 * self.totalBytesDone) / self.totalBytesAll))
+			if self.totalBytesAll == 0:
+				self.totalBytesGaugeText.SetLabel('100 %')
+			else:
+				self.totalBytesGaugeText.SetLabel('{0:d} %'.format( \
+				(100 * self.totalBytesDone) / self.totalBytesAll))
 		else:
 			self.totalBytesHeader.SetLabel('Total Size -/-')
 			self.totalBytesGauge.SetValue(0)
