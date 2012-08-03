@@ -85,12 +85,10 @@ class Checksum(object):
 			if not data:
 				break
 			if signalBytesDone is not None:
-				if signalBytesDone(len(data)):
-					return True
+				signalBytesDone(len(data))
 			checksum.update(data)
 		f.close()
 		self.__checksum = buffer(checksum.digest())
-		return False
 
 	def saveToFile(self, path):
 		f = open(path, 'w')
@@ -126,6 +124,15 @@ class MyException(Exception):
 			raise Exception('Unknown log level {0:d}'.format(self.__level))
 		result += self.__message
 		return result
+
+
+
+class UserCancelledException(Exception):
+	def __init_(self):
+		super(UserCancelledException, self).__init__('UserCancelledException')
+
+	def __str__(self):
+		return 'UserCancelledException'
 
 
 
@@ -422,6 +429,8 @@ class Tree(object):
 
 	def __recursiveGetTree(self, nodetree):
 		for node in nodetree:
+			if self.signalNewFile is not None:
+				self.signalNewFile(node.path, node.size)
 			self.calculate(node)
 			if node.isdir:
 				node.children = self.getChildren(node)
@@ -436,15 +445,11 @@ class Tree(object):
 	def __recursiveCopy(self, dest, nodelist):
 		for node in nodelist:
 			if self.signalNewFile is not None:
-				if self.signalNewFile(node.path, node.size):
-					return True
-			if self.calculate(node):
-				return True
+				self.signalNewFile(node.path, node.size)
+			self.calculate(node)
 			dest.insertNode(node)
 			if node.isdir:
-				if self.__recursiveCopy(dest, self.getChildren(node)):
-					return True
-		return False
+				self.__recursiveCopy(dest, self.getChildren(node))
 
 	def recursiveCopy(self, dest):
 		nodelist = NodeDict()
@@ -472,21 +477,24 @@ class Tree(object):
 	def __recursiveGetDiffTree(self, other, selfnodes, othernodes, removeOkNodes):
 		okNodes = []
 		for snode in selfnodes:
+			if self.signalNewFile is not None:
+				self.signalNewFile(snode.path, snode.size)
+			self.calculate(snode)
 			onode = othernodes.getByUniqueID(snode.getUniqueKey())
 			if not onode is None:
 				# nodes existing in selfnodes and othernodes: already known nodes
-				snode.compareEqualNodesAndSetStatus(onode)
+				self.transferUniqueInformation(onode, snode)
 				other.transferUniqueInformation(snode, onode)
+				if other.signalNewFile is not None:
+					other.signalNewFile(onode.path, onode.size)
+				other.calculate(onode)
+				# compare and set status
+				snode.compareEqualNodesAndSetStatus(onode)
+				# recurse
 				if snode.isdir:
-					# get children
+					# get children, but construct a tree just for self not for other
 					snode.children = self.getChildren(snode)
 					onode_children = other.getChildren(onode)
-					# do calculations (this takes time...)
-					for n in snode.children:
-						self.calculate(n)
-					for n in onode_children:
-						other.calculate(n)
-					# recurse
 					self.__recursiveGetDiffTree(other, snode.children, onode_children, removeOkNodes)
 					# collect nodes that are okay or have no descendants
 					# (or only descendants that are okay and those have been removed)
@@ -510,6 +518,9 @@ class Tree(object):
 				selfnodes.delByUniqueID(s)
 		# nodes existing in othernodes but not in selfnodes: missing nodes
 		for onode in othernodes:
+			if other.signalNewFile is not None:
+				other.signalNewFile(onode.path, onode.size)
+			other.calculate(onode)
 			onode.status = NodeStatus.Missing
 			if onode.isdir:
 				onode.children = other.getChildren(onode)
@@ -622,7 +633,7 @@ class Database(Tree):
 	def calculate(self, node):
 		# nothing to do, just signal that the job is done if necessary
 		if self.signalBytesDone is not None:
-			return self.signalBytesDone(node.size)
+			self.signalBytesDone(node.size)
 
 	def transferUniqueInformation(self, destNode, srcNode):
 		destNode.nodeid = srcNode.nodeid
@@ -785,11 +796,11 @@ class Filesystem(Tree):
 	def calculate(self, node):
 		if node.isdir:
 			if self.signalBytesDone is not None:
-				return self.signalBytesDone(node.size)
+				self.signalBytesDone(node.size)
 		if not node.isdir:
 			fullpath = os.path.join(self.__rootDir, node.path)
 			node.checksum = Checksum()
-			return node.checksum.calculateForFile(fullpath, self.signalBytesDone)
+			node.checksum.calculateForFile(fullpath, self.signalBytesDone)
 
 	def transferUniqueInformation(self, destNode, srcNode):
 		destNode.path = srcNode.path
@@ -876,7 +887,7 @@ class Instance:
 		self.__fs.reset()
 		self.__db.reset()
 
-	def importTree(self, signalNewFile, signalBytesDone):
+	def importTree(self, signalNewFile=None, signalBytesDone=None):
 		self.__fs.registerHandlers(signalNewFile, signalBytesDone)
 		self.__fs.recursiveCopy(self.__db)
 		self.__fs.registerHandlers(None, None)
@@ -885,15 +896,29 @@ class Instance:
 		return self.__fs.getStatistics(self.__fs.getRootNode())
 		#return self.__db.getStatistics(self.__db.getRootNode())
 
-	def getFilesystemTree(self):
-		return self.__fs.recursiveGetTree()
+	def getFilesystemTree(self, signalNewFile=None, signalBytesDone=None):
+		self.__fs.registerHandlers(signalNewFile, signalBytesDone)
+		tree = self.__fs.recursiveGetTree()
+		self.__fs.registerHandlers(None, None)
+		return tree
 
-	def getDatabaseTree(self):
-		return self.__db.recursiveGetTree()
+	def getDatabaseTree(self, signalNewFile=None, signalBytesDone=None):
+		self.__db.registerHandlers(signalNewFile, signalBytesDone)
+		tree = self.__db.recursiveGetTree()
+		self.__db.registerHandlers(None, None)
+		return tree
 
-	def getDiffTree(self):
-		return self.__fs.recursiveGetDiffTree(self.__db)
-		#return self.__db.recursiveGetDiffTree(self.__fs)
+	def getDiffTree(self, signalNewFile=None, signalBytesDone=None):
+		# careful when testing: handlers have to fit to statistics
+		# determined in getStatistics!
+		self.__fs.registerHandlers(signalNewFile, signalBytesDone)
+		tree = self.__fs.recursiveGetDiffTree(self.__db)
+		self.__fs.registerHandlers(None, None)
+		#self.__db.registerHandlers(signalNewFile, signalBytesDone)
+		#tree = self.__db.recursiveGetDiffTree(self.__fs)
+		#self.__db.registerHandlers(None, None)
+		return tree
+
 
 
 
@@ -969,6 +994,7 @@ class FileProcessingProgressDialog(wx.Dialog):
 			self.cancelRequest = True
 
 	def Init(self, totalFiles, totalSize):
+		#print('init for {0:d} files and {1:d} bytes'.format(totalFiles, totalSize))
 		self.totalFilesDone = 0
 		self.totalFilesAll = totalFiles
 		self.totalFilesGauge.SetRange(totalFiles)
@@ -978,18 +1004,25 @@ class FileProcessingProgressDialog(wx.Dialog):
 		self.OnPaint()
 
 	def SignalNewFile(self, path, size):
+		#print('signal new file "{0:s}", size {1:d}'.format(path, size))
 		if not self.currentBytesDone == self.currentBytesAll:
 			raise MyException('Signaled a new file but the old one is not done yet.', 3)
 		if self.totalBytesDone == 0:
 			self.processingText.SetLabel('Processing ...')
-		self.currentPathText.SetLabel(path)
+		if path is None:
+			self.currentPathText.SetLabel('<No known path>')
+		else:
+			self.currentPathText.SetLabel(path)
 		self.currentBytesDone = 0
 		self.currentBytesAll = size
 		self.currentBytesGauge.SetRange(size)
 		self.OnPaint()
-		return self.cancelRequest
+		if self.cancelRequest:
+			raise UserCancelledException()
 
 	def SignalBytesDone(self, bytesDone):
+		#print('signal {0:d} bytes done, current is {1:d}/{2:d}'.format( \
+		#	bytesDone, self.currentBytesDone, self.currentBytesAll))
 		# update current bytes
 		self.currentBytesDone += bytesDone
 		if self.currentBytesDone > self.currentBytesAll:
@@ -1006,9 +1039,11 @@ class FileProcessingProgressDialog(wx.Dialog):
 		if self.totalBytesDone > self.totalBytesAll:
 			raise MyException('Signaled total size larger than full size.', 3)
 		self.OnPaint()
-		return self.cancelRequest
+		if self.cancelRequest:
+			raise UserCancelledException()
 
 	def SignalFinished(self):
+		#print('signal finished, cancel request is {0:b}'.format(self.cancelRequest))
 		self.button.SetLabel('OK')
 		if self.cancelRequest:
 			self.processingText.SetLabel('Canceled by user.')
@@ -1016,7 +1051,6 @@ class FileProcessingProgressDialog(wx.Dialog):
 			self.processingText.SetLabel('All files successfully processed.')
 		self.currentPathText.SetLabel('')
 		self.ShowModal()
-		return self.cancelRequest
 
 	def OnPaint(self):
 		if self.currentBytesDone is not None and self.currentBytesAll is not None:
@@ -1301,24 +1335,63 @@ class MainFrame(wx.Frame):
 		stats = instance.getStatistics()
 		progressDialog.Init(stats[0] + stats[2], stats[1] + stats[3])
 
-		# do the importing
-		instance.importTree(progressDialog.SignalNewFile, \
-			progressDialog.SignalBytesDone)
-
-		# signal that we have returned from calculation, either
-		# after it is done or after progressDialog signalled that the
-		# user stopped the calcuation using the cancel button
-		if progressDialog.SignalFinished():
+		try:
+			# do the importing
+			instance.importTree(progressDialog.SignalNewFile, \
+				progressDialog.SignalBytesDone)
+		except UserCancelledException:
 			self.list.Clear()
-		else:
-			tree = instance.getDatabaseTree()
-			tree.apply(lambda n: n.setStatus(NodeStatus.OK))
-			self.list.ShowNodeTree(tree)
+			return
+		finally:
+			# signal that we have returned from calculation, either
+			# after it is done or after progressDialog signalled that the
+			# user stopped the calcuation using the cancel button
+			progressDialog.SignalFinished()
+
+		tree = instance.getDatabaseTree()
+		tree.apply(lambda n: n.setStatus(NodeStatus.OK))
+		self.list.ShowNodeTree(tree)
 
 		instance.close()
 
 	def OnCheck(self, event):
-		pass
+		# get path from user
+		dirDialog = wx.DirDialog(self, "Choose a directory for check:", \
+			style=wx.DD_DEFAULT_STYLE)
+		dirDialog.SetPath('../dtint-example') # TESTING
+		if dirDialog.ShowModal() == wx.ID_OK:
+			userPath = dirDialog.GetPath()
+		else:
+			return
+		self.Title = self.baseTitle + ' - ' + userPath
+
+		# create and reset instance
+		instance = Instance(userPath)
+		instance.open()
+
+		# create progress dialog
+		progressDialog = FileProcessingProgressDialog(self, 'Checking ' + userPath)
+		progressDialog.Show()
+		stats = instance.getStatistics()
+		progressDialog.Init(stats[0] + stats[2], stats[1] + stats[3])
+
+		try:
+			# do the importing
+			tree = instance.getDiffTree(progressDialog.SignalNewFile, \
+				progressDialog.SignalBytesDone)
+		except UserCancelledException:
+			self.list.Clear()
+			return
+		finally:
+			# signal that we have returned from calculation, either
+			# after it is done or after progressDialog signalled that the
+			# user stopped the calcuation using the cancel button
+			progressDialog.SignalFinished()
+
+		self.list.ShowNodeTree(tree)
+
+		instance.close()
+
 
 	def OnExit(self, event):
 		self.Close(True)
