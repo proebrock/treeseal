@@ -111,19 +111,35 @@ class MyException(Exception):
 		self.__level = level
 
 	def __str__(self):
-		result = ''
+		return self.__getPrefix() + ': ' + self.__message
+
+	def __getPrefix(self):
 		if self.__level == 0:
-			result += 'Info: '
+			return 'Info'
 		elif self.__level == 1:
-			result += 'Warning: '
+			return 'Warning'
 		elif self.__level == 2:
-			result += 'Error: '
+			return 'Error'
 		elif self.__level == 3:
-			result += '### Fatal Error: '
+			return '### Fatal Error'
 		else:
 			raise Exception('Unknown log level {0:d}'.format(self.__level))
-		result += self.__message
-		return result
+
+	def __getIcon(self):
+		if self.__level == 0:
+			return wx.ICON_INFORMATION
+		elif self.__level == 1:
+			return wx.ICON_WARNING
+		elif self.__level == 2:
+			return wx.ICON_ERROR
+		elif self.__level == 3:
+			return wx.ICON_STOP
+		else:
+			raise Exception('Unknown log level {0:d}'.format(self.__level))
+
+	def showDialog(self, headerMessage=''):
+		wx.MessageBox(self.__getPrefix() + ': ' + self.__message, \
+			headerMessage, wx.OK | self.__getIcon())
 
 
 
@@ -1349,18 +1365,23 @@ class MainFrame(wx.Frame):
 		stats = instance.getStatistics()
 		progressDialog.Init(stats[0] + stats[2], stats[1] + stats[3])
 
+		# execute task
 		try:
-			# do the importing
 			instance.importTree(progressDialog.SignalNewFile, \
 				progressDialog.SignalBytesDone)
 		except UserCancelledException:
 			self.list.Clear()
-			return
-		finally:
-			# signal that we have returned from calculation, either
-			# after it is done or after progressDialog signalled that the
-			# user stopped the calcuation using the cancel button
 			progressDialog.SignalFinished()
+			return
+		except MyException as e:
+			progressDialog.Destroy()
+			e.showDialog('Importing ' + userPath)
+			return
+
+		# signal that we have returned from calculation, either
+		# after it is done or after progressDialog signalled that the
+		# user stopped the calcuation using the cancel button
+		progressDialog.SignalFinished()
 
 		tree = instance.getDatabaseTree()
 		tree.apply(lambda n: n.setStatus(NodeStatus.OK))
@@ -1389,18 +1410,23 @@ class MainFrame(wx.Frame):
 		stats = instance.getStatistics()
 		progressDialog.Init(stats[0] + stats[2], stats[1] + stats[3])
 
+		# execute task
 		try:
-			# do the importing
 			tree = instance.getDiffTree(progressDialog.SignalNewFile, \
 				progressDialog.SignalBytesDone)
 		except UserCancelledException:
 			self.list.Clear()
-			return
-		finally:
-			# signal that we have returned from calculation, either
-			# after it is done or after progressDialog signalled that the
-			# user stopped the calcuation using the cancel button
 			progressDialog.SignalFinished()
+			return
+		except MyException as e:
+			progressDialog.Destroy()
+			e.showDialog('Checking ' + userPath)
+			return
+
+		# signal that we have returned from calculation, either
+		# after it is done or after progressDialog signalled that the
+		# user stopped the calcuation using the cancel button
+		progressDialog.SignalFinished()
 
 		self.list.ShowNodeTree(tree)
 
