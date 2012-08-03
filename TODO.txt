@@ -1,4 +1,7 @@
-* Progress bar on diff calculation
+* Status bar with statistics of currently displayed tree
+  (size/number of file/dir for each status, with 5 statuses we get 20 values!)
+* Before import, check if no upper or lower node has already .dtint
+* Before check, check if current dir has a .dtint
 * Right-Click menu
   - Dependent on previous action, e.g. import, check, ...)
   - Working with multi-select
