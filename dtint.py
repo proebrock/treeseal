@@ -1016,6 +1016,8 @@ class FileProcessingProgressDialog(wx.Dialog):
 		self.currentBytesDone = 0
 		self.currentBytesAll = size
 		self.currentBytesGauge.SetRange(size)
+		if size == 0:
+			self.totalFilesDone += 1
 		self.OnPaint()
 		if self.cancelRequest:
 			raise UserCancelledException()
@@ -1023,16 +1025,17 @@ class FileProcessingProgressDialog(wx.Dialog):
 	def SignalBytesDone(self, bytesDone):
 		#print('signal {0:d} bytes done, current is {1:d}/{2:d}'.format( \
 		#	bytesDone, self.currentBytesDone, self.currentBytesAll))
+		# ignore zero byte changes
+		if bytesDone == 0:
+			return
 		# update current bytes
 		self.currentBytesDone += bytesDone
 		if self.currentBytesDone > self.currentBytesAll:
-			print(self)
 			raise MyException('Signaled current size larger than full size.', 3)
 		elif self.currentBytesDone == self.currentBytesAll:
 			# file is complete
 			self.totalFilesDone += 1
 			if self.totalFilesDone > self.totalFilesAll:
-				print(self)
 				raise MyException('Signaled number of files larger than full size.', 3)
 		# update total bytes
 		self.totalBytesDone += bytesDone
@@ -1053,39 +1056,48 @@ class FileProcessingProgressDialog(wx.Dialog):
 		self.ShowModal()
 
 	def OnPaint(self):
+		# size of current file
 		if self.currentBytesDone is not None and self.currentBytesAll is not None:
 			self.currentBytesHeader.SetLabel('Current File {0:s}/{1:s}'.format( \
 				sizeToString(self.currentBytesDone), sizeToString(self.currentBytesAll)))
-			self.currentBytesGauge.SetValue(self.currentBytesDone)
 			if self.currentBytesAll == 0:
+				self.currentBytesGauge.SetRange(1)
+				self.currentBytesGauge.SetValue(1)
 				self.currentBytesGaugeText.SetLabel('100 %')
 			else:
+				self.currentBytesGauge.SetValue(self.currentBytesDone)
 				self.currentBytesGaugeText.SetLabel('{0:d} %'.format( \
 				(100 * self.currentBytesDone) / self.currentBytesAll))
 		else:
 			self.currentBytesHeader.SetLabel('Current File -/-')
 			self.currentBytesGauge.SetValue(0)
 			self.currentBytesGaugeText.SetLabel('--- %')
+		# total number of files
 		if self.totalFilesDone is not None and self.totalFilesAll is not None:
 			self.totalFilesHeader.SetLabel('Total Number of Files {0:d}/{1:d}'.format( \
 				self.totalFilesDone, self.totalFilesAll))
-			self.totalFilesGauge.SetValue(self.totalFilesDone)
 			if self.totalFilesAll == 0:
+				self.totalFilesGauge.SetRange(1)
+				self.totalFilesGauge.SetValue(1)
 				self.totalFilesGaugeText.SetLabel('100 %')
 			else:
+				self.totalFilesGauge.SetValue(self.totalFilesDone)
 				self.totalFilesGaugeText.SetLabel('{0:d} %'.format( \
 				(100 * self.totalFilesDone) / self.totalFilesAll))
 		else:
 			self.totalFilesHeader.SetLabel('Total Number of Files -/-')
 			self.totalFilesGauge.SetValue(0)
 			self.totalFilesGaugeText.SetLabel('--- %')
+		# total size of all files
 		if self.totalBytesDone is not None and self.totalBytesAll is not None:
 			self.totalBytesHeader.SetLabel('Total Size {0:s}/{1:s}'.format( \
 				sizeToString(self.totalBytesDone), sizeToString(self.totalBytesAll)))
-			self.totalBytesGauge.SetValue(self.totalBytesDone)
 			if self.totalBytesAll == 0:
+				self.totalBytesGauge.SetRange(1)
+				self.totalBytesGauge.SetValue(1)
 				self.totalBytesGaugeText.SetLabel('100 %')
 			else:
+				self.totalBytesGauge.SetValue(self.totalBytesDone)
 				self.totalBytesGaugeText.SetLabel('{0:d} %'.format( \
 				(100 * self.totalBytesDone) / self.totalBytesAll))
 		else:
