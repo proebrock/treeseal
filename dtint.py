@@ -605,8 +605,11 @@ class Tree(object):
 		othernodes.append(other.getRootNode())
 		self.__recursiveGetDiffTree(other, selfnodes, othernodes, removeOkNodes)
 		if len(selfnodes) == 0:
-			# keep housekeeping root node if removed by removeOkNodes feature
-			selfnodes.append(self.getRootNode())
+			# keep housekeeping root node with empty children
+			# if all nodes have been removed by removeOkNodes feature
+			node = self.getRootNode()
+			node.children = NodeDict()
+			selfnodes.append(node)
 		return selfnodes
 
 
@@ -1285,7 +1288,7 @@ class ListControlPanel(wx.Panel):
 	def ShowNodeTree(self, nodetree):
 		self.list.SetFocus()
 		self.nodestack = []
-		if nodetree[0].children is not None:
+		if len(nodetree[0].children) > 0:
 			self.nodestack.append(nodetree[0].children)
 		self.namestack = []
 		self.namestack.append('')
