@@ -598,7 +598,7 @@ class Tree(object):
 				onode.children.apply(lambda n: n.setStatus(NodeStatus.Missing))
 		selfnodes.update(othernodes)
 
-	def recursiveGetDiffTree(self, other, removeOkNodes=False):
+	def recursiveGetDiffTree(self, other, removeOkNodes=True):
 		selfnodes = NodeDict()
 		selfnodes.append(self.getRootNode())
 		othernodes = NodeDict()
@@ -914,6 +914,8 @@ class Filesystem(Tree):
 
 class Instance:
 
+	METADIRNAME = '.' + ProgramName
+
 	def __init__(self, path):
 		# check if specified root dir exists
 		if not os.path.exists(path):
@@ -922,25 +924,14 @@ class Instance:
 			raise MyException('Given root directory is not a directory.', 3)
 		# get rootdir (full path) and metadir
 		self.__rootDir = path
-		self.__metaName = '.' + ProgramName
-		self.__metaDir = os.path.join(self.__rootDir, self.__metaName)
+		self.__metaDir = os.path.join(self.__rootDir, Instance.METADIRNAME)
 		# initialize two Trees, the filesystem and the database
 		self.__fs = Filesystem(self.__rootDir, self.__metaDir)
 		self.__db = Database(self.__rootDir, self.__metaDir)
 
-	def findRoot(self, path):
-		# try to find a metadir in rootdir, then go further up in the
-		# directory tree until you reach the root looking for an existing
-		# metadir
-		rootDir = os.path.abspath(path)
-		while True:
-			metaDir = os.path.join(rootDir, self.__metaName)
-			if os.path.exists(metaDir):
-				return rootDir
-			newRoot = os.path.split(rootDir)[0]
-			if newRoot == rootDir:
-				return None
-			rootDir = newRoot
+	@staticmethod
+	def isRootDir(path):
+		return os.path.exists(os.path.join(path, Instance.METADIRNAME))
 
 	def getRootDir(self):
 		return self.__rootDir
@@ -1398,7 +1389,7 @@ class MainFrame(wx.Frame):
 		self.address.SetValue(path)
 
 	def OnImport(self, event):
-		# get path from user
+		# get a valid path from user
 		dirDialog = wx.DirDialog(self, "Choose a directory for import:", \
 			style=wx.DD_DEFAULT_STYLE)
 		dirDialog.SetPath('../dtint-example') # TESTING
@@ -1406,6 +1397,11 @@ class MainFrame(wx.Frame):
 			userPath = dirDialog.GetPath()
 		else:
 			return
+		if Instance.isRootDir(userPath):
+			dial = wx.MessageBox('Path "' + userPath + '" is already a valid root dir.\n\nDo you still want to continue?', \
+				'Warning', wx.YES_NO | wx.ICON_WARNING | wx.NO_DEFAULT)
+			if not dial == wx.YES:
+				return
 		self.Title = self.baseTitle + ' - ' + userPath
 
 		# create and reset instance
@@ -1444,13 +1440,17 @@ class MainFrame(wx.Frame):
 		instance.close()
 
 	def OnCheck(self, event):
-		# get path from user
+		# get a valid path from user
 		dirDialog = wx.DirDialog(self, "Choose a directory for check:", \
 			style=wx.DD_DEFAULT_STYLE)
 		dirDialog.SetPath('../dtint-example') # TESTING
 		if dirDialog.ShowModal() == wx.ID_OK:
 			userPath = dirDialog.GetPath()
 		else:
+			return
+		if not Instance.isRootDir(userPath):
+			wx.MessageBox('Path "' + userPath + '" is no valid root dir.', \
+				'Error', wx.OK | wx.ICON_ERROR)
 			return
 		self.Title = self.baseTitle + ' - ' + userPath
 
