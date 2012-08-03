@@ -154,18 +154,75 @@ class UserCancelledException(Exception):
 
 class NodeStatus:
 
-	OK = 0
-	New = 1
-	Missing = 2
-	Warn = 3
-	Error = 4
+	Unknown = 0
+	OK = 1
+	New = 2
+	Missing = 3
+	Warn = 4
+	Error = 5
+
+	NumStatuses = 6
+
+	@staticmethod
+	def toString(status):
+		if status == NodeStatus.Unknown:
+			return 'Unknown'
+		elif status == NodeStatus.OK:
+			return 'OK'
+		elif status == NodeStatus.New:
+			return 'New'
+		elif status == NodeStatus.Missing:
+			return 'Missing'
+		elif status == NodeStatus.Warn:
+			return 'Warning'
+		elif status == NodeStatus.Error:
+			return 'Error'
+		else:
+			raise MyException('Unknown node status {0:d}'.format(status), 3)
+
+
+
+class NodeStatistics:
+
+	def __init__(self):
+		self.reset()
+
+	def __str__(self):
+		result = '( '
+		for i in range(NodeStatus.NumStatuses):
+			result += '{0:s}=({1:d}/{2:s}, {3:d}/{4:s}) '.format( \
+				NodeStatus.toString(i), \
+				self.__dircount[i], sizeToString(self.__dirsize[i]), \
+				self.__filecount[i], sizeToString(self.__filesize[i]))
+		result += ')'
+		return result
+
+	def reset(self):
+		self.__dircount = [ 0 for i in range(NodeStatus.NumStatuses) ]
+		self.__dirsize = [ 0 for i in range(NodeStatus.NumStatuses) ]
+		self.__filecount = [ 0 for i in range(NodeStatus.NumStatuses) ]
+		self.__filesize = [ 0 for i in range(NodeStatus.NumStatuses) ]
+
+	def update(self, node):
+		if node.isdir:
+			self.__dircount[node.status] += 1
+			self.__dirsize[node.status] += node.size
+		else:
+			self.__filecount[node.status] += 1
+			self.__filesize[node.status] += node.size
+
+	def getNodeCount(self):
+		return sum(self.__dircount) + sum(self.__filecount)
+
+	def getNodeSize(self):
+		return sum(self.__dirsize) + sum(self.__filesize)
 
 
 
 class Node(object):
 
 	def __init__(self):
-		self.status = None
+		self.status = NodeStatus.Unknown
 		self.pythonid = id(self)
 		self.nodeid = None
 		self.parentid = None
@@ -204,18 +261,8 @@ class Node(object):
 	def getStatusString(self):
 		if self.status is None:
 			return self.NoneString
-		elif self.status == NodeStatus.OK:
-			return 'OK'
-		elif self.status == NodeStatus.New:
-			return 'New'
-		elif self.status == NodeStatus.Missing:
-			return 'Missing'
-		elif self.status == NodeStatus.Warn:
-			return 'Warning'
-		elif self.status == NodeStatus.Error:
-			return 'Error'
 		else:
-			raise Exception('Unknown node status {0:d}'.format(self.status))
+			return NodeStatus.toString(self.status)
 
 	def getNodeIDString(self):
 		if self.nodeid is None:
@@ -335,6 +382,17 @@ class NodeContainer(object):
 
 	def prettyPrint(self):
 		self.__prettyPrint(self, 0)
+
+	def __getStatistics(self, nodes, stats):
+		for n in nodes:
+			stats.update(n)
+			if not n.children is None:
+				self.__getStatistics(n.children, stats)
+
+	def getStatistics(self):
+		stats = NodeStatistics()
+		self.__getStatistics(self, stats)
+		return stats
 
 
 
@@ -473,22 +531,18 @@ class Tree(object):
 		self.__recursiveCopy(dest, nodelist)
 		dest.commit()
 
-	def __recursiveGetStatistics(self, nodelist, statistics):
+	def __recursiveGetStatistics(self, nodelist, stats):
 		for node in nodelist:
-			if not node.isdir:
-				statistics[0] += 1
-				statistics[1] += node.size
-			else:
-				statistics[2] += 1
-				statistics[3] += node.size
-				self.__recursiveGetStatistics(self.getChildren(node), statistics)
+			stats.update(node)
+			if node.isdir:
+				self.__recursiveGetStatistics(self.getChildren(node), stats)
 
 	def getStatistics(self, node):
-		statistics = [ 0, 0, 0, 0 ]
+		stats = NodeStatistics()
 		nodelist = NodeDict()
 		nodelist.append(node)
-		self.__recursiveGetStatistics(nodelist, statistics)
-		return statistics
+		self.__recursiveGetStatistics(nodelist, stats)
+		return stats
 
 	def __recursiveGetDiffTree(self, other, selfnodes, othernodes, removeOkNodes):
 		okNodes = []
@@ -544,7 +598,7 @@ class Tree(object):
 				onode.children.apply(lambda n: n.setStatus(NodeStatus.Missing))
 		selfnodes.update(othernodes)
 
-	def recursiveGetDiffTree(self, other, removeOkNodes=True):
+	def recursiveGetDiffTree(self, other, removeOkNodes=False):
 		selfnodes = NodeDict()
 		selfnodes.append(self.getRootNode())
 		othernodes = NodeDict()
@@ -1191,7 +1245,7 @@ class ListControlPanel(wx.Panel):
 		self.list.SetImageList(self.imagelist, wx.IMAGE_LIST_SMALL)
 
 	def AppendNode(self, node):
-		if node.status is None:
+		if node.status is None or node.status == NodeStatus.Unknown:
 			index = self.list.InsertImageItem(sys.maxint, self.iconUnknown)
 		elif node.status == NodeStatus.OK:
 			index = self.list.InsertImageItem(sys.maxint, self.iconOk)
@@ -1363,7 +1417,7 @@ class MainFrame(wx.Frame):
 		progressDialog = FileProcessingProgressDialog(self, 'Importing ' + userPath)
 		progressDialog.Show()
 		stats = instance.getStatistics()
-		progressDialog.Init(stats[0] + stats[2], stats[1] + stats[3])
+		progressDialog.Init(stats.getNodeCount(), stats.getNodeSize())
 
 		# execute task
 		try:
@@ -1408,7 +1462,7 @@ class MainFrame(wx.Frame):
 		progressDialog = FileProcessingProgressDialog(self, 'Checking ' + userPath)
 		progressDialog.Show()
 		stats = instance.getStatistics()
-		progressDialog.Init(stats[0] + stats[2], stats[1] + stats[3])
+		progressDialog.Init(stats.getNodeCount(), stats.getNodeSize())
 
 		# execute task
 		try:
