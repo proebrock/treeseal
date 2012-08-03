@@ -1208,22 +1208,24 @@ class ListControlPanel(wx.Panel):
 	def RefreshTree(self):
 		self.Clear()
 		if not self.IsRoot():
+			# for directories other than root show entry to go back to parent
 			index = self.list.InsertStringItem(sys.maxint, '')
 			self.list.SetStringItem(index, 2, self.__parentNameString)
-		for node in self.nodestack[-1]:
-			self.AppendNode(node)
+		if len(self.nodestack) == 0:
+			# for an empty list show a special string
+			index = self.list.InsertStringItem(sys.maxint, '')
+			self.list.SetStringItem(index, 2, self.__emptyNameString)
+		else:
+			for node in self.nodestack[-1]:
+				self.AppendNode(node)
 		path = reduce(lambda x, y: os.path.join(x, y), self.namestack)
 		self.GetParent().SetAddressLine(path)
 
 	def ShowNodeTree(self, nodetree):
 		self.list.SetFocus()
-		# of nodetree is empty, show pseudo node
-		if nodetree[0].children is None:
-			index = self.list.InsertStringItem(sys.maxint, '')
-			self.list.SetStringItem(index, 2, self.__emptyNameString)
-			return
 		self.nodestack = []
-		self.nodestack.append(nodetree[0].children)
+		if nodetree[0].children is not None:
+			self.nodestack.append(nodetree[0].children)
 		self.namestack = []
 		self.namestack.append('')
 		self.RefreshTree()
