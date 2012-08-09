@@ -49,7 +49,8 @@ class Checksum(object):
 	def __eq__(self, other):
 		if other is None:
 			return False
-		return self.getString() == other.getString()
+		else:
+			return self.getString() == other.getString()
 
 	def __ne__(self, other):
 		return not self.__eq__(other)
@@ -154,18 +155,24 @@ class UserCancelledException(Exception):
 
 class NodeStatus:
 
-	Unknown = 0
-	OK = 1
-	New = 2
-	Missing = 3
-	Warn = 4
-	Error = 5
+	# the numbers defined here determine the priority of the status;
+	# this is important when determining the the status of a directory
+	# with multiple children of different status
+	Undefined = 0
+	Unknown = 1
+	OK = 2
+	New = 3
+	Missing = 4
+	Warn = 5
+	Error = 6
 
 	NumStatuses = 6
 
 	@staticmethod
 	def toString(status):
-		if status == NodeStatus.Unknown:
+		if status == NodeStatus.Undefined:
+			return "Undefined"
+		elif status == NodeStatus.Unknown:
 			return 'Unknown'
 		elif status == NodeStatus.OK:
 			return 'OK'
@@ -178,7 +185,7 @@ class NodeStatus:
 		elif status == NodeStatus.Error:
 			return 'Error'
 		else:
-			raise MyException('Unknown node status {0:d}'.format(status), 3)
+			raise MyException('Not existing node status {0:d}'.format(status), 3)
 
 
 
@@ -190,64 +197,43 @@ class NodeStatistics:
 	def __str__(self):
 		result = '( '
 		for i in range(NodeStatus.NumStatuses):
-			result += '{0:s}=({1:d}/{2:s}, {3:d}/{4:s}) '.format( \
+			result += '{0:s}=({1:d}/{2:s}) '.format( \
 				NodeStatus.toString(i), \
-				self.__dircount[i], sizeToString(self.__dirsize[i]), \
 				self.__filecount[i], sizeToString(self.__filesize[i]))
 		result += ')'
 		return result
 
 	def reset(self):
-		self.__dircount = [ 0 for i in range(NodeStatus.NumStatuses) ]
-		self.__dirsize = [ 0 for i in range(NodeStatus.NumStatuses) ]
 		self.__filecount = [ 0 for i in range(NodeStatus.NumStatuses) ]
 		self.__filesize = [ 0 for i in range(NodeStatus.NumStatuses) ]
 
 	def update(self, node):
-		if node.isdir:
-			self.__dircount[node.status] += 1
-			self.__dirsize[node.status] += node.size
-		else:
-			self.__filecount[node.status] += 1
-			self.__filesize[node.status] += node.size
+		if node.isDirectory():
+			return
+		self.__filecount[node.status] += 1
+		self.__filesize[node.status] += node.info.size
 
 	def getNodeCount(self):
-		return sum(self.__dircount) + sum(self.__filecount)
+		return sum(self.__filecount)
 
 	def getNodeSize(self):
-		return sum(self.__dirsize) + sum(self.__filesize)
+		return sum(self.__filesize)
 
 
 
-class Node(object):
+class NodeInfo(object):
 
 	def __init__(self):
-		self.status = NodeStatus.Unknown
-		self.pythonid = id(self)
-		self.nodeid = None
-		self.parentid = None
-		self.name = None
-		self.path = None
-		self.isdir = None
 		self.size = None
 		self.ctime = None
 		self.atime = None
 		self.mtime = None
 		self.checksum = None
 
-		self.children = None
-		self.similar = None
-
 		self.NoneString = ''
 
 	def __str__(self):
 		return '(' + \
-			'status="' + self.getStatusString() + '", ' + \
-			'nodeid="' + self.getNodeIDString() + '", ' + \
-			'parentid="' + self.getParentIDString() + '", ' + \
-			'name="' + self.getNameString() + '", ' + \
-			'path="' + self.getPathString() + '", ' + \
-			'isdir="' + self.getIsDirString() + '", ' + \
 			'size="' + self.getSizeString() + '", ' + \
 			'ctime="' + self.getCTimeString() + '", ' + \
 			'atime="' + self.getATimeString() + '", ' + \
@@ -255,47 +241,17 @@ class Node(object):
 			'checksum="' + self.getChecksumString() + '"' + \
 			')'
 
-	def setStatus(self, status):
-		self.status = status
-
-	def getStatusString(self):
-		if self.status is None:
-			return self.NoneString
+	def __eq__(self, other):
+		if other is None:
+			return False
 		else:
-			return NodeStatus.toString(self.status)
+			return self.size == other.size and \
+			self.ctime == other.ctime and \
+			self.atime == other.atime and \
+			self.mtime == other.mtime
 
-	def getNodeIDString(self):
-		if self.nodeid is None:
-			return self.NoneString
-		else:
-			return '{0:d}'.format(self.nodeid)
-
-	def getParentIDString(self):
-		if self.parentid is None:
-			return self.NoneString
-		else:
-			return '{0:d}'.format(self.parentid)
-
-	def getNameString(self):
-		if self.name is None:
-			return self.NoneString
-		else:
-			return self.name
-
-	def getUniqueKey(self):
-		return '{0:b}{1:s}'.format(not self.isdir, self.name)
-
-	def getPathString(self):
-		if self.path is None:
-			return self.NoneString
-		else:
-			return self.path
-
-	def getIsDirString(self):
-		if self.isdir is None:
-			return self.NoneString
-		else:
-			return '{0:b}'.format(self.isdir)
+	def __ne__(self, other):
+		return not self.__eq__(other)
 
 	def getSizeString(self):
 		if self.size is None:
@@ -327,22 +283,84 @@ class Node(object):
 		else:
 			return self.checksum.getString(True)
 
-	def compareEqualNodesAndSetStatus(self, other):
-		if not (self.name == other.name and self.isdir == other.isdir):
-			raise Exception('Nodes are not equal.')
-		if self.size == other.size and \
-			self.ctime == other.ctime and \
-			self.atime == other.atime and \
-			self.mtime == other.mtime:
-			if self.isdir:
-				self.status = NodeStatus.OK
-			else:
-				if self.checksum == other.checksum:
-					self.status = NodeStatus.OK
-				else:
-					self.status = NodeStatus.Error
+	def prettyPrint(self, prefix=''):
+		print('{0:s}size                {1:s}'.format(prefix, self.getSizeString()))
+		print('{0:s}creation time       {1:s}'.format(prefix, self.getCTimeString()))
+		print('{0:s}access time         {1:s}'.format(prefix, self.getATimeString()))
+		print('{0:s}modification time   {1:s}'.format(prefix, self.getMTimeString()))
+		print('{0:s}checksum            {1:s}'.format(prefix, self.getChecksumString()))
+
+
+
+class Node(object):
+
+	def __init__(self):
+		self.status = NodeStatus.Undefined
+		self.pythonid = id(self)
+		self.nodeid = None
+		self.parentid = None
+		self.name = None
+		self.path = None
+
+		self.info = None
+		self.children = None
+
+		self.NoneString = ''
+
+	def __str__(self):
+		return '(' + \
+			'status="' + self.getStatusString() + '", ' + \
+			'nodeid="' + self.getNodeIDString() + '", ' + \
+			'parentid="' + self.getParentIDString() + '", ' + \
+			'name="' + self.getNameString() + '", ' + \
+			'path="' + self.getPathString() + '", ' + \
+			'info="' + self.getInfoString() + '", ' + \
+			')'
+
+	def isDirectory(self):
+		return self.info is None
+
+	def setStatus(self, status):
+		self.status = status
+
+	def getStatusString(self):
+		if self.status is None:
+			return self.NoneString
 		else:
-			self.status = NodeStatus.Warn
+			return NodeStatus.toString(self.status)
+
+	def getNodeIDString(self):
+		if self.nodeid is None:
+			return self.NoneString
+		else:
+			return '{0:d}'.format(self.nodeid)
+
+	def getParentIDString(self):
+		if self.parentid is None:
+			return self.NoneString
+		else:
+			return '{0:d}'.format(self.parentid)
+
+	def getNameString(self):
+		if self.name is None:
+			return self.NoneString
+		else:
+			return self.name
+
+	def getUniqueKey(self):
+		return '{0:b}{1:s}'.format(not self.isDirectory(), self.name)
+
+	def getPathString(self):
+		if self.path is None:
+			return self.NoneString
+		else:
+			return self.path
+
+	def getInfoString(self):
+		if self.info is None:
+			return self.NoneString
+		else:
+			return str(self.info)
 
 	def prettyPrint(self, prefix=''):
 		print('{0:s}status              {1:s}'.format(prefix, self.getStatusString()))
@@ -350,12 +368,8 @@ class Node(object):
 		print('{0:s}parentid            {1:s}'.format(prefix, self.getParentIDString()))
 		print('{0:s}name                {1:s}'.format(prefix, self.getNameString()))
 		print('{0:s}path                {1:s}'.format(prefix, self.getPathString()))
-		print('{0:s}isdir               {1:s}'.format(prefix, self.getIsDirString()))
-		print('{0:s}size                {1:s}'.format(prefix, self.getSizeString()))
-		print('{0:s}creation time       {1:s}'.format(prefix, self.getCTimeString()))
-		print('{0:s}access time         {1:s}'.format(prefix, self.getATimeString()))
-		print('{0:s}modification time   {1:s}'.format(prefix, self.getMTimeString()))
-		print('{0:s}checksum            {1:s}'.format(prefix, self.getChecksumString()))
+		if self.info is not None:
+			self.info.prettyPrint(prefix)
 
 
 
@@ -376,7 +390,7 @@ class NodeContainer(object):
 	def __prettyPrint(self, nodes, depth):
 		for n in nodes:
 			n.prettyPrint(depth * '    ')
-			#print((depth * '    ') + n.name)
+			print('')
 			if not n.children is None:
 				self.__prettyPrint(n.children, depth + 1)
 
@@ -506,10 +520,8 @@ class Tree(object):
 
 	def __recursiveGetTree(self, nodetree):
 		for node in nodetree:
-			if self.signalNewFile is not None:
-				self.signalNewFile(node.path, node.size)
 			self.calculate(node)
-			if node.isdir:
+			if node.isDirectory():
 				node.children = self.getChildren(node)
 				self.__recursiveGetTree(node.children)
 
@@ -521,11 +533,9 @@ class Tree(object):
 
 	def __recursiveCopy(self, dest, nodelist):
 		for node in nodelist:
-			if self.signalNewFile is not None:
-				self.signalNewFile(node.path, node.size)
 			self.calculate(node)
 			dest.insertNode(node)
-			if node.isdir:
+			if node.isDirectory():
 				self.__recursiveCopy(dest, self.getChildren(node))
 
 	def recursiveCopy(self, dest):
@@ -537,7 +547,7 @@ class Tree(object):
 	def __recursiveGetStatistics(self, nodelist, stats):
 		for node in nodelist:
 			stats.update(node)
-			if node.isdir:
+			if node.isDirectory():
 				self.__recursiveGetStatistics(self.getChildren(node), stats)
 
 	def getStatistics(self, node):
@@ -550,30 +560,37 @@ class Tree(object):
 	def __recursiveGetDiffTree(self, other, selfnodes, othernodes, removeOkNodes):
 		okNodes = []
 		for snode in selfnodes:
-			if self.signalNewFile is not None:
-				self.signalNewFile(snode.path, snode.size)
 			self.calculate(snode)
 			onode = othernodes.getByUniqueID(snode.getUniqueKey())
 			if not onode is None:
 				# nodes existing in selfnodes and othernodes: already known nodes
 				self.transferUniqueInformation(onode, snode)
 				other.transferUniqueInformation(snode, onode)
-				if other.signalNewFile is not None:
-					other.signalNewFile(onode.path, onode.size)
 				other.calculate(onode)
-				# compare and set status
-				snode.compareEqualNodesAndSetStatus(onode)
 				# recurse
-				if snode.isdir:
+				if snode.isDirectory():
 					# get children, but construct a tree just for self not for other
 					snode.children = self.getChildren(snode)
 					onode_children = other.getChildren(onode)
 					self.__recursiveGetDiffTree(other, snode.children, onode_children, removeOkNodes)
+					# set node status: maximum (most imporant) if statuses of child nodes
+					snode.status = NodeStatus.OK
+					for n in snode.children:
+						snode.status = max(snode.status, n.status)
 					# collect nodes that are okay or have no descendants
 					# (or only descendants that are okay and those have been removed)
-					if snode.status == NodeStatus.OK and len(snode.children) == 0:
-						okNodes.append(snode.getUniqueKey())
+					if removeOkNodes:
+						if snode.status == NodeStatus.OK and len(snode.children) == 0:
+							okNodes.append(snode.getUniqueKey())
 				else:
+					# compare snode and onode and set status
+					if snode.info == onode.info:
+						if snode.info.checksum == onode.info.checksum:
+							snode.status = NodeStatus.OK
+						else:
+							snode.status = NodeStatus.Error
+					else:
+						snode.status = NodeStatus.Warn
 					# collect nodes that are okay
 					if snode.status == NodeStatus.OK:
 						okNodes.append(snode.getUniqueKey())
@@ -581,7 +598,7 @@ class Tree(object):
 			else:
 				# nodes existing in selfnodes but not in othernodes: new nodes
 				snode.status = NodeStatus.New
-				if snode.isdir:
+				if snode.isDirectory():
 					snode.children = self.getChildren(snode)
 					self.__recursiveGetTree(snode.children)
 					snode.children.apply(lambda n: n.setStatus(NodeStatus.New))
@@ -591,17 +608,15 @@ class Tree(object):
 				selfnodes.delByUniqueID(s)
 		# nodes existing in othernodes but not in selfnodes: missing nodes
 		for onode in othernodes:
-			if other.signalNewFile is not None:
-				other.signalNewFile(onode.path, onode.size)
 			other.calculate(onode)
 			onode.status = NodeStatus.Missing
-			if onode.isdir:
+			if onode.isDirectory():
 				onode.children = other.getChildren(onode)
 				other.__recursiveGetTree(onode.children)
 				onode.children.apply(lambda n: n.setStatus(NodeStatus.Missing))
 		selfnodes.update(othernodes)
 
-	def recursiveGetDiffTree(self, other, removeOkNodes=True):
+	def recursiveGetDiffTree(self, other, removeOkNodes=False):
 		selfnodes = NodeDict()
 		selfnodes.append(self.getRootNode())
 		othernodes = NodeDict()
@@ -697,19 +712,23 @@ class Database(Tree):
 		node.nodeid = row[0]
 		node.parentid = row[1]
 		node.name = row[2]
-		node.isdir = row[3]
-		node.size = row[4]
-		node.ctime = row[5]
-		node.atime = row[6]
-		node.mtime = row[7]
-		if not node.isdir:
-			node.checksum = Checksum()
-			node.checksum.setBinary(row[8])
+		if not row[3]:
+			node.info = NodeInfo()
+			node.info.size = row[4]
+			node.info.ctime = row[5]
+			node.info.atime = row[6]
+			node.info.mtime = row[7]
+			node.info.checksum = Checksum()
+			node.info.checksum.setBinary(row[8])
 
 	def calculate(self, node):
+		if node.isDirectory():
+			return
 		# nothing to do, just signal that the job is done if necessary
+		if self.signalNewFile is not None:
+			self.signalNewFile(node.path, node.info.size)
 		if self.signalBytesDone is not None:
-			self.signalBytesDone(node.size)
+			self.signalBytesDone(node.info.size)
 
 	def transferUniqueInformation(self, destNode, srcNode):
 		destNode.nodeid = srcNode.nodeid
@@ -771,15 +790,18 @@ class Database(Tree):
 		if not node.nodeid is None:
 			raise MyException('Node already contains a valid node id, ' + \
 				'so maybe you want to update instead of insert?', 3)
-		if node.checksum is None:
-			checksum = None
-		else:
-			checksum = node.checksum.getBinary()
 		cursor = self.__dbcon.cursor()
-		cursor.execute('insert into nodes (' + self.__databaseInsertVars + \
-			') values (' + self.__databaseInsertQMarks + ')', \
-			(node.parentid, node.name, node.isdir, node.size, \
-			node.ctime, node.atime, node.mtime, checksum))
+		if node.isDirectory():
+			cursor.execute('insert into nodes (' + self.__databaseInsertVars + \
+				') values (' + self.__databaseInsertQMarks + ')', \
+				(node.parentid, node.name, True, None, \
+				None, None, None, None))
+		else:
+			cursor.execute('insert into nodes (' + self.__databaseInsertVars + \
+				') values (' + self.__databaseInsertQMarks + ')', \
+				(node.parentid, node.name, False, node.info.size, \
+				node.info.ctime, node.info.atime, node.info.mtime, \
+				node.info.checksum.getBinary()))
 		node.nodeid = cursor.lastrowid
 		cursor.close()
 
@@ -787,14 +809,17 @@ class Database(Tree):
 		if node.nodeid is None:
 			raise MyException('Node does not contain a valid node id, ' + \
 			'so maybe you want to insert instead of update?', 3)
-		if node.checksum is None:
-			checksum = None
+		if node.isDirectory():
+			self.__dbcon.execute('update nodes set ' + self.__databaseUpdateString + \
+				' where nodeid=?', \
+				(node.parentid, node.name, True, None, \
+				None, None, None, None, node.nodeid))
 		else:
-			checksum = node.checksum.getBinary()
-		self.__dbcon.execute('update nodes set ' + self.__databaseUpdateString + \
-			' where nodeid=?', \
-			(node.parentid, node.name, node.isdir, node.size, \
-			node.ctime, node.atime, node.mtime, checksum, node.nodeid))
+			self.__dbcon.execute('update nodes set ' + self.__databaseUpdateString + \
+				' where nodeid=?', \
+				(node.parentid, node.name, False, node.info.size, \
+				node.info.ctime, node.info.atime, node.info.mtime, \
+				node.info.checksum.getBinary(), node.nodeid))
 
 	def commit(self):
 		self.__dbcon.commit()
@@ -875,21 +900,22 @@ class Filesystem(Tree):
 		if not os.path.exists(fullpath):
 			raise MyException('Cannot fetch data for non-existing path.', 3)
 		node.name = os.path.split(node.path)[1]
-		node.isdir = os.path.isdir(fullpath)
-		node.size = os.path.getsize(fullpath)
-		# this conversion from unix time stamp to local date/time might fail after year 2038...
-		node.ctime = datetime.datetime.fromtimestamp(os.path.getctime(fullpath))
-		node.atime = datetime.datetime.fromtimestamp(os.path.getatime(fullpath))
-		node.mtime = datetime.datetime.fromtimestamp(os.path.getmtime(fullpath))
+		if not os.path.isdir(fullpath):
+			node.info = NodeInfo()
+			node.info.size = os.path.getsize(fullpath)
+			# this conversion from unix time stamp to local date/time might fail after year 2038...
+			node.info.ctime = datetime.datetime.fromtimestamp(os.path.getctime(fullpath))
+			node.info.atime = datetime.datetime.fromtimestamp(os.path.getatime(fullpath))
+			node.info.mtime = datetime.datetime.fromtimestamp(os.path.getmtime(fullpath))
 
 	def calculate(self, node):
-		if node.isdir:
-			if self.signalBytesDone is not None:
-				self.signalBytesDone(node.size)
-		if not node.isdir:
-			fullpath = os.path.join(self.__rootDir, node.path)
-			node.checksum = Checksum()
-			node.checksum.calculateForFile(fullpath, self.signalBytesDone)
+		if node.isDirectory():
+			return
+		if self.signalNewFile is not None:
+			self.signalNewFile(node.path, node.info.size)
+		fullpath = os.path.join(self.__rootDir, node.path)
+		node.info.checksum = Checksum()
+		node.info.checksum.calculateForFile(fullpath, self.signalBytesDone)
 
 	def transferUniqueInformation(self, destNode, srcNode):
 		destNode.path = srcNode.path
@@ -939,6 +965,8 @@ class Filesystem(Tree):
 		if path == self.__metaDir:
 			return True
 		return False
+
+
 
 class Instance:
 
@@ -1261,7 +1289,9 @@ class ListControlPanel(wx.Panel):
 		self.list.SetImageList(self.imagelist, wx.IMAGE_LIST_SMALL)
 
 	def AppendNode(self, node):
-		if node.status is None or node.status == NodeStatus.Unknown:
+		if node.status is None or node.status == NodeStatus.Undefined:
+			index = self.list.InsertStringItem(sys.maxint, '')
+		elif node.status == NodeStatus.Unknown:
 			index = self.list.InsertImageItem(sys.maxint, self.iconUnknown)
 		elif node.status == NodeStatus.OK:
 			index = self.list.InsertImageItem(sys.maxint, self.iconOk)
@@ -1275,14 +1305,15 @@ class ListControlPanel(wx.Panel):
 			index = self.list.InsertImageItem(sys.maxint, self.iconError)
 		else:
 			raise Exception('Unknown node status {0:d}'.format(node.status))
-		if node.isdir:
+		if node.isDirectory():
 			self.list.SetStringItem(index, 1, '>')
+		else:
+			self.list.SetStringItem(index, 3, node.info.getSizeString())
+			self.list.SetStringItem(index, 4, node.info.getCTimeString())
+			self.list.SetStringItem(index, 5, node.info.getATimeString())
+			self.list.SetStringItem(index, 6, node.info.getMTimeString())
+			self.list.SetStringItem(index, 7, node.info.getChecksumString())
 		self.list.SetStringItem(index, 2, node.name)
-		self.list.SetStringItem(index, 3, node.getSizeString())
-		self.list.SetStringItem(index, 4, node.getCTimeString())
-		self.list.SetStringItem(index, 5, node.getATimeString())
-		self.list.SetStringItem(index, 6, node.getMTimeString())
-		self.list.SetStringItem(index, 7, node.getChecksumString())
 		self.list.SetItemData(index, node.pythonid)
 
 	def IsRoot(self):
@@ -1333,7 +1364,7 @@ class ListControlPanel(wx.Panel):
 			return
 		pythonid = self.list.GetItemData(index)
 		node = self.nodestack[-1].getByPythonID(pythonid)
-		if node.isdir:
+		if node.isDirectory():
 			self.nodestack.append(node.children)
 			self.namestack.append(node.name)
 			self.RefreshTree()
@@ -1508,6 +1539,7 @@ class MainFrame(wx.Frame):
 		progressDialog.SignalFinished()
 
 		self.list.ShowNodeTree(tree)
+		tree.prettyPrint()
 
 		instance.close()
 
