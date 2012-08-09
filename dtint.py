@@ -68,12 +68,12 @@ class Checksum(object):
 			raise MyException('Wrong checksum size.', 3)
 		self.__checksum = binascii.unhexlify(checksum)
 
-	def getString(self, short=False):
+	def getString(self, abbreviate=False):
 		if self.__checksum is None:
 			return '<none>'
 		else:
-			if short:
-				return binascii.hexlify(self.__checksum[0:7]).decode('utf-8') + '...'
+			if abbreviate:
+				return binascii.hexlify(self.__checksum[0:4]).decode('utf-8')
 			else:
 				return binascii.hexlify(self.__checksum).decode('utf-8')
 
@@ -1254,7 +1254,7 @@ class ListControlPanel(wx.Panel):
 				('CTime', 142), \
 				('ATime', 142), \
 				('MTime', 142), \
-				('Checksum', 132)
+				('Checksum', 80)
 			]
 		index = 0
 		for coldef in self.coldefs:
@@ -1539,7 +1539,6 @@ class MainFrame(wx.Frame):
 		progressDialog.SignalFinished()
 
 		self.list.ShowNodeTree(tree)
-		tree.prettyPrint()
 
 		instance.close()
 
