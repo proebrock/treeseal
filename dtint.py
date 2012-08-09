@@ -155,9 +155,6 @@ class UserCancelledException(Exception):
 
 class NodeStatus:
 
-	# the numbers defined here determine the priority of the status;
-	# this is important when determining the the status of a directory
-	# with multiple children of different status
 	Undefined = 0
 	Unknown = 1
 	OK = 2
@@ -567,21 +564,20 @@ class Tree(object):
 				self.transferUniqueInformation(onode, snode)
 				other.transferUniqueInformation(snode, onode)
 				other.calculate(onode)
-				# recurse
 				if snode.isDirectory():
-					# get children, but construct a tree just for self not for other
+					# get children, but chain the tree just for self not for other
 					snode.children = self.getChildren(snode)
 					onode_children = other.getChildren(onode)
 					self.__recursiveGetDiffTree(other, snode.children, onode_children, removeOkNodes)
-					# set node status: maximum (most imporant) if statuses of child nodes
-					snode.status = NodeStatus.OK
-					for n in snode.children:
-						snode.status = max(snode.status, n.status)
-					# collect nodes that are okay or have no descendants
-					# (or only descendants that are okay and those have been removed)
-					if removeOkNodes:
-						if snode.status == NodeStatus.OK and len(snode.children) == 0:
-							okNodes.append(snode.getUniqueKey())
+					# set node status (after statuses of children are known)
+					if len(snode.children) == 0:
+						snode.status = NodeStatus.OK
+					else:
+						snode.status = snode.children[0].status
+						for i in range(1, len(snode.children)):
+							if not snode.status == snode.children[i].status:
+								snode.status = NodeStatus.Unknown
+								break
 				else:
 					# compare snode and onode and set status
 					if snode.info == onode.info:
@@ -591,7 +587,9 @@ class Tree(object):
 							snode.status = NodeStatus.Error
 					else:
 						snode.status = NodeStatus.Warn
-					# collect nodes that are okay
+				if removeOkNodes:
+					# collect nodes to delete, we cannot delete them from
+					# selfnodes because we are iterating over it
 					if snode.status == NodeStatus.OK:
 						okNodes.append(snode.getUniqueKey())
 				othernodes.delByUniqueID(onode.getUniqueKey())
@@ -616,7 +614,7 @@ class Tree(object):
 				onode.children.apply(lambda n: n.setStatus(NodeStatus.Missing))
 		selfnodes.update(othernodes)
 
-	def recursiveGetDiffTree(self, other, removeOkNodes=False):
+	def recursiveGetDiffTree(self, other, removeOkNodes=True):
 		selfnodes = NodeDict()
 		selfnodes.append(self.getRootNode())
 		othernodes = NodeDict()
