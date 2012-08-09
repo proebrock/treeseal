@@ -494,6 +494,9 @@ class Tree(object):
 	def insertNode(self, node):
 		raise MyException('Not implemented.', 3)
 
+	def updateNode(self, node):
+		raise MyException('Not implemented.', 3)
+
 	def commit(self):
 		raise MyException('Not implemented.', 3)
 
@@ -768,17 +771,30 @@ class Database(Tree):
 		if not node.nodeid is None:
 			raise MyException('Node already contains a valid node id, ' + \
 				'so maybe you want to update instead of insert?', 3)
-		cursor = self.__dbcon.cursor()
 		if node.checksum is None:
 			checksum = None
 		else:
 			checksum = node.checksum.getBinary()
+		cursor = self.__dbcon.cursor()
 		cursor.execute('insert into nodes (' + self.__databaseInsertVars + \
 			') values (' + self.__databaseInsertQMarks + ')', \
 			(node.parentid, node.name, node.isdir, node.size, \
 			node.ctime, node.atime, node.mtime, checksum))
 		node.nodeid = cursor.lastrowid
 		cursor.close()
+
+	def updateNode(self, node):
+		if node.nodeid is None:
+			raise MyException('Node does not contain a valid node id, ' + \
+			'so maybe you want to insert instead of update?', 3)
+		if node.checksum is None:
+			checksum = None
+		else:
+			checksum = node.checksum.getBinary()
+		self.__dbcon.execute('update nodes set ' + self.__databaseUpdateString + \
+			' where nodeid=?', \
+			(node.parentid, node.name, node.isdir, node.size, \
+			node.ctime, node.atime, node.mtime, checksum, node.nodeid))
 
 	def commit(self):
 		self.__dbcon.commit()
@@ -907,6 +923,15 @@ class Filesystem(Tree):
 		self.fetch(node)
 		return node
 
+	def insertNode(self, node):
+		print('Filesystem.insertNode(' + node.name + ') is not implemented.')
+
+	def updateNode(self, node):
+		print('Filesystem.updateNode(' + node.name + ') is not implemented.')
+
+	def commit(self):
+		print('Filesystem.commit() is not implemented.')
+
 	### following methods are Database specific and not from Tree
 
 	def __isOnBlacklist(self, path):
@@ -931,6 +956,8 @@ class Instance:
 		# initialize two Trees, the filesystem and the database
 		self.__fs = Filesystem(self.__rootDir, self.__metaDir)
 		self.__db = Database(self.__rootDir, self.__metaDir)
+		#self.__fs = Database(self.__rootDir, self.__metaDir)
+		#self.__db = Filesystem(self.__rootDir, self.__metaDir)
 
 	@staticmethod
 	def isRootDir(path):
@@ -958,7 +985,6 @@ class Instance:
 
 	def getStatistics(self):
 		return self.__fs.getStatistics(self.__fs.getRootNode())
-		#return self.__db.getStatistics(self.__db.getRootNode())
 
 	def getFilesystemTree(self, signalNewFile=None, signalBytesDone=None):
 		self.__fs.registerHandlers(signalNewFile, signalBytesDone)
@@ -978,11 +1004,7 @@ class Instance:
 		self.__fs.registerHandlers(signalNewFile, signalBytesDone)
 		tree = self.__fs.recursiveGetDiffTree(self.__db)
 		self.__fs.registerHandlers(None, None)
-		#self.__db.registerHandlers(signalNewFile, signalBytesDone)
-		#tree = self.__db.recursiveGetDiffTree(self.__fs)
-		#self.__db.registerHandlers(None, None)
 		return tree
-
 
 
 
