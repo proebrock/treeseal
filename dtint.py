@@ -203,15 +203,17 @@ class NodeStatistics:
 	def reset(self):
 		self.__filecount = [ 0 for i in range(NodeStatus.NumStatuses) ]
 		self.__filesize = [ 0 for i in range(NodeStatus.NumStatuses) ]
+		self.__dircount = 0
 
 	def update(self, node):
 		if node.isDirectory():
-			return
-		self.__filecount[node.status] += 1
-		self.__filesize[node.status] += node.info.size
+			self.__dircount += 1
+		else:
+			self.__filecount[node.status] += 1
+			self.__filesize[node.status] += node.info.size
 
 	def getNodeCount(self):
-		return sum(self.__filecount)
+		return sum(self.__filecount) + self.__dircount
 
 	def getNodeSize(self):
 		return sum(self.__filesize)
@@ -721,12 +723,14 @@ class Database(Tree):
 
 	def calculate(self, node):
 		if node.isDirectory():
-			return
-		# nothing to do, just signal that the job is done if necessary
-		if self.signalNewFile is not None:
-			self.signalNewFile(node.path, node.info.size)
-		if self.signalBytesDone is not None:
-			self.signalBytesDone(node.info.size)
+			if self.signalNewFile is not None:
+				self.signalNewFile(node.path, 0)
+		else:
+			# nothing to do, just signal that the job is done if necessary
+			if self.signalNewFile is not None:
+				self.signalNewFile(node.path, node.info.size)
+			if self.signalBytesDone is not None:
+				self.signalBytesDone(node.info.size)
 
 	def transferUniqueInformation(self, destNode, srcNode):
 		destNode.nodeid = srcNode.nodeid
@@ -908,12 +912,14 @@ class Filesystem(Tree):
 
 	def calculate(self, node):
 		if node.isDirectory():
-			return
-		if self.signalNewFile is not None:
-			self.signalNewFile(node.path, node.info.size)
-		fullpath = os.path.join(self.__rootDir, node.path)
-		node.info.checksum = Checksum()
-		node.info.checksum.calculateForFile(fullpath, self.signalBytesDone)
+			if self.signalNewFile is not None:
+				self.signalNewFile(node.path, 0)
+		else:
+			if self.signalNewFile is not None:
+				self.signalNewFile(node.path, node.info.size)
+			fullpath = os.path.join(self.__rootDir, node.path)
+			node.info.checksum = Checksum()
+			node.info.checksum.calculateForFile(fullpath, self.signalBytesDone)
 
 	def transferUniqueInformation(self, destNode, srcNode):
 		destNode.path = srcNode.path
