@@ -381,7 +381,7 @@ class NodeContainer(object):
 		for n in nodes:
 			func(n)
 			if not n.children is None:
-				self.__apply(n.children, func)
+				nodes.__apply(n.children, func)
 
 	def apply(self, func):
 		self.__apply(self, func)
@@ -391,7 +391,7 @@ class NodeContainer(object):
 			n.prettyPrint(depth * '    ')
 			print('')
 			if not n.children is None:
-				self.__prettyPrint(n.children, depth + 1)
+				nodes.__prettyPrint(n.children, depth + 1)
 
 	def prettyPrint(self):
 		self.__prettyPrint(self, 0)
@@ -400,7 +400,7 @@ class NodeContainer(object):
 		for n in nodes:
 			stats.update(n)
 			if not n.children is None:
-				self.__getStatistics(n.children, stats)
+				nodes.__getStatistics(n.children, stats)
 
 	def getStatistics(self):
 		stats = NodeStatistics()
@@ -441,17 +441,22 @@ class NodeDict(NodeContainer):
 		self.__dictByUniqueID.clear()
 		self.__dictByPythonID.clear()
 
-	def update(self, other):
+	def mergeAndUpdate(self, other):
 		self.__dictByUniqueID.update(other.__dictByUniqueID)
 		self.__dictByPythonID.update(other.__dictByPythonID)
 
 	def getByPythonID(self, pythonid):
 		return self.__dictByPythonID[pythonid]
 
-	def delByPythonID(self, pythonid):
-		node = self.__dictByPythonID[pythonid]
+	def __delNode(self, node):
+		if not node.children is None:
+			for n in node.children:
+				node.children.__delNode(n)
 		del self.__dictByUniqueID[node.getUniqueKey()]
 		del self.__dictByPythonID[node.pythonid]
+
+	def delByPythonID(self, pythonid):
+		self.__delNode(self.__dictByPythonID[pythonid])
 
 	def getByUniqueID(self, uniqueid):
 		if uniqueid not in self.__dictByUniqueID:
@@ -459,9 +464,7 @@ class NodeDict(NodeContainer):
 		return self.__dictByUniqueID[uniqueid]
 
 	def delByUniqueID(self, uniqueid):
-		node = self.__dictByUniqueID[uniqueid]
-		del self.__dictByUniqueID[node.getUniqueKey()]
-		del self.__dictByPythonID[node.pythonid]
+		self.__delNode(self.__dictByUniqueID[uniqueid])
 
 
 
@@ -614,7 +617,7 @@ class Tree(object):
 				onode.children = other.getChildren(onode)
 				other.__recursiveGetTree(onode.children)
 				onode.children.apply(lambda n: n.setStatus(NodeStatus.Missing))
-		selfnodes.update(othernodes)
+		selfnodes.mergeAndUpdate(othernodes)
 
 	def recursiveGetDiffTree(self, other, removeOkNodes=True):
 		selfnodes = NodeDict()
@@ -1293,6 +1296,7 @@ class ListControlPanel(wx.Panel):
 		self.list.SetImageList(self.imagelist, wx.IMAGE_LIST_SMALL)
 
 	def AppendNode(self, node):
+		# insert new line with icon
 		if node.status is None or node.status == NodeStatus.Undefined:
 			index = self.list.InsertStringItem(sys.maxint, '')
 		elif node.status == NodeStatus.Unknown:
@@ -1309,6 +1313,8 @@ class ListControlPanel(wx.Panel):
 			index = self.list.InsertImageItem(sys.maxint, self.iconError)
 		else:
 			raise Exception('Unknown node status {0:d}'.format(node.status))
+		# fill in rest of information
+		self.list.SetStringItem(index, 2, node.name)
 		if node.isDirectory():
 			self.list.SetStringItem(index, 1, '>')
 		else:
@@ -1317,7 +1323,7 @@ class ListControlPanel(wx.Panel):
 			self.list.SetStringItem(index, 5, node.info.getATimeString())
 			self.list.SetStringItem(index, 6, node.info.getMTimeString())
 			self.list.SetStringItem(index, 7, node.info.getChecksumString())
-		self.list.SetStringItem(index, 2, node.name)
+		# assign python id with entry
 		self.list.SetItemData(index, node.pythonid)
 
 	def IsRoot(self):
@@ -1327,6 +1333,7 @@ class ListControlPanel(wx.Panel):
 		self.list.DeleteAllItems()
 
 	def RefreshTree(self):
+		# clear old contents
 		self.Clear()
 		if not self.IsRoot():
 			# for directories other than root show entry to go back to parent
@@ -1337,8 +1344,10 @@ class ListControlPanel(wx.Panel):
 			index = self.list.InsertStringItem(sys.maxint, '')
 			self.list.SetStringItem(index, 2, self.__emptyNameString)
 		else:
+			# otherwise just append all nodes
 			for node in self.nodestack[-1]:
 				self.AppendNode(node)
+		# set address line
 		path = reduce(lambda x, y: os.path.join(x, y), self.namestack)
 		self.GetParent().SetAddressLine(path)
 
@@ -1354,6 +1363,7 @@ class ListControlPanel(wx.Panel):
 	def OnItemSelected(self, event):
 		index = event.m_itemIndex
 		namecol = self.list.GetItem(index, 2).GetText()
+		# prevent user from selecting parent dir entry or empty name string
 		if namecol == self.__parentNameString or namecol == self.__emptyNameString:
 			self.list.SetItemState(index, 0, wx.LIST_STATE_SELECTED)
 		event.Skip()
@@ -1361,6 +1371,7 @@ class ListControlPanel(wx.Panel):
 	def OnItemActivated(self, event):
 		index = event.m_itemIndex
 		namecol = self.list.GetItem(index, 2).GetText()
+		# navigate to parent directory
 		if namecol == self.__parentNameString:
 			self.nodestack.pop()
 			self.namestack.pop()
@@ -1368,6 +1379,7 @@ class ListControlPanel(wx.Panel):
 			return
 		pythonid = self.list.GetItemData(index)
 		node = self.nodestack[-1].getByPythonID(pythonid)
+		# navigate to child/sub directory
 		if node.isDirectory():
 			self.nodestack.append(node.children)
 			self.namestack.append(node.name)
@@ -1381,14 +1393,14 @@ class ListControlPanel(wx.Panel):
 
 		# only do this part the first time so the events are only bound once
 		if not hasattr(self, "popupID1"):
-			self.popupIdRefresh = wx.NewId()
+			self.popupIdIgnore = wx.NewId()
 			self.popupIdUpdateDB = wx.NewId()
 
-			self.Bind(wx.EVT_MENU, self.OnPopupRefresh, id=self.popupIdRefresh)
+			self.Bind(wx.EVT_MENU, self.OnPopupIgnore, id=self.popupIdIgnore)
 			self.Bind(wx.EVT_MENU, self.OnPopupUpdateDB, id=self.popupIdUpdateDB)
 
 			menu = wx.Menu()
-			menu.Append(self.popupIdRefresh, "Refresh")
+			menu.Append(self.popupIdIgnore, "Ignore")
 			menu.Append(self.popupIdUpdateDB, "Update DB")
 
 			# Popup the menu.  If an item is selected then its handler
@@ -1396,16 +1408,21 @@ class ListControlPanel(wx.Panel):
 			self.PopupMenu(menu)
 			menu.Destroy()
 
-	def OnPopupRefresh(self, event):
+	def OnPopupIgnore(self, event):
+		index = self.list.GetFirstSelected()
+		while not index == -1:
+			pythonid = self.list.GetItemData(index)
+			self.nodestack[-1].delByPythonID(pythonid)
+			index = self.list.GetNextSelected(index)
+		self.RefreshTree()
+
+	def OnPopupUpdateDB(self, event):
 		index = self.list.GetFirstSelected()
 		while not index == -1:
 			pythonid = self.list.GetItemData(index)
 			node = self.nodestack[-1].getByPythonID(pythonid)
 			print(node.name) # some something useful here
 			index = self.list.GetNextSelected(index)
-
-	def OnPopupUpdateDB(self, event):
-		pass
 
 
 
