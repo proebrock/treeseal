@@ -134,9 +134,6 @@ class Node(object):
 	def isDirectory(self):
 		return self.info is None
 
-	def setStatus(self, status):
-		self.status = status
-
 	def getStatusString(self):
 		if self.status is None:
 			return self.NoneString
@@ -226,34 +223,43 @@ class NodeContainer(object):
 	def __init__(self):
 		pass
 
-	def __apply(self, nodes, func):
-		for n in nodes:
-			func(n)
-			if not n.children is None:
-				nodes.__apply(n.children, func)
+	def __preOrderApply(self, nodes, func, param, depth):
+		for node in nodes:
+			func(self, node, param, depth)
+			if not node.children is None:
+				nodes.__preOrderApply(node.children, func, param, depth + 1)
 
-	def apply(self, func):
-		self.__apply(self, func)
+	def preOrderApply(self, func, param):
+		self.__preOrderApply(self, func, param, 0)
 
-	def __prettyPrint(self, nodes, depth):
-		for n in nodes:
-			n.prettyPrint(depth * '    ')
-			print('')
-			if not n.children is None:
-				nodes.__prettyPrint(n.children, depth + 1)
+	def __postOrderApply(self, nodes, func, param, depth):
+		for node in nodes:
+			if not node.children is None:
+				nodes.__postOrderApply(node.children, func, param, depth + 1)
+			func(self, node, param, depth)
+
+	def postOrderApply(self, func, param):
+		self.__postOrderApply(self, func, param, 0)
+
+	def __setStatusFunc(self, node, param, depth):
+		node.status = param
+
+	def setStatus(self, status):
+		self.preOrderApply(NodeContainer.__setStatusFunc, status)
+
+	def __prettyPrintFunc(self, node, param, depth):
+		node.prettyPrint(depth * '    ')
+		print('')
 
 	def prettyPrint(self):
-		self.__prettyPrint(self, 0)
+		self.preOrderApply(NodeContainer.__prettyPrintFunc, None)
 
-	def __getStatistics(self, nodes, stats):
-		for n in nodes:
-			stats.update(n)
-			if not n.children is None:
-				nodes.__getStatistics(n.children, stats)
+	def __getStatisticsFunc(self, node, param, depth):
+		param.update(node)
 
 	def getStatistics(self):
 		stats = NodeStatistics()
-		self.__getStatistics(self, stats)
+		self.preOrderApply(NodeContainer.__getStatisticsFunc, stats)
 		return stats
 
 
@@ -294,26 +300,29 @@ class NodeDict(NodeContainer):
 		self.__dictByUniqueID.update(other.__dictByUniqueID)
 		self.__dictByPythonID.update(other.__dictByPythonID)
 
-	def getByPythonID(self, pythonid):
-		return self.__dictByPythonID[pythonid]
-
-	def __delNode(self, node):
-		if not node.children is None:
-			for n in node.children:
-				node.children.__delNode(n)
-		del self.__dictByUniqueID[node.getUniqueKey()]
-		del self.__dictByPythonID[node.pythonid]
-
-	def delByPythonID(self, pythonid):
-		self.__delNode(self.__dictByPythonID[pythonid])
-
 	def getByUniqueID(self, uniqueid):
 		if uniqueid not in self.__dictByUniqueID:
 			return None
 		return self.__dictByUniqueID[uniqueid]
 
+	def getByPythonID(self, pythonid):
+		return self.__dictByPythonID[pythonid]
+
+	def __delNodeFunc(self, node, param, depth):
+		del self.__dictByUniqueID[node.getUniqueKey()]
+		del self.__dictByPythonID[node.pythonid]
+
 	def delByUniqueID(self, uniqueid):
-		self.__delNode(self.__dictByUniqueID[uniqueid])
+		node = self.getByUniqueID(uniqueid)
+		if not node.children is None:
+			node.children.postOrderApply(NodeDict.__delNodeFunc, None)
+		self.__delNodeFunc(node, None, 0)
+
+	def delByPythonID(self, pythonid):
+		node = self.getByPythonID(pythonid)
+		if not node.children is None:
+			node.children.postOrderApply(NodeDict.__delNodeFunc, None)
+		self.__delNodeFunc(node, None, 0)
 
 
 

@@ -56,7 +56,7 @@ class Instance:
 
 	def importTree(self, signalNewFile=None, signalBytesDone=None):
 		self.__fs.registerHandlers(signalNewFile, signalBytesDone)
-		self.__fs.recursiveCopy(self.__db)
+		self.__fs.copyTree(self.__db)
 		self.__fs.registerHandlers(None, None)
 
 	def getStatistics(self):
@@ -64,13 +64,13 @@ class Instance:
 
 	def getFilesystemTree(self, signalNewFile=None, signalBytesDone=None):
 		self.__fs.registerHandlers(signalNewFile, signalBytesDone)
-		tree = self.__fs.recursiveGetTree()
+		tree = self.__fs.getTree()
 		self.__fs.registerHandlers(None, None)
 		return tree
 
 	def getDatabaseTree(self, signalNewFile=None, signalBytesDone=None):
 		self.__db.registerHandlers(signalNewFile, signalBytesDone)
-		tree = self.__db.recursiveGetTree()
+		tree = self.__db.getTree()
 		self.__db.registerHandlers(None, None)
 		return tree
 
@@ -81,6 +81,9 @@ class Instance:
 		tree = self.__fs.recursiveGetDiffTree(self.__db)
 		self.__fs.registerHandlers(None, None)
 		return tree
+
+	def resolveDiffTree(self, node):
+		pass
 
 
 
@@ -276,8 +279,9 @@ class ListControlPanel(wx.Panel):
 		index = self.list.GetFirstSelected()
 		while not index == -1:
 			pythonid = self.list.GetItemData(index)
-			node = self.nodestack[-1].getByPythonID(pythonid)
-			print(node.name) # some something useful here
+			#node = self.nodestack[-1].getByPythonID(pythonid)
+			#instance.resolveDiffTree(node)
+			self.nodestack[-1].delByPythonID(pythonid)
 			index = self.list.GetNextSelected(index)
 
 
@@ -367,7 +371,7 @@ class MainFrame(wx.Frame):
 		progressDialog.SignalFinished()
 
 		tree = instance.getDatabaseTree()
-		tree.apply(lambda n: n.setStatus(NodeStatus.OK))
+		tree.setStatus(NodeStatus.OK)
 		self.list.ShowNodeTree(tree)
 
 		instance.close()
@@ -416,6 +420,7 @@ class MainFrame(wx.Frame):
 		progressDialog.SignalFinished()
 
 		self.list.ShowNodeTree(tree)
+		tree.prettyPrint()
 
 		instance.close()
 

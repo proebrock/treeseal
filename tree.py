@@ -53,6 +53,9 @@ class Tree(object):
 	def updateNode(self, node):
 		raise MyException('Not implemented.', 3)
 
+	def deleteNode(self, node):
+		raise MyException('Not implemented.', 3)
+
 	def commit(self):
 		raise MyException('Not implemented.', 3)
 
@@ -60,43 +63,43 @@ class Tree(object):
 		self.signalNewFile = signalNewFile
 		self.signalBytesDone = signalBytesDone
 
-	def __recursiveGetTree(self, nodetree):
+	def __getTree(self, nodetree):
 		for node in nodetree:
 			self.calculate(node)
 			if node.isDirectory():
 				node.children = self.getChildren(node)
-				self.__recursiveGetTree(node.children)
+				self.__getTree(node.children)
 
-	def recursiveGetTree(self):
+	def getTree(self):
 		nodetree = NodeDict()
 		nodetree.append(self.getRootNode())
-		self.__recursiveGetTree(nodetree)
+		self.__getTree(nodetree)
 		return nodetree
 
-	def __recursiveCopy(self, dest, nodelist):
-		for node in nodelist:
+	def __copyTree(self, dest, nodes):
+		for node in nodes:
 			self.calculate(node)
 			dest.insertNode(node)
 			if node.isDirectory():
-				self.__recursiveCopy(dest, self.getChildren(node))
+				self.__copyTree(dest, self.getChildren(node))
 
-	def recursiveCopy(self, dest):
-		nodelist = NodeDict()
-		nodelist.append(self.getRootNode())
-		self.__recursiveCopy(dest, nodelist)
+	def copyTree(self, dest):
+		nodes = NodeDict()
+		nodes.append(self.getRootNode())
+		self.__copyTree(dest, nodes)
 		dest.commit()
 
-	def __recursiveGetStatistics(self, nodelist, stats):
-		for node in nodelist:
+	def __recursiveGetStatistics(self, nodes, stats):
+		for node in nodes:
 			stats.update(node)
 			if node.isDirectory():
 				self.__recursiveGetStatistics(self.getChildren(node), stats)
 
 	def getStatistics(self, node):
 		stats = NodeStatistics()
-		nodelist = NodeDict()
-		nodelist.append(node)
-		self.__recursiveGetStatistics(nodelist, stats)
+		nodes = NodeDict()
+		nodes.append(node)
+		self.__recursiveGetStatistics(nodes, stats)
 		return stats
 
 	def __recursiveGetDiffTree(self, other, selfnodes, othernodes, removeOkNodes):
@@ -143,8 +146,8 @@ class Tree(object):
 				snode.status = NodeStatus.New
 				if snode.isDirectory():
 					snode.children = self.getChildren(snode)
-					self.__recursiveGetTree(snode.children)
-					snode.children.apply(lambda n: n.setStatus(NodeStatus.New))
+					self.__getTree(snode.children)
+					snode.children.setStatus(NodeStatus.New)
 		# remove nodes marked as ok
 		if removeOkNodes:
 			for s in okNodes:
@@ -155,8 +158,8 @@ class Tree(object):
 			onode.status = NodeStatus.Missing
 			if onode.isDirectory():
 				onode.children = other.getChildren(onode)
-				other.__recursiveGetTree(onode.children)
-				onode.children.apply(lambda n: n.setStatus(NodeStatus.Missing))
+				other.__getTree(onode.children)
+				onode.children.setStatus(NodeStatus.Missing)
 		selfnodes.mergeAndUpdate(othernodes)
 
 	def recursiveGetDiffTree(self, other, removeOkNodes=True):
@@ -366,6 +369,9 @@ class Database(Tree):
 				node.info.ctime, node.info.atime, node.info.mtime, \
 				node.info.checksum.getBinary(), node.nodeid))
 
+	def deleteNode(self, node):
+		self.__dbcon.execute('delete from nodes where nodeid=?', (node.nodeid,))
+
 	def commit(self):
 		self.__dbcon.commit()
 		self.__dbcon.execute('vacuum')
@@ -497,13 +503,24 @@ class Filesystem(Tree):
 		return node
 
 	def insertNode(self, node):
+		# a node contains the metadata necessary to create the file,
+		# instead of the file content just its checksum...
 		print('Filesystem.insertNode(' + node.name + ') is not implemented.')
 
 	def updateNode(self, node):
+		# a node contains the metadata necessary to update the file,
+		# instead of the file content just its checksum...
 		print('Filesystem.updateNode(' + node.name + ') is not implemented.')
 
+	def deleteNode(self, node):
+		fullpath = os.path.join(self.__rootDir, node.path)
+		if node.isDirectory():
+			os.rmdir(fullpath)
+		else:
+			os.remove(fullpath)
+
 	def commit(self):
-		print('Filesystem.commit() is not implemented.')
+		pass
 
 	### following methods are Database specific and not from Tree
 
