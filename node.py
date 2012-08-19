@@ -227,7 +227,7 @@ class NodeContainer(object):
 		for node in nodes:
 			func(self, node, param, depth)
 			if not node.children is None:
-				nodes.__preOrderApply(node.children, func, param, depth + 1)
+				node.children.__preOrderApply(node.children, func, param, depth + 1)
 
 	def preOrderApply(self, func, param):
 		self.__preOrderApply(self, func, param, 0)
@@ -235,7 +235,7 @@ class NodeContainer(object):
 	def __postOrderApply(self, nodes, func, param, depth):
 		for node in nodes:
 			if not node.children is None:
-				nodes.__postOrderApply(node.children, func, param, depth + 1)
+				node.children.__postOrderApply(node.children, func, param, depth + 1)
 			func(self, node, param, depth)
 
 	def postOrderApply(self, func, param):
@@ -323,6 +323,5 @@ class NodeDict(NodeContainer):
 		if not node.children is None:
 			node.children.postOrderApply(NodeDict.__delNodeFunc, None)
 		self.__delNodeFunc(node, None, 0)
-
 
 
