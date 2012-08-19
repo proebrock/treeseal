@@ -56,7 +56,14 @@ class Instance:
 
 	def importTree(self, signalNewFile=None, signalBytesDone=None):
 		self.__fs.registerHandlers(signalNewFile, signalBytesDone)
-		self.__fs.copyTree(self.__db)
+		if True:
+			# fast and memory saving alternative
+			self.__fs.copyNodeTree(self.__db)
+		else:
+			# slower more memory consuming alternative: first the whole tree is read into memory, then it is written
+			tree = self.__fs.getNodeTree()
+			tree.insert(self.__db)
+			tree.prettyPrint()
 		self.__fs.registerHandlers(None, None)
 
 	def getStatistics(self):
@@ -64,13 +71,13 @@ class Instance:
 
 	def getFilesystemTree(self, signalNewFile=None, signalBytesDone=None):
 		self.__fs.registerHandlers(signalNewFile, signalBytesDone)
-		tree = self.__fs.getTree()
+		tree = self.__fs.getNodeTree()
 		self.__fs.registerHandlers(None, None)
 		return tree
 
 	def getDatabaseTree(self, signalNewFile=None, signalBytesDone=None):
 		self.__db.registerHandlers(signalNewFile, signalBytesDone)
-		tree = self.__db.getTree()
+		tree = self.__db.getNodeTree()
 		self.__db.registerHandlers(None, None)
 		return tree
 
@@ -420,7 +427,6 @@ class MainFrame(wx.Frame):
 		progressDialog.SignalFinished()
 
 		self.list.ShowNodeTree(tree)
-		tree.prettyPrint()
 
 		instance.close()
 

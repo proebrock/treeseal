@@ -63,30 +63,30 @@ class Tree(object):
 		self.signalNewFile = signalNewFile
 		self.signalBytesDone = signalBytesDone
 
-	def __getTree(self, nodetree):
+	def __getNodeTree(self, nodetree):
 		for node in nodetree:
 			self.calculate(node)
 			if node.isDirectory():
 				node.children = self.getChildren(node)
-				self.__getTree(node.children)
+				self.__getNodeTree(node.children)
 
-	def getTree(self):
+	def getNodeTree(self):
 		nodetree = NodeDict()
 		nodetree.append(self.getRootNode())
-		self.__getTree(nodetree)
+		self.__getNodeTree(nodetree)
 		return nodetree
 
-	def __copyTree(self, dest, nodes):
+	def __copyNodeTree(self, dest, nodes):
 		for node in nodes:
 			self.calculate(node)
 			dest.insertNode(node)
 			if node.isDirectory():
-				self.__copyTree(dest, self.getChildren(node))
+				self.__copyNodeTree(dest, self.getChildren(node))
 
-	def copyTree(self, dest):
+	def copyNodeTree(self, dest):
 		nodes = NodeDict()
 		nodes.append(self.getRootNode())
-		self.__copyTree(dest, nodes)
+		self.__copyNodeTree(dest, nodes)
 		dest.commit()
 
 	def __recursiveGetStatistics(self, nodes, stats):
@@ -290,6 +290,7 @@ class Database(Tree):
 		for row in cursor:
 			child = Node()
 			self.fetch(child, row)
+			child.chainWithParent(node)
 			result.append(child)
 		cursor.close()
 		return result
@@ -351,6 +352,9 @@ class Database(Tree):
 				node.info.ctime, node.info.atime, node.info.mtime, \
 				node.info.checksum.getBinary()))
 		node.nodeid = cursor.lastrowid
+		if not node.children is None:
+			for child in node.children:
+				child.chainWithParent(node)
 		cursor.close()
 
 	def updateNode(self, node):
@@ -477,12 +481,12 @@ class Filesystem(Tree):
 		result = NodeDict()
 		for childname in os.listdir(os.path.join(self.__rootDir, node.path)):
 			childpath = os.path.join(node.path, childname)
-			if self.__isOnBlacklist(os.path.join(self.__rootDir, childpath)):
+			if self.__isBlacklisted(os.path.join(self.__rootDir, childpath)):
 				continue
 			child = Node()
 			child.path = childpath
-			child.parentid = node.nodeid # important when importing nodes into the db
 			self.fetch(child)
+			child.chainWithParent(node)
 			result.append(child)
 		return result
 
@@ -524,7 +528,7 @@ class Filesystem(Tree):
 
 	### following methods are Database specific and not from Tree
 
-	def __isOnBlacklist(self, path):
+	def __isBlacklisted(self, path):
 		# skip the metadir, we do not want to add that to the database
 		if path == self.__metaDir:
 			return True

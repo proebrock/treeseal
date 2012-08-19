@@ -1,3 +1,4 @@
+import os
 from misc import sizeToString, MyException
 
 
@@ -131,6 +132,12 @@ class Node(object):
 			'info="' + self.getInfoString() + '", ' + \
 			')'
 
+	def chainWithParent(self, parent):
+		if not parent.path is None:
+			self.path = os.path.join(parent.path, self.name)
+		if not parent.nodeid is None:
+			self.parentid = parent.nodeid
+
 	def isDirectory(self):
 		return self.info is None
 
@@ -261,6 +268,13 @@ class NodeContainer(object):
 		stats = NodeStatistics()
 		self.preOrderApply(NodeContainer.__getStatisticsFunc, stats)
 		return stats
+
+	def __insertFunc(self, node, param, depth):
+		dest = param
+		dest.insertNode(node)
+
+	def insert(self, dest):
+		self.preOrderApply(NodeContainer.__insertFunc, dest)
 
 
 
