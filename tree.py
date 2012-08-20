@@ -509,12 +509,12 @@ class Filesystem(Tree):
 	def insertNode(self, node):
 		# a node contains the metadata necessary to create the file,
 		# instead of the file content just its checksum...
-		print('Filesystem.insertNode(' + node.name + ') is not implemented.')
+		print('Filesystem.insertNode(\'' + node.name + '\') is not implemented.')
 
 	def updateNode(self, node):
 		# a node contains the metadata necessary to update the file,
 		# instead of the file content just its checksum...
-		print('Filesystem.updateNode(' + node.name + ') is not implemented.')
+		print('Filesystem.updateNode(\'' + node.name + '\') is not implemented.')
 
 	def deleteNode(self, node):
 		fullpath = os.path.join(self.__rootDir, node.path)

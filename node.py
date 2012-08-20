@@ -275,6 +275,7 @@ class NodeContainer(object):
 
 	def insert(self, dest):
 		self.preOrderApply(NodeContainer.__insertFunc, dest)
+		dest.commit()
 
 
 

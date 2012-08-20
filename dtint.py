@@ -63,7 +63,6 @@ class Instance:
 			# slower more memory consuming alternative: first the whole tree is read into memory, then it is written
 			tree = self.__fs.getNodeTree()
 			tree.insert(self.__db)
-			tree.prettyPrint()
 		self.__fs.registerHandlers(None, None)
 
 	def getStatistics(self):
