@@ -8,7 +8,7 @@ import wx.lib.mixins.listctrl as listmix
 from icons import IconError, IconMissing, IconNew, IconOk, IconUnknown, IconWarning
 from misc import MyException
 from node import NodeStatus
-from tree import Database, Filesystem
+from device import Database, Filesystem
 from progressdialog import UserCancelledException, FileProcessingProgressDialog
 
 ProgramName = 'dtint'
@@ -29,7 +29,7 @@ class Instance:
 		# get rootdir (full path) and metadir
 		self.__rootDir = path
 		self.__metaDir = os.path.join(self.__rootDir, Instance.METADIRNAME)
-		# initialize two Trees, the filesystem and the database
+		# initialize two devices, the filesystem and the database
 		self.__fs = Filesystem(self.__rootDir, self.__metaDir)
 		self.__db = Database(self.__rootDir, self.__metaDir)
 		#self.__fs = Database(self.__rootDir, self.__metaDir)

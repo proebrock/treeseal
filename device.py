@@ -8,7 +8,7 @@ from node import NodeStatus, NodeInfo, Node, NodeStatistics, NodeList, NodeDict
 
 
 
-class Tree(object):
+class Device(object):
 
 	def __init__(self):
 		self.signalNewFile = None
@@ -146,7 +146,7 @@ class Tree(object):
 				snode.status = NodeStatus.New
 				if snode.isDirectory():
 					snode.children = self.getChildren(snode)
-					self.__getTree(snode.children)
+					self.__getNodeTree(snode.children)
 					snode.children.setStatus(NodeStatus.New)
 		# remove nodes marked as ok
 		if removeOkNodes:
@@ -158,7 +158,7 @@ class Tree(object):
 			onode.status = NodeStatus.Missing
 			if onode.isDirectory():
 				onode.children = other.getChildren(onode)
-				other.__getTree(onode.children)
+				other.__getNodeTree(onode.children)
 				onode.children.setStatus(NodeStatus.Missing)
 		selfnodes.mergeAndUpdate(othernodes)
 
@@ -178,7 +178,7 @@ class Tree(object):
 
 
 
-class Database(Tree):
+class Database(Device):
 
 	def __init__(self, rootDir, metaDir):
 		super(Database, self).__init__()
@@ -380,7 +380,7 @@ class Database(Tree):
 		self.__dbcon.commit()
 		self.__dbcon.execute('vacuum')
 
-	### following methods are Database specific and not from Tree
+	### following methods are Database specific and not from Device
 
 	def getNodeByChecksum(self, checksum):
 		result = NodeList()
@@ -423,7 +423,7 @@ class Database(Tree):
 
 
 
-class Filesystem(Tree):
+class Filesystem(Device):
 
 	def __init__(self, rootDir, metaDir):
 		super(Filesystem, self).__init__()
@@ -526,7 +526,7 @@ class Filesystem(Tree):
 	def commit(self):
 		pass
 
-	### following methods are Database specific and not from Tree
+	### following methods are Database specific and not from Device
 
 	def __isBlacklisted(self, path):
 		# skip the metadir, we do not want to add that to the database
@@ -536,3 +536,5 @@ class Filesystem(Tree):
 
 
 
+class XmlFile(Device):
+	pass
