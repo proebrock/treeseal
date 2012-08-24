@@ -13,7 +13,7 @@ class NodeStatus:
 	Warn = 5
 	Error = 6
 
-	NumStatuses = 6
+	NumStatuses = 7
 
 	@staticmethod
 	def toString(status):
@@ -254,6 +254,12 @@ class NodeContainer(object):
 	def setStatus(self, status):
 		self.preOrderApply(NodeContainer.__setStatusFunc, status)
 
+	def splitByStatus(self):
+		result = [ self.__class__() for i in range(NodeStatus.NumStatuses) ]
+		for node in self:
+			result[node.status].append(node)
+		return result
+
 	def __prettyPrintFunc(self, node, param, depth):
 		node.prettyPrint(depth * '    ')
 		print('')
@@ -269,12 +275,28 @@ class NodeContainer(object):
 		self.preOrderApply(NodeContainer.__getStatisticsFunc, stats)
 		return stats
 
-	def __insertFunc(self, node, param, depth):
+	def __deviceInsertFunc(self, node, param, depth):
 		dest = param
 		dest.insertNode(node)
 
-	def insert(self, dest):
-		self.preOrderApply(NodeContainer.__insertFunc, dest)
+	def deviceInsert(self, dest):
+		self.preOrderApply(NodeContainer.__deviceInsertFunc, dest)
+		dest.commit()
+
+	def __deviceUpdateFunc(self, node, param, depth):
+		dest = param
+		dest.updateNode(node)
+
+	def deviceUpdate(self, dest):
+		self.preOrderApply(NodeContainer.__deviceUpdateFunc, dest)
+		dest.commit()
+
+	def __deviceDeleteFunc(self, node, param, depth):
+		dest = param
+		dest.deleteNode(node)
+
+	def deviceDelete(self, dest):
+		self.preOrderApply(NodeContainer.__deviceDeleteFunc, dest)
 		dest.commit()
 
 

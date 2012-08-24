@@ -7,7 +7,7 @@ import wx.lib.mixins.listctrl as listmix
 
 from icons import IconError, IconMissing, IconNew, IconOk, IconUnknown, IconWarning
 from misc import MyException
-from node import NodeStatus
+from node import NodeStatus,NodeDict
 from device import Database, Filesystem
 from progressdialog import UserCancelledException, FileProcessingProgressDialog
 
@@ -62,7 +62,7 @@ class Instance:
 		else:
 			# slower more memory consuming alternative: first the whole tree is read into memory, then it is written
 			tree = self.__fs.getNodeTree()
-			tree.insert(self.__db)
+			tree.deviceInsert(self.__db)
 		self.__fs.registerHandlers(None, None)
 
 	def getStatistics(self):
@@ -81,15 +81,24 @@ class Instance:
 		return tree
 
 	def getDiffTree(self, signalNewFile=None, signalBytesDone=None):
-		# careful when testing: handlers have to fit to statistics
-		# determined in getStatistics!
 		self.__fs.registerHandlers(signalNewFile, signalBytesDone)
 		tree = self.__fs.recursiveGetDiffTree(self.__db)
 		self.__fs.registerHandlers(None, None)
 		return tree
 
-	def resolveDiffTree(self, node):
-		pass
+	def updateDB(self, nodes):
+		nodelists = nodes.splitByStatus()
+		for i in range(NodeStatus.NumStatuses):
+			if len(nodelists[i]) == 0 or i == NodeStatus.OK:
+				continue
+			elif i == NodeStatus.New:
+				nodelists[i].deviceInsert(self.__db)
+			elif i == NodeStatus.Missing:
+				nodelists[i].deviceDelete(self.__db)
+			elif i == NodeStatus.Warn or i == NodeStatus.Error:
+				nodelists[i].deviceUpdate(self.__db)
+			else:
+				raise Exception('Unable to update database for node with status {0:s}'.format(NodeStatus.toString(i)))
 
 
 
@@ -140,6 +149,7 @@ class ListControlPanel(wx.Panel):
 		# start with empty node tree
 		self.nodestack = []
 		self.namestack = []
+		self.instance = None
 
 		# some constants
 		self.__emptyNameString = '<empty>'
@@ -216,13 +226,14 @@ class ListControlPanel(wx.Panel):
 		path = reduce(lambda x, y: os.path.join(x, y), self.namestack)
 		self.GetParent().SetAddressLine(path)
 
-	def ShowNodeTree(self, nodetree):
+	def ShowNodeTree(self, instance, nodetree):
 		self.list.SetFocus()
 		self.nodestack = []
 		if len(nodetree[0].children) > 0:
 			self.nodestack.append(nodetree[0].children)
 		self.namestack = []
 		self.namestack.append('')
+		self.instance = instance
 		self.RefreshTree()
 
 	def OnItemSelected(self, event):
@@ -273,22 +284,28 @@ class ListControlPanel(wx.Panel):
 			self.PopupMenu(menu)
 			menu.Destroy()
 
-	def OnPopupIgnore(self, event):
+	def getSelectedNodes(self):
+		result = NodeDict()
 		index = self.list.GetFirstSelected()
 		while not index == -1:
 			pythonid = self.list.GetItemData(index)
-			self.nodestack[-1].delByPythonID(pythonid)
+			node = self.nodestack[-1].getByPythonID(pythonid)
+			result.append(node)
 			index = self.list.GetNextSelected(index)
+		return result
+
+	def OnPopupIgnore(self, event):
+		nodes = self.getSelectedNodes()
+		for node in nodes:
+			self.nodestack[-1].delByPythonID(node.pythonid)
 		self.RefreshTree()
 
 	def OnPopupUpdateDB(self, event):
-		index = self.list.GetFirstSelected()
-		while not index == -1:
-			pythonid = self.list.GetItemData(index)
-			#node = self.nodestack[-1].getByPythonID(pythonid)
-			#instance.resolveDiffTree(node)
-			self.nodestack[-1].delByPythonID(pythonid)
-			index = self.list.GetNextSelected(index)
+		nodes = self.getSelectedNodes()
+		self.instance.updateDB(nodes)
+		for node in nodes:
+			self.nodestack[-1].delByPythonID(node.pythonid)
+		self.RefreshTree()
 
 
 
@@ -335,7 +352,7 @@ class MainFrame(wx.Frame):
 		# get a valid path from user
 		dirDialog = wx.DirDialog(self, "Choose a directory for import:", \
 			style=wx.DD_DEFAULT_STYLE)
-		dirDialog.SetPath('../dtint-example') # TESTING
+		dirDialog.SetPath('D:\\Projects\\dtint-example') # TESTING
 		if dirDialog.ShowModal() == wx.ID_OK:
 			userPath = dirDialog.GetPath()
 		else:
@@ -378,15 +395,13 @@ class MainFrame(wx.Frame):
 
 		tree = instance.getDatabaseTree()
 		tree.setStatus(NodeStatus.OK)
-		self.list.ShowNodeTree(tree)
-
-		instance.close()
+		self.list.ShowNodeTree(instance, tree)
 
 	def OnCheck(self, event):
 		# get a valid path from user
 		dirDialog = wx.DirDialog(self, "Choose a directory for check:", \
 			style=wx.DD_DEFAULT_STYLE)
-		dirDialog.SetPath('../dtint-example') # TESTING
+		dirDialog.SetPath('D:\\Projects\\dtint-example') # TESTING
 		if dirDialog.ShowModal() == wx.ID_OK:
 			userPath = dirDialog.GetPath()
 		else:
@@ -425,10 +440,7 @@ class MainFrame(wx.Frame):
 		# user stopped the calcuation using the cancel button
 		progressDialog.SignalFinished()
 
-		self.list.ShowNodeTree(tree)
-
-		instance.close()
-
+		self.list.ShowNodeTree(instance, tree)
 
 	def OnExit(self, event):
 		self.Close(True)
