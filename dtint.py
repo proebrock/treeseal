@@ -7,7 +7,7 @@ import wx.lib.mixins.listctrl as listmix
 
 from icons import IconError, IconMissing, IconNew, IconOk, IconUnknown, IconWarning
 from misc import MyException
-from node import NodeStatus,NodeDict
+from node import NodeStatus, NodeDict
 from device import Database, Filesystem
 from progressdialog import UserCancelledException, FileProcessingProgressDialog
 
@@ -98,7 +98,8 @@ class Instance:
 			elif i == NodeStatus.Warn or i == NodeStatus.Error:
 				nodelists[i].deviceUpdate(self.__db)
 			else:
-				raise Exception('Unable to update database for node with status {0:s}'.format(NodeStatus.toString(i)))
+				raise Exception('Unable to update database for node container with {0:d} entries and status {1:s}'.format( \
+					len(nodelists[i]), NodeStatus.toString(i)))
 
 
 
@@ -206,6 +207,12 @@ class ListControlPanel(wx.Panel):
 
 	def Clear(self):
 		self.list.DeleteAllItems()
+
+	def ClearInstance(self):
+		if not self.instance is None:
+			self.instance.close()
+			self.instance = None
+
 
 	def RefreshTree(self):
 		# clear old contents
@@ -365,6 +372,7 @@ class MainFrame(wx.Frame):
 		self.Title = self.baseTitle + ' - ' + userPath
 
 		# create and reset instance
+		self.list.ClearInstance()
 		instance = Instance(userPath)
 		instance.reset()
 		instance.open()
@@ -413,6 +421,7 @@ class MainFrame(wx.Frame):
 		self.Title = self.baseTitle + ' - ' + userPath
 
 		# create and reset instance
+		self.list.ClearInstance()
 		instance = Instance(userPath)
 		instance.open()
 
