@@ -10,6 +10,7 @@ from misc import MyException
 from node import NodeStatus, NodeDict
 from device import Database, Filesystem
 from progressdialog import UserCancelledException, FileProcessingProgressDialog
+from comparisondialog import NodeComparisonDialog
 
 ProgramName = 'dtint'
 ProgramVersion = '3.0'
@@ -267,6 +268,10 @@ class ListControlPanel(wx.Panel):
 			self.nodestack.append(node.children)
 			self.namestack.append(node.name)
 			self.RefreshTree()
+		# show comparison dialog
+		else:
+			comparisonDialog = NodeComparisonDialog(self, node)
+			comparisonDialog.Show()
 
 	def OnRightClick(self, event):
 		index = self.list.GetFirstSelected()
