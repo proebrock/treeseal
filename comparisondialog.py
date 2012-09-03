@@ -1,24 +1,26 @@
 import wx
 
+from node import NodeStatus
+
 
 
 class SimpleGrid(wx.FlexGridSizer):
 
-	def __init__(self, parent, rowlabels, collabels, entries):
+	def __init__(self, parent, entries, rowlabels=None, collabels=None):
 		numRows = len(entries)
 		if rowlabels is None:
 			haveRowLabels = 0
 		else:
 			haveRowLabels = 1
 			if not len(rowlabels) == numRows:
-				raise Exception('Number of row labels must match number of rows.')
+				raise Exception('Number of row labels ({0:d}) must match number of rows ({1:d}).'.format(len(rowlabels), numRows))
 		numCols = len(entries[0])
 		if collabels is None:
 			haveColLabels = 0
 		else:
 			haveColLabels = 1
 			if not len(collabels) == numCols:
-				raise Exception('Number of column labels must match number of columns.')
+				raise Exception('Number of column labels ({0:d}) must match number of columns ({1:d}).'.format(len(collabels), numCols))
 
 		border = 5
 
@@ -51,35 +53,74 @@ class SimpleGrid(wx.FlexGridSizer):
 class NodeComparisonDialog(wx.Dialog):
 
 	def __init__(self, parent, node):
-		wx.Dialog.__init__(self, parent, title='Node Diff', size=(500,500), \
+		wx.Dialog.__init__(self, parent, title='Node Information', size=(500,600), \
 			style=wx.CAPTION | wx.RESIZE_BORDER | wx.STAY_ON_TOP)
 
 		border = 5
 
 		# header information
-		headerGrid = SimpleGrid(self, ['path', 'id', 'status'], None, \
-			[[node.getPathString()], [node.getNodeIDString()], [node.getStatusString()]])
+		entries = [ \
+			[node.getPathString()], \
+			[node.getNodeIDString()], \
+			[node.getParentIDString()], \
+			[node.getStatusString()], \
+			]
+		rowlabels = ['path', 'id', 'parentid', 'status']
+		headerGrid = SimpleGrid(self, entries, rowlabels)
 		# static box with contents
-		headerBox = wx.StaticBox(self, -1, 'General Information')
+		headerBox = wx.StaticBox(self, -1, 'General')
 		headerBoxSizer = wx.StaticBoxSizer(headerBox, wx.VERTICAL)
 		headerBoxSizer.Add(headerGrid, 1, wx.ALL | wx.EXPAND, border)
 
-		# diff information
+		if not node.isDirectory():
+			# diff information
+			rowlabels = ['size','ctime', 'atime', 'mtime', 'checksum']
+			collabels = ['database', 'filesystem']
+			nodestr = [ \
+					[node.info.getSizeString()], \
+					[node.info.getCTimeString()], \
+					[node.info.getATimeString()], \
+					[node.info.getMTimeString()], \
+					[node.info.getChecksumString()], \
+					]
+			if node.status == NodeStatus.OK:
+				entries = map(lambda s: [ s[0], s[0] ], nodestr)
+			elif node.status == NodeStatus.New:
+				entries = map(lambda s: [ '', s[0] ], nodestr)
+			elif node.status == NodeStatus.Missing:
+				entries = map(lambda s: [ s[0], '' ], nodestr)
+			elif node.status == NodeStatus.Warn or \
+				node.status == NodeStatus.Error:
+				otherstr = [\
+						[node.other.info.getSizeString()], \
+						[node.other.info.getCTimeString()], \
+						[node.other.info.getATimeString()], \
+						[node.other.info.getMTimeString()], \
+						[node.other.info.getChecksumString()], \
+						]
+				entries = nodestr
+				for i in range(len(nodestr)):
+					entries[i].append(otherstr[i][0])
 
+			diffGrid = SimpleGrid(self, entries, rowlabels, collabels)
+			# static box with contents
+			diffBox = wx.StaticBox(self, -1, 'Differences')
+			diffBoxSizer = wx.StaticBoxSizer(diffBox, wx.VERTICAL)
+			diffBoxSizer.Add(diffGrid, 1, wx.ALL | wx.EXPAND, border)
 
-		# list box with database occurrences
-		dbOccurencesList = wx.ListBox(self)
-		# static box with contents
-		dbOccurencesBox = wx.StaticBox(self, -1, 'Occurrences in database')
-		dbOccurencesBoxSizer = wx.StaticBoxSizer(dbOccurencesBox, wx.VERTICAL)
-		dbOccurencesBoxSizer.Add(dbOccurencesList, 1, wx.ALL | wx.EXPAND, border)
+			# list box with database occurrences
+			dbOccurencesList = wx.ListBox(self)
+			# static box with contents
+			dbOccurencesBox = wx.StaticBox(self, -1, 'Occurrences in database')
+			dbOccurencesBoxSizer = wx.StaticBoxSizer(dbOccurencesBox, wx.VERTICAL)
+			dbOccurencesBoxSizer.Add(dbOccurencesList, 1, wx.ALL | wx.EXPAND, border)
 
-		# list box with filesystem occurrences
-		fsOccurencesList = wx.ListBox(self)
-		# static box with contents
-		fsOccurencesBox = wx.StaticBox(self, -1, 'Occurrences in filesystem')
-		fsOccurencesBoxSizer = wx.StaticBoxSizer(fsOccurencesBox, wx.VERTICAL)
-		fsOccurencesBoxSizer.Add(fsOccurencesList, 1, wx.ALL | wx.EXPAND, border)
+			# list box with filesystem occurrences
+			fsOccurencesList = wx.ListBox(self)
+			# static box with contents
+			fsOccurencesBox = wx.StaticBox(self, -1, 'Occurrences in filesystem')
+			fsOccurencesBoxSizer = wx.StaticBoxSizer(fsOccurencesBox, wx.VERTICAL)
+			fsOccurencesBoxSizer.Add(fsOccurencesList, 1, wx.ALL | wx.EXPAND, border)
 
 		button = wx.Button(self, label='OK')
 		button.SetFocus()
@@ -87,8 +128,10 @@ class NodeComparisonDialog(wx.Dialog):
 
 		sizer = wx.BoxSizer(wx.VERTICAL)
 		sizer.Add(headerBoxSizer, 0, wx.ALL | wx.EXPAND, border)
-		sizer.Add(dbOccurencesBoxSizer, 1, wx.ALL | wx.EXPAND, border)
-		sizer.Add(fsOccurencesBoxSizer, 1, wx.ALL | wx.EXPAND, border)
+		if not node.isDirectory():
+			sizer.Add(diffBoxSizer, 0, wx.ALL | wx.EXPAND, border)
+			sizer.Add(dbOccurencesBoxSizer, 1, wx.ALL | wx.EXPAND, border)
+			sizer.Add(fsOccurencesBoxSizer, 1, wx.ALL | wx.EXPAND, border)
 		sizer.Add(button, 0, wx.ALL | wx.ALIGN_CENTER, border)
 		self.SetSizer(sizer)
 		self.CenterOnScreen()

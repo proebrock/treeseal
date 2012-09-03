@@ -214,7 +214,6 @@ class ListControlPanel(wx.Panel):
 			self.instance.close()
 			self.instance = None
 
-
 	def RefreshTree(self):
 		# clear old contents
 		self.Clear()

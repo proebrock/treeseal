@@ -127,6 +127,8 @@ class Device(object):
 								snode.status = NodeStatus.Unknown
 								break
 				else:
+					# save other node
+					snode.other = onode
 					# compare snode and onode and set status
 					if snode.info == onode.info:
 						if snode.info.checksum == onode.info.checksum:

@@ -119,6 +119,7 @@ class Node(object):
 
 		self.info = None
 		self.children = None
+		self.other = None
 
 		self.NoneString = ''
 
