@@ -6,7 +6,7 @@ from node import NodeStatus
 
 class SimpleGrid(wx.FlexGridSizer):
 
-	def __init__(self, parent, entries, rowlabels=None, collabels=None):
+	def __init__(self, parent, entries, rowlabels=None, collabels=None, markers=None):
 		numRows = len(entries)
 		if rowlabels is None:
 			haveRowLabels = 0
@@ -42,7 +42,11 @@ class SimpleGrid(wx.FlexGridSizer):
 				self.Add(wx.StaticText(parent, label=rowlabels[i]), 0, firstColAlign, border)
 			# print entries itself
 			for j in range(numCols):
-				self.Add(wx.TextCtrl(parent, -1, entries[i][j], style=wx.TE_READONLY), 0, otherColAlign, border)
+				entry = wx.TextCtrl(parent, -1, entries[i][j], style=wx.TE_READONLY)
+				if markers is not None:
+					if markers[i][j]:
+						entry.SetBackgroundColour('Yellow')
+				self.Add(entry, 0, otherColAlign, border)
 
 		# make all columns growable (except first one if we have row labels)
 		for i in range(haveRowLabels, haveRowLabels + numCols):
@@ -76,6 +80,7 @@ class NodeComparisonDialog(wx.Dialog):
 			# diff information
 			rowlabels = ['size','ctime', 'atime', 'mtime', 'checksum']
 			collabels = ['database', 'filesystem']
+			markers = None
 			nodestr = [ \
 					[node.info.getSizeString()], \
 					[node.info.getCTimeString()], \
@@ -99,10 +104,15 @@ class NodeComparisonDialog(wx.Dialog):
 						[node.other.info.getChecksumString()], \
 						]
 				entries = nodestr
+				markers = []
 				for i in range(len(nodestr)):
 					entries[i].append(otherstr[i][0])
+					if not entries[i][0] == otherstr[i][0]:
+						markers.append([ True, True ])
+					else:
+						markers.append([ False, False ])
 
-			diffGrid = SimpleGrid(self, entries, rowlabels, collabels)
+			diffGrid = SimpleGrid(self, entries, rowlabels, collabels, markers)
 			# static box with contents
 			diffBox = wx.StaticBox(self, -1, 'Differences')
 			diffBoxSizer = wx.StaticBoxSizer(diffBox, wx.VERTICAL)
