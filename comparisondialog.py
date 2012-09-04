@@ -1,7 +1,5 @@
 import wx
 
-from node import NodeStatus
-
 
 
 class SimpleGrid(wx.FlexGridSizer):
@@ -57,7 +55,7 @@ class SimpleGrid(wx.FlexGridSizer):
 class NodeComparisonDialog(wx.Dialog):
 
 	def __init__(self, parent, node):
-		wx.Dialog.__init__(self, parent, title='Node Information', size=(500,600), \
+		wx.Dialog.__init__(self, parent, title='Node information', size=(500,600), \
 			style=wx.CAPTION | wx.RESIZE_BORDER | wx.STAY_ON_TOP)
 
 		border = 5
@@ -69,7 +67,7 @@ class NodeComparisonDialog(wx.Dialog):
 			[node.getParentIDString()], \
 			[node.getStatusString()], \
 			]
-		rowlabels = ['path', 'id', 'parentid', 'status']
+		rowlabels = ['Path', 'ID', 'Parent ID', 'Status']
 		headerGrid = SimpleGrid(self, entries, rowlabels)
 		# static box with contents
 		headerBox = wx.StaticBox(self, -1, 'General')
@@ -78,24 +76,21 @@ class NodeComparisonDialog(wx.Dialog):
 
 		if not node.isDirectory():
 			# diff information
-			rowlabels = ['size','ctime', 'atime', 'mtime', 'checksum']
-			collabels = ['database', 'filesystem']
-			markers = None
-			nodestr = [ \
+			rowlabels = ['Size','Creation time', 'Access time', 'Modification time', 'Checksum']
+			entries = [ \
 					[node.info.getSizeString()], \
 					[node.info.getCTimeString()], \
 					[node.info.getATimeString()], \
 					[node.info.getMTimeString()], \
 					[node.info.getChecksumString()], \
 					]
-			if node.status == NodeStatus.OK:
-				entries = map(lambda s: [ s[0], s[0] ], nodestr)
-			elif node.status == NodeStatus.New:
-				entries = map(lambda s: [ '', s[0] ], nodestr)
-			elif node.status == NodeStatus.Missing:
-				entries = map(lambda s: [ s[0], '' ], nodestr)
-			elif node.status == NodeStatus.Warn or \
-				node.status == NodeStatus.Error:
+			if node.other is None:
+				boxstring = 'Details'
+				collabels = None
+				markers = None
+			else:
+				boxstring = 'Differences'
+				collabels = ['Database', 'Filesystem']
 				otherstr = [\
 						[node.other.info.getSizeString()], \
 						[node.other.info.getCTimeString()], \
@@ -103,9 +98,8 @@ class NodeComparisonDialog(wx.Dialog):
 						[node.other.info.getMTimeString()], \
 						[node.other.info.getChecksumString()], \
 						]
-				entries = nodestr
 				markers = []
-				for i in range(len(nodestr)):
+				for i in range(len(entries)):
 					entries[i].append(otherstr[i][0])
 					if not entries[i][0] == otherstr[i][0]:
 						markers.append([ True, True ])
@@ -114,7 +108,7 @@ class NodeComparisonDialog(wx.Dialog):
 
 			diffGrid = SimpleGrid(self, entries, rowlabels, collabels, markers)
 			# static box with contents
-			diffBox = wx.StaticBox(self, -1, 'Differences')
+			diffBox = wx.StaticBox(self, -1, boxstring)
 			diffBoxSizer = wx.StaticBoxSizer(diffBox, wx.VERTICAL)
 			diffBoxSizer.Add(diffGrid, 1, wx.ALL | wx.EXPAND, border)
 
