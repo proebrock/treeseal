@@ -47,6 +47,12 @@ class Device(object):
 	def getNodeByPath(self, path):
 		raise MyException('Not implemented.', 3)
 
+	def getPathsByChecksum(self, checksumString):
+		raise MyException('Not implemented.', 3)
+
+	def getNodesByChecksum(self, checksumString):
+		raise MyException('Not implemented.', 3)
+
 	def insertNode(self, node):
 		raise MyException('Not implemented.', 3)
 
@@ -308,7 +314,7 @@ class Database(Device):
 		cursor.close()
 		return parent
 
-	def getNodeByPath(self, path):
+	def getNodesByPath(self, path):
 		if path == '':
 			node = self.getRootNode()
 			node.path = ''
@@ -336,6 +342,21 @@ class Database(Device):
 		node.path = path
 		cursor.close()
 		return node
+
+	def getPathsByChecksum(self, checksumString):
+		return [ n.name for n in self.getNodesByChecksum(checksumString) ]
+
+	def getNodesByChecksum(self, checksumString):
+		result = NodeList()
+		cursor = self.__dbcon.cursor()
+		cursor.execute('select ' + self.__databaseSelectString + \
+			' from nodes where checksum=X\'{0:s}\''.format(checksumString))
+		for row in cursor:
+			child = Node()
+			self.fetch(child, row)
+			result.append(child)
+		cursor.close()
+		return result
 
 	def insertNode(self, node):
 		if not node.nodeid is None:
@@ -384,18 +405,6 @@ class Database(Device):
 
 	### following methods are Database specific and not from Device
 
-	def getNodeByChecksum(self, checksum):
-		result = NodeList()
-		cursor = self.__dbcon.cursor()
-		cursor.execute('select ' + self.__databaseSelectString + \
-			' from nodes where checksum=X\'{0:s}\''.format(checksum.getString()))
-		for row in cursor:
-			child = Node()
-			self.fetch(child, row)
-			result.append(child)
-		cursor.close()
-		return result
-
 	def dbOpen(self):
 		self.__dbcon = sqlite3.connect(self.__dbFile, \
 			# necessary for proper retrival of datetime objects from the database,
@@ -432,6 +441,12 @@ class Filesystem(Device):
 		self.__rootDir = rootDir
 		self.__metaDir = metaDir
 		self.isOpen = False
+
+		# Computation of checksums is expensive. To realize global queries
+		# by checksum we can keep a map "checksum->(multiple)paths" since
+		# it uses memory, this feature can be disabled
+		self.__bufferChecksums = True
+		self.__checksumToPathsMap = {}
 
 	def open(self):
 		self.isOpen = True
@@ -475,6 +490,12 @@ class Filesystem(Device):
 			fullpath = os.path.join(self.__rootDir, node.path)
 			node.info.checksum = Checksum()
 			node.info.checksum.calculateForFile(fullpath, self.signalBytesDone)
+			if self.__bufferChecksums:
+				csumstr = node.info.checksum.getString()
+				if csumstr in self.__checksumToPathsMap:
+					self.__checksumToPathsMap[csumstr].append(node.path)
+				else:
+					self.__checksumToPathsMap[csumstr] = [ node.path ]
 
 	def transferUniqueInformation(self, destNode, srcNode):
 		destNode.path = srcNode.path
@@ -507,6 +528,22 @@ class Filesystem(Device):
 		node.path = path
 		self.fetch(node)
 		return node
+
+	def getPathsByChecksum(self, checksumString):
+		if not self.__bufferChecksums:
+			raise MyException('To use this feature you need to enable the checksum buffering.', 3)
+		if checksumString in self.__checksumToPathsMap:
+			return self.__checksumToPathsMap[checksumString]
+		else:
+			return []
+
+	def getNodesByChecksum(self, checksumString):
+		if not self.__bufferChecksums:
+			raise MyException('To use this feature you need to enable the checksum buffering.', 3)
+		result = NodeList()
+		for path in self.getPathsByChecksum(checksumString):
+			result.append(self.getNodeByPath(path))
+		return result
 
 	def insertNode(self, node):
 		# a node contains the metadata necessary to create the file,
