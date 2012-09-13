@@ -344,7 +344,10 @@ class Database(Device):
 		return node
 
 	def getPathsByChecksum(self, checksumString):
-		return [ n.name for n in self.getNodesByChecksum(checksumString) ]
+		nodes = self.getNodesByChecksum(checksumString)
+		for node in nodes:
+			self.retrieveNodePath(node)
+		return [ n.path for n in nodes ]
 
 	def getNodesByChecksum(self, checksumString):
 		result = NodeList()
