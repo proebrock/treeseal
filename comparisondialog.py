@@ -100,8 +100,8 @@ class NodeComparisonDialog(wx.Dialog):
 						]
 				markers = []
 				for i in range(len(entries)):
-					entries[i].append(otherstr[i][0])
-					if not entries[i][0] == otherstr[i][0]:
+					entries[i].insert(0, otherstr[i][0])
+					if not entries[i][0] == entries[i][1]:
 						markers.append([ True, True ])
 					else:
 						markers.append([ False, False ])
