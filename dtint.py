@@ -3,7 +3,6 @@
 import os
 import sys
 import wx
-import wx.lib.mixins.listctrl as listmix
 
 from icons import IconError, IconMissing, IconNew, IconOk, IconUnknown, IconWarning
 from misc import MyException
@@ -11,6 +10,7 @@ from node import NodeStatus, NodeDict
 from device import Database, Filesystem
 from progressdialog import UserCancelledException, FileProcessingProgressDialog
 from comparisondialog import NodeComparisonDialog
+from simplelistctrl import SimpleListControl
 
 ProgramName = 'dtint'
 ProgramVersion = '3.0'
@@ -108,47 +108,35 @@ class Instance:
 ################### GUI ###################
 ###########################################
 
-class ListControl(wx.ListCtrl, listmix.ListCtrlAutoWidthMixin):
-
-	def __init__(self, parent, ID=wx.ID_ANY, pos=wx.DefaultPosition, \
-		size=wx.DefaultSize, style=0):
-		wx.ListCtrl.__init__(self, parent, ID, pos, size, style)
-		listmix.ListCtrlAutoWidthMixin.__init__(self)
-
-
-
 class ListControlPanel(wx.Panel):
 
 	def __init__(self, parent):
 		wx.Panel.__init__(self, parent, -1, style=wx.WANTS_CHARS)
 
 		# setup listctrl and columns
-		self.list = self.list = ListControl(self, size=(-1,100), style=wx.LC_REPORT)
-		self.list.Bind(wx.EVT_LIST_ITEM_SELECTED, self.OnItemSelected)
-		self.list.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.OnItemActivated)
-		self.list.Bind(wx.EVT_COMMAND_RIGHT_CLICK, self.OnRightClick) # for wxMSW
-		self.list.Bind(wx.EVT_RIGHT_UP, self.OnRightClick) # for wxGTK
-		self.coldefs = \
-			[ \
+		self.list = SimpleListControl(self)
+		self.list.InitializeColumns([ \
 				('', 22), \
 				('', 22), \
-				('Name', 150), \
+				('Name', None), \
 				('Size', 130), \
 				('CTime', 142), \
 				('ATime', 142), \
 				('MTime', 142), \
-				('Checksum', 80)
-			]
-		index = 0
-		for coldef in self.coldefs:
-			self.list.InsertColumn(index, coldef[0])
-			self.list.SetColumnWidth(index, coldef[1])
-			index = index + 1
+				('Checksum', 80), \
+			])
 
-		# for listmix.ListCtrlAutoWidthMixin, auto extend name column
-		self.list.setResizeColumn(3)
+		# one pseudo boxer with the listctrl filling the whole panel
+		sizer = wx.BoxSizer(wx.VERTICAL)
+		sizer.Add(self.list, 1, wx.EXPAND)
+		self.SetSizer(sizer)
 
-		# start with empty node tree
+		# bind controls
+		self.list.Bind(wx.EVT_LIST_ITEM_SELECTED, self.OnItemSelected)
+		self.list.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.OnItemActivated)
+		self.list.Bind(wx.EVT_COMMAND_RIGHT_CLICK, self.OnRightClick) # for wxMSW
+		self.list.Bind(wx.EVT_RIGHT_UP, self.OnRightClick) # for wxGTK		# start with empty node tree
+
 		self.nodestack = []
 		self.namestack = []
 		self.instance = None
@@ -156,11 +144,6 @@ class ListControlPanel(wx.Panel):
 		# some constants
 		self.__emptyNameString = '<empty>'
 		self.__parentNameString = '..'
-
-		# one pseudo boxer with the listctrl filling the whole panel
-		sizer = wx.BoxSizer(wx.VERTICAL)
-		sizer.Add(self.list, 1, wx.ALL | wx.EXPAND, 5)
-		self.SetSizer(sizer)
 
 		# prepare image list
 		self.imagelist = wx.ImageList(16, 16)
