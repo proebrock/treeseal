@@ -269,7 +269,8 @@ class NodeContainer(object):
 		self.preOrderApply(NodeContainer.__prettyPrintFunc, None)
 
 	def __getStatisticsFunc(self, node, param, depth):
-		param.update(node)
+		stats = param
+		stats.update(node)
 
 	def getStatistics(self):
 		stats = NodeStatistics()

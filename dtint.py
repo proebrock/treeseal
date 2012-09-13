@@ -81,6 +81,12 @@ class Instance:
 		self.__db.registerHandlers(None, None)
 		return tree
 
+	def getPathsByChecksum(self, checksumString):
+		return [ \
+			set(self.__db.getPathsByChecksum(checksumString)), \
+			set(self.__fs.getPathsByChecksum(checksumString)), \
+			]
+
 	def getDiffTree(self, signalNewFile=None, signalBytesDone=None):
 		self.__fs.registerHandlers(signalNewFile, signalBytesDone)
 		tree = self.__fs.recursiveGetDiffTree(self.__db)
@@ -252,7 +258,7 @@ class ListControlPanel(wx.Panel):
 			self.RefreshTree()
 		# show comparison dialog
 		else:
-			comparisonDialog = NodeComparisonDialog(self, node)
+			comparisonDialog = NodeComparisonDialog(self, node, self.instance)
 			comparisonDialog.Show()
 
 	def OnRightClick(self, event):
