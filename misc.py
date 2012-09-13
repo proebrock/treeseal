@@ -99,9 +99,9 @@ class Checksum(object):
 			return '<none>'
 		else:
 			if abbreviate:
-				return binascii.hexlify(self.__checksum[0:4]).decode('utf-8')
+				return unicode(binascii.hexlify(self.__checksum[0:4]))
 			else:
-				return binascii.hexlify(self.__checksum).decode('utf-8')
+				return unicode(binascii.hexlify(self.__checksum))
 
 	def calculateForFile(self, path, signalBytesDone=None):
 		checksum = hashlib.sha256()
