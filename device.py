@@ -1,5 +1,6 @@
 import datetime
 import os
+import platform
 import sqlite3
 import sys
 
@@ -462,7 +463,11 @@ class Filesystem(Device):
 
 	def reset(self):
 		if not os.path.exists(self.__metaDir):
+			# create directory
 			os.mkdir(self.__metaDir)
+			# if on windows platform, hide directory
+			if platform.system() == 'Windows':
+				os.system('attrib +h "' + self.__metaDir + '"')
 
 	def getRootNode(self):
 		node = Node()
