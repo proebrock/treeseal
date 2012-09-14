@@ -1,4 +1,6 @@
+import sys
 import wx
+
 from simplelistctrl import SimpleListControl
 
 
@@ -60,8 +62,8 @@ class ContentListControlPanel(wx.Panel):
 		# setup listctrl and columns
 		self.list = self.list = SimpleListControl(self)
 		self.list.InitializeColumns([ \
-				('', 22), \
 				('Path', None), \
+				('Where', 60), \
 			])
 
 		# one pseudo boxer with the listctrl filling the whole panel
@@ -147,11 +149,13 @@ class NodeComparisonDialog(wx.Dialog):
 			diffBoxSizer.Add(diffGrid, 0, wx.ALL | wx.EXPAND, self.border)
 
 			# list box with other occurrences of file content
-			contentBoxSizer = self.ContentBox(node.info.checksum, instance)
+
 			if node.other is None:
+				contentBoxSizer = self.ContentBox(node.info.checksum, instance)
 				contentBoxSizerOther = None
 			else:
-				contentBoxSizerOther = self.ContentBox(node.other.info.checksum, instance)
+				contentBoxSizer = self.ContentBox(node.info.checksum, instance, 'New content')
+				contentBoxSizerOther = self.ContentBox(node.other.info.checksum, instance, 'Old content')
 
 		# button
 		button = wx.Button(self, label='OK')
@@ -163,22 +167,37 @@ class NodeComparisonDialog(wx.Dialog):
 		sizer.Add(headerBoxSizer, 0, wx.ALL | wx.EXPAND, self.border)
 		if not node.isDirectory():
 			sizer.Add(diffBoxSizer, 0, wx.ALL | wx.EXPAND, self.border)
-			sizer.Add(contentBoxSizer, 1, wx.ALL | wx.EXPAND, self.border)
 			if not contentBoxSizerOther is None:
 				sizer.Add(contentBoxSizerOther, 1, wx.ALL | wx.EXPAND, self.border)
+			sizer.Add(contentBoxSizer, 1, wx.ALL | wx.EXPAND, self.border)
 		sizer.Add(button, 0, wx.ALL | wx.ALIGN_CENTER, self.border)
 		self.SetSizer(sizer)
 		self.CenterOnScreen()
 
-	def ContentBox(self, checksum, instance):
+	def ContentBox(self, checksum, instance, comment=None):
 		# showing number of instances
-		[ dbsums, fssums] = instance.getPathsByChecksum(checksum.getString())
+		[ dbpaths, fspaths ] = instance.getPathsByChecksum(checksum.getString())
 		instancesGrid = SimpleGrid(self, \
-			[ ['{0:d}'.format(len(dbsums)), '{0:d}'.format(len(fssums))] ], \
+			[ ['{0:d}'.format(len(dbpaths)), '{0:d}'.format(len(fspaths))] ], \
 			['Number of occurrences'], ['Database', 'Filesystem'], None)
+		# show list control with list of files
 		contentList = ContentListControlPanel(self)
+		paths = list(dbpaths | fspaths)
+		for path in paths:
+			index = contentList.list.InsertStringItem(sys.maxint, path)
+			if path in dbpaths:
+				if path in fspaths:
+					wherestr = 'both'
+				else:
+					wherestr = 'db'
+			elif path in fspaths:
+				wherestr = 'fs'
+			contentList.list.SetStringItem(index, 1, wherestr)
 		# static box with contents
-		contentBox = wx.StaticBox(self, -1, 'File content \'' + checksum.getString(True) + '\'')
+		boxlabel = 'File content \'' + checksum.getString(True) + '\''
+		if comment is not None:
+			boxlabel += ' (' + comment + ')'
+		contentBox = wx.StaticBox(self, -1, boxlabel)
 		contentBoxSizer = wx.StaticBoxSizer(contentBox, wx.VERTICAL)
 		contentBoxSizer.Add(instancesGrid, 0, wx.ALL | wx.EXPAND, self.border)
 		contentBoxSizer.Add(contentList, 1, wx.ALL | wx.EXPAND, self.border)
