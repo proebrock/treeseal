@@ -68,11 +68,14 @@ class NodeInfo(object):
 	def __ne__(self, other):
 		return not self.__eq__(other)
 
-	def getSizeString(self):
+	def getSizeString(self, abbreviate=True):
 		if self.size is None:
 			return self.NoneString
 		else:
-			return sizeToString(self.size)
+			if abbreviate:
+				return sizeToString(self.size)
+			else:
+				return '{0:,}'.format(self.size)
 
 	def getCTimeString(self):
 		if self.ctime is None:
@@ -92,11 +95,11 @@ class NodeInfo(object):
 		else:
 			return self.mtime.strftime('%Y-%m-%d %H:%M:%S')
 
-	def getChecksumString(self):
+	def getChecksumString(self, abbreviate=True):
 		if self.checksum is None:
 			return self.NoneString
 		else:
-			return self.checksum.getString(True)
+			return self.checksum.getString(abbreviate)
 
 	def prettyPrint(self, prefix=''):
 		print('{0:s}size                {1:s}'.format(prefix, self.getSizeString()))

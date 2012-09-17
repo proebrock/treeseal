@@ -80,7 +80,7 @@ class NodeComparisonDialog(wx.Dialog):
 			height = 600
 		else:
 			height = 800
-		wx.Dialog.__init__(self, parent, title='Node information', size=(500,height), \
+		wx.Dialog.__init__(self, parent, title='Node information', size=(600,height), \
 			style=wx.CAPTION | wx.RESIZE_BORDER | wx.STAY_ON_TOP)
 
 		self.border = 5
@@ -114,7 +114,7 @@ class NodeComparisonDialog(wx.Dialog):
 				'Checksum', \
 				]
 			entries = [ \
-					[node.info.getSizeString()], \
+					[node.info.getSizeString(False)], \
 					[node.info.getCTimeString()], \
 					[node.info.getATimeString()], \
 					[node.info.getMTimeString()], \
@@ -128,7 +128,7 @@ class NodeComparisonDialog(wx.Dialog):
 				boxstring = 'Differences'
 				collabels = ['Database', 'Filesystem']
 				otherstr = [\
-						[node.other.info.getSizeString()], \
+						[node.other.info.getSizeString(False)], \
 						[node.other.info.getCTimeString()], \
 						[node.other.info.getATimeString()], \
 						[node.other.info.getMTimeString()], \
