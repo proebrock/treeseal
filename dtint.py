@@ -67,7 +67,7 @@ class Instance:
 		self.__fs.registerHandlers(None, None)
 
 	def getStatistics(self):
-		return self.__fs.getStatistics(self.__fs.getRootNode())
+		return self.__fs.getStatistics()
 
 	def getFilesystemTree(self, signalNewFile=None, signalBytesDone=None):
 		self.__fs.registerHandlers(signalNewFile, signalBytesDone)

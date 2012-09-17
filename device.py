@@ -14,6 +14,7 @@ class Device(object):
 	def __init__(self):
 		self.signalNewFile = None
 		self.signalBytesDone = None
+		self.calculateUponFetch = True
 
 	def open(self):
 		raise MyException('Not implemented.', 3)
@@ -72,7 +73,6 @@ class Device(object):
 
 	def __getNodeTree(self, nodetree):
 		for node in nodetree:
-			self.calculate(node)
 			if node.isDirectory():
 				node.children = self.getChildren(node)
 				self.__getNodeTree(node.children)
@@ -85,7 +85,6 @@ class Device(object):
 
 	def __copyNodeTree(self, dest, nodes):
 		for node in nodes:
-			self.calculate(node)
 			dest.insertNode(node)
 			if node.isDirectory():
 				self.__copyNodeTree(dest, self.getChildren(node))
@@ -102,23 +101,26 @@ class Device(object):
 			if node.isDirectory():
 				self.__recursiveGetStatistics(self.getChildren(node), stats)
 
-	def getStatistics(self, node):
+	def getStatistics(self, node=None):
 		stats = NodeStatistics()
 		nodes = NodeDict()
-		nodes.append(node)
+		self.calculateUponFetch = False
+		if node is None:
+			nodes.append(self.getRootNode())
+		else:
+			nodes.append(node)
 		self.__recursiveGetStatistics(nodes, stats)
+		self.calculateUponFetch = True
 		return stats
 
 	def __recursiveGetDiffTree(self, other, selfnodes, othernodes, removeOkNodes):
 		okNodes = []
 		for snode in selfnodes:
-			self.calculate(snode)
 			onode = othernodes.getByUniqueID(snode.getUniqueKey())
 			if not onode is None:
 				# nodes existing in selfnodes and othernodes: already known nodes
 				self.transferUniqueInformation(onode, snode)
 				other.transferUniqueInformation(snode, onode)
-				other.calculate(onode)
 				if snode.isDirectory():
 					# get children, but chain the tree just for self not for other
 					snode.children = self.getChildren(snode)
@@ -163,7 +165,6 @@ class Device(object):
 				selfnodes.delByUniqueID(s)
 		# nodes existing in othernodes but not in selfnodes: missing nodes
 		for onode in othernodes:
-			other.calculate(onode)
 			onode.status = NodeStatus.Missing
 			if onode.isDirectory():
 				onode.children = other.getChildren(onode)
@@ -275,6 +276,8 @@ class Database(Device):
 			node.info.mtime = row[7]
 			node.info.checksum = Checksum()
 			node.info.checksum.setBinary(row[8])
+		if self.calculateUponFetch:
+			self.calculate(node)
 
 	def calculate(self, node):
 		if node.isDirectory():
@@ -483,6 +486,11 @@ class Filesystem(Device):
 		if not os.path.isdir(fullpath):
 			node.info = NodeInfo()
 			node.info.size = os.path.getsize(fullpath)
+		if self.calculateUponFetch:
+			self.calculate(node)
+		if not os.path.isdir(fullpath):
+			# determine date AFTER calculating the checksum, otherwise opening
+			# the file might change the access time (OS dependent)
 			# this conversion from unix time stamp to local date/time might fail after year 2038...
 			node.info.ctime = datetime.datetime.fromtimestamp(os.path.getctime(fullpath))
 			node.info.atime = datetime.datetime.fromtimestamp(os.path.getatime(fullpath))
