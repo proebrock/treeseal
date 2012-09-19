@@ -82,12 +82,30 @@ class FileProcessingProgressDialog(wx.Dialog):
 
 	def Init(self, totalFiles, totalSize):
 		#print('init for {0:d} files and {1:d} bytes'.format(totalFiles, totalSize))
+
+		# the gauge control accepts a range of integer type, but the sizes
+		# (and maybe number of files) exceed the integer range of 2/4 GB;
+		# we do not do any scaling is size/number is smaller than this factor;
+		# scaling is just used for the gauges, other variables contain the
+		# correct sizes!
+		self.gaugeScalingFactor = 1e6
+
 		self.totalFilesDone = 0
+		if totalFiles <= self.gaugeScalingFactor:
+			self.totalFilesFactor = 1
+		else:
+			self.totalFilesFactor = totalFiles / self.gaugeScalingFactor
 		self.totalFilesAll = totalFiles
-		self.totalFilesGauge.SetRange(totalFiles)
+		self.totalFilesGauge.SetRange(totalFiles / self.totalFilesFactor)
+
 		self.totalBytesDone = 0
+		if totalSize <= self.gaugeScalingFactor:
+			self.totalBytesFactor = 1
+		else:
+			self.totalBytesFactor = totalSize / self.gaugeScalingFactor
 		self.totalBytesAll = totalSize
-		self.totalBytesGauge.SetRange(totalSize)
+		self.totalBytesGauge.SetRange(totalSize / self.totalBytesFactor)
+
 		self.OnPaint()
 
 	def SignalNewFile(self, path, size):
@@ -101,8 +119,12 @@ class FileProcessingProgressDialog(wx.Dialog):
 		else:
 			self.currentPathText.SetLabel(path)
 		self.currentBytesDone = 0
+		if size <= self.gaugeScalingFactor:
+			self.currentBytesFactor = 1
+		else:
+			self.currentBytesFactor = size / self.gaugeScalingFactor
 		self.currentBytesAll = size
-		self.currentBytesGauge.SetRange(size)
+		self.currentBytesGauge.SetRange(size / self.currentBytesFactor)
 		if size == 0:
 			self.totalFilesDone += 1
 		self.OnPaint()
@@ -152,7 +174,7 @@ class FileProcessingProgressDialog(wx.Dialog):
 				self.currentBytesGauge.SetValue(1)
 				self.currentBytesGaugeText.SetLabel('100 %')
 			else:
-				self.currentBytesGauge.SetValue(self.currentBytesDone)
+				self.currentBytesGauge.SetValue(self.currentBytesDone / self.currentBytesFactor)
 				self.currentBytesGaugeText.SetLabel('{0:d} %'.format( \
 				(100 * self.currentBytesDone) / self.currentBytesAll))
 		else:
@@ -168,7 +190,7 @@ class FileProcessingProgressDialog(wx.Dialog):
 				self.totalFilesGauge.SetValue(1)
 				self.totalFilesGaugeText.SetLabel('100 %')
 			else:
-				self.totalFilesGauge.SetValue(self.totalFilesDone)
+				self.totalFilesGauge.SetValue(self.totalFilesDone / self.totalFilesFactor)
 				self.totalFilesGaugeText.SetLabel('{0:d} %'.format( \
 				(100 * self.totalFilesDone) / self.totalFilesAll))
 		else:
@@ -184,7 +206,7 @@ class FileProcessingProgressDialog(wx.Dialog):
 				self.totalBytesGauge.SetValue(1)
 				self.totalBytesGaugeText.SetLabel('100 %')
 			else:
-				self.totalBytesGauge.SetValue(self.totalBytesDone)
+				self.totalBytesGauge.SetValue(self.totalBytesDone / self.totalBytesFactor)
 				self.totalBytesGaugeText.SetLabel('{0:d} %'.format( \
 				(100 * self.totalBytesDone) / self.totalBytesAll))
 		else:
