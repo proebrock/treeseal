@@ -80,7 +80,7 @@ class NodeComparisonDialog(wx.Dialog):
 			height = 600
 		else:
 			height = 800
-		wx.Dialog.__init__(self, parent, title='Node information', size=(600,height), \
+		wx.Dialog.__init__(self, parent, title='Node information', size=(500,height), \
 			style=wx.CAPTION | wx.RESIZE_BORDER | wx.STAY_ON_TOP)
 
 		self.border = 5

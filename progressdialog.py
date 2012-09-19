@@ -16,7 +16,7 @@ class UserCancelledException(Exception):
 class FileProcessingProgressDialog(wx.Dialog):
 
 	def __init__(self, parent, title):
-		wx.Dialog.__init__(self, parent, title=title, size=(500,350), \
+		wx.Dialog.__init__(self, parent, title=title, size=(500,380), \
 			style=wx.CAPTION | wx.RESIZE_BORDER | wx.STAY_ON_TOP)
 
 		self.currentBytesDone = None
@@ -62,11 +62,11 @@ class FileProcessingProgressDialog(wx.Dialog):
 
 		sizer = wx.BoxSizer(wx.VERTICAL)
 		sizer.Add(processingSizer, 0, wx.ALL | wx.EXPAND, border)
-		sizer.Add(self.currentBytesHeader, 1, wx.ALL | wx.EXPAND, border)
+		sizer.Add(self.currentBytesHeader, 0, wx.ALL | wx.EXPAND, border)
 		sizer.Add(currentBytesSizer, 1, wx.ALL | wx.EXPAND, border)
-		sizer.Add(self.totalFilesHeader, 1, wx.ALL | wx.EXPAND, border)
+		sizer.Add(self.totalFilesHeader, 0, wx.ALL | wx.EXPAND, border)
 		sizer.Add(totalFilesSizer, 1, wx.ALL | wx.EXPAND, border)
-		sizer.Add(self.totalBytesHeader, 1, wx.ALL | wx.EXPAND, border)
+		sizer.Add(self.totalBytesHeader, 0, wx.ALL | wx.EXPAND, border)
 		sizer.Add(totalBytesSizer, 1, wx.ALL | wx.EXPAND, border)
 		sizer.Add(self.button, 0, wx.ALL | wx.ALIGN_CENTER, border)
 		self.SetSizer(sizer)
