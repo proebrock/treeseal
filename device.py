@@ -181,9 +181,18 @@ class Device(object):
 		if len(selfnodes) == 0:
 			# keep housekeeping root node with empty children
 			# if all nodes have been removed by removeOkNodes feature
+			# save old handlers
+			oldNewFileHandler = self.signalNewFile
+			oldBytesDoneHandler = self.signalBytesDone
+			self.signalNewFile = None
+			self.signalBytesDone = None
+			# get root node without triggering progress signal functions
 			node = self.getRootNode()
 			node.children = NodeDict()
 			selfnodes.append(node)
+			# restore old handlers
+			self.signalNewFile = oldNewFileHandler
+			self.signalBytesDone = oldBytesDoneHandler
 		return selfnodes
 
 
