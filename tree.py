@@ -85,13 +85,19 @@ class Tree(object):
 		self.preOrderApply(Tree.__getStatisticsFunc, stats)
 		return stats
 
-	def __copyFromFunc(self, node, param):
-		dest = param
-		dest.insert(node)
+	def __copyTo(self, dest):
+		for node in self:
+			dest.insert(node)
+			if node.isDirectory():
+				self.down(node)
+				dest.down(node)
+				self.__copyTo(dest)
+				dest.up()
+				self.up()
 
-	def copyFrom(self, srctree):
-		srctree.preOrderApply(Tree.__copyFromFunc, self)
-		self.commit()
+	def copyTo(self, dest):
+		self.__copyTo(dest)
+		dest.commit()
 
 
 
