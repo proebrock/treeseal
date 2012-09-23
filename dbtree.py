@@ -45,6 +45,12 @@ class DatabaseTree(Tree):
 
 	### implementation of base class methods, please keep order
 
+	def getDepth(self):
+		return len(self.__parentIdStack) - 1
+
+	def getPath(self):
+		return reduce(lambda x, y: os.path.join(x, y), self.__parentNameStack)
+
 	def reset(self):
 		# close database
 		self.dbClose()
@@ -72,12 +78,6 @@ class DatabaseTree(Tree):
 		self.__parentNameStack = [ '' ]
 		cursor.close()
 
-	def getDepth(self):
-		return len(self.__parentIdStack) - 1
-
-	def getPath(self):
-		return reduce(lambda x, y: os.path.join(x, y), self.__parentNameStack)
-
 	def up(self):
 		if self.isRoot():
 			raise MyException('\'up\' on root node not allowed.', 3)
@@ -89,51 +89,6 @@ class DatabaseTree(Tree):
 			raise MyException('\'down\' on file not allowed.', 3)
 		self.__parentIdStack.append(node.nodeid)
 		self.__parentNameStack.append(node.name)
-
-	def getByName(self, name):
-		cursor = self.__dbcon.cursor()
-		cursor.execute('select ' + self.__databaseSelectString + \
-			' from nodes where parent=? and name=?', (self.getCurrentNodeId(), name))
-		node = Node()
-		self.fetch(node, cursor.fetchone())
-		cursor.close()
-		return node
-
-	def __iter__(self):
-		cursor = self.__dbcon.cursor()
-		cursor.execute('select ' + self.__databaseSelectString + \
-			' from nodes where parent=?', (self.getCurrentNodeId(),))
-		for row in cursor:
-			node = Node()
-			self.fetch(node, row)
-			yield node
-		cursor.close()
-
-	def fetch(self, node, row):
-		node.nodeid = row[0]
-		node.parentid = row[1]
-		node.name = row[2]
-		if not row[3]:
-			node.info = NodeInfo()
-			node.info.size = row[4]
-			node.info.ctime = row[5]
-			node.info.atime = row[6]
-			node.info.mtime = row[7]
-			node.info.checksum = Checksum()
-			node.info.checksum.setBinary(row[8])
-		if self.calculateUponFetch:
-			self.calculate(node)
-
-	def calculate(self, node):
-		if node.isDirectory():
-			if self.signalNewFile is not None:
-				self.signalNewFile(node.path, 0)
-		else:
-			# nothing to do, just signal that the job is done if necessary
-			if self.signalNewFile is not None:
-				self.signalNewFile(node.path, node.info.size)
-			if self.signalBytesDone is not None:
-				self.signalBytesDone(node.info.size)
 
 	def insert(self, node):
 		if not node.nodeid is None:
@@ -176,6 +131,51 @@ class DatabaseTree(Tree):
 	def commit(self):
 		self.__dbcon.commit()
 		self.__dbcon.execute('vacuum')
+
+	def fetch(self, node, row):
+		node.nodeid = row[0]
+		node.parentid = row[1]
+		node.name = row[2]
+		if not row[3]:
+			node.info = NodeInfo()
+			node.info.size = row[4]
+			node.info.ctime = row[5]
+			node.info.atime = row[6]
+			node.info.mtime = row[7]
+			node.info.checksum = Checksum()
+			node.info.checksum.setBinary(row[8])
+		if self.calculateUponFetch:
+			self.calculate(node)
+
+	def calculate(self, node):
+		if node.isDirectory():
+			if self.signalNewFile is not None:
+				self.signalNewFile(node.path, 0)
+		else:
+			# nothing to do, just signal that the job is done if necessary
+			if self.signalNewFile is not None:
+				self.signalNewFile(node.path, node.info.size)
+			if self.signalBytesDone is not None:
+				self.signalBytesDone(node.info.size)
+
+	def getNodeByName(self, name):
+		cursor = self.__dbcon.cursor()
+		cursor.execute('select ' + self.__databaseSelectString + \
+			' from nodes where parent=? and name=?', (self.getCurrentNodeId(), name))
+		node = Node()
+		self.fetch(node, cursor.fetchone())
+		cursor.close()
+		return node
+
+	def __iter__(self):
+		cursor = self.__dbcon.cursor()
+		cursor.execute('select ' + self.__databaseSelectString + \
+			' from nodes where parent=?', (self.getCurrentNodeId(),))
+		for row in cursor:
+			node = Node()
+			self.fetch(node, row)
+			yield node
+		cursor.close()
 
 	### the following methods are not implementations of base class methods
 

@@ -10,13 +10,7 @@ class Tree(object):
 		self.signalBytesDone = None
 		self.calculateUponFetch = True
 
-	### those classes should be implemented in derived classes
-
-	def reset():
-		raise MyException('Not implemented.', 3)
-
-	def gotoRoot(self):
-		raise MyException('Not implemented.', 3)
+	### those basic methods should be implemented in derived classes
 
 	def getDepth(self):
 		raise MyException('Not implemented.', 3)
@@ -24,16 +18,16 @@ class Tree(object):
 	def getPath(self):
 		raise MyException('Not implemented.', 3)
 
+	def reset():
+		raise MyException('Not implemented.', 3)
+
+	def gotoRoot(self):
+		raise MyException('Not implemented.', 3)
+
 	def up(self):
 		raise MyException('Not implemented.', 3)
 
 	def down(self, node):
-		raise MyException('Not implemented.', 3)
-
-	def getByName(self, name):
-		raise MyException('Not implemented.', 3)
-
-	def __iter__(self):
 		raise MyException('Not implemented.', 3)
 
 	def insert(self, node):
@@ -48,7 +42,13 @@ class Tree(object):
 	def commit(self):
 		raise MyException('Not implemented.', 3)
 
-	### generic methods
+	def getNodeByName(self, name):
+		raise MyException('Not implemented.', 3)
+
+	def __iter__(self):
+		raise MyException('Not implemented.', 3)
+
+	### generic methods using basic methods
 
 	def isRoot(self):
 		return self.getDepth() == 0
@@ -80,9 +80,9 @@ class Tree(object):
 		stats = param
 		stats.update(node)
 
-	def getStatistics(self):
+	def getStatistics(self, recurse=True):
 		stats = NodeStatistics()
-		self.preOrderApply(Tree.__getStatisticsFunc, stats)
+		self.preOrderApply(Tree.__getStatisticsFunc, stats, recurse)
 		return stats
 
 	def __copyTo(self, dest):
@@ -98,13 +98,3 @@ class Tree(object):
 	def copyTo(self, dest):
 		self.__copyTo(dest)
 		dest.commit()
-
-
-
-
-
-
-
-
-
-

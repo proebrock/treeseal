@@ -18,6 +18,12 @@ class FilesystemTree(Tree):
 
 	### implementation of base class methods, please keep order
 
+	def getDepth(self):
+		return self.__currentDepth
+
+	def getPath(self):
+		return self.__currentPath
+
 	def reset(self):
 		if not os.path.exists(self.__metaDir):
 			# create directory
@@ -31,12 +37,6 @@ class FilesystemTree(Tree):
 		self.__currentPath = ''
 		self.__currentDepth = 0
 
-	def getDepth(self):
-		return self.__currentDepth
-
-	def getPath(self):
-		return self.__currentPath
-
 	def up(self):
 		if self.isRoot():
 			raise MyException('\'up\' on root node not allowed.', 3)
@@ -49,24 +49,25 @@ class FilesystemTree(Tree):
 		self.__currentPath = os.path.join(self.__currentPath, node.name)
 		self.__currentDepth += 1
 
-	def getByName(self, name):
-		path = os.path.join(self.__currentPath, name)
-		node = Node()
-		node.name = name
-		node.path = path
-		self.fetch(node)
-		return node
+	def insert(self, node):
+		# a node contains the metadata necessary to create the file,
+		# but instead of the file content just its checksum...
+		print('FilesystemTree.insert(\'' + os.path.join(self.getPath(), node.name) + '\') is not implemented.')
 
-	def __iter__(self):
-		for name in os.listdir(os.path.join(self.__rootDir, self.__currentPath)):
-			path = os.path.join(self.__currentPath, name)
-			if self.__isBlacklisted(path):
-				continue
-			node = Node()
-			node.name = name
-			node.path = path
-			self.fetch(node)
-			yield node
+	def update(self, node):
+		# a node contains the metadata necessary to update the file,
+		# but instead of the file content just its checksum...
+		print('FilesystemTree.update(\'' + os.path.join(self.getPath(), node.name) + '\') is not implemented.')
+
+	def delete(self, node):
+		fullpath = os.path.join(self.__rootDir, node.path)
+		if node.isDirectory():
+			os.rmdir(fullpath)
+		else:
+			os.remove(fullpath)
+
+	def commit(self):
+		pass
 
 	def fetch(self, node):
 		fullpath = os.path.join(self.__rootDir, node.path)
@@ -94,25 +95,24 @@ class FilesystemTree(Tree):
 			node.info.checksum = Checksum()
 			node.info.checksum.calculateForFile(fullpath, self.signalBytesDone)
 
-	def insert(self, node):
-		# a node contains the metadata necessary to create the file,
-		# but instead of the file content just its checksum...
-		print('FilesystemTree.insert(\'' + os.path.join(self.getPath(), node.name) + '\') is not implemented.')
+	def getNodeByName(self, name):
+		path = os.path.join(self.__currentPath, name)
+		node = Node()
+		node.name = name
+		node.path = path
+		self.fetch(node)
+		return node
 
-	def update(self, node):
-		# a node contains the metadata necessary to update the file,
-		# but instead of the file content just its checksum...
-		print('FilesystemTree.update(\'' + os.path.join(self.getPath(), node.name) + '\') is not implemented.')
-
-	def delete(self, node):
-		fullpath = os.path.join(self.__rootDir, node.path)
-		if node.isDirectory():
-			os.rmdir(fullpath)
-		else:
-			os.remove(fullpath)
-
-	def commit(self):
-		pass
+	def __iter__(self):
+		for name in os.listdir(os.path.join(self.__rootDir, self.__currentPath)):
+			path = os.path.join(self.__currentPath, name)
+			if self.__isBlacklisted(path):
+				continue
+			node = Node()
+			node.name = name
+			node.path = path
+			self.fetch(node)
+			yield node
 
 	### the following methods are not implementations of base class methods
 
