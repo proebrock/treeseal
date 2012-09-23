@@ -98,12 +98,12 @@ class DatabaseTree(Tree):
 		if node.isDirectory():
 			cursor.execute('insert into nodes (' + self.__databaseInsertVars + \
 				') values (' + self.__databaseInsertQMarks + ')', \
-				(self.getCurrentNodeId(), node.name, True, None, \
+				(self.getCurrentParentId(), node.name, True, None, \
 				None, None, None, None))
 		else:
 			cursor.execute('insert into nodes (' + self.__databaseInsertVars + \
 				') values (' + self.__databaseInsertQMarks + ')', \
-				(self.getCurrentNodeId(), node.name, False, node.info.size, \
+				(self.getCurrentParentId(), node.name, False, node.info.size, \
 				node.info.ctime, node.info.atime, node.info.mtime, \
 				node.info.checksum.getBinary()))
 		node.nodeid = cursor.lastrowid
@@ -116,12 +116,12 @@ class DatabaseTree(Tree):
 		if node.isDirectory():
 			self.__dbcon.execute('update nodes set ' + self.__databaseUpdateString + \
 				' where nodeid=?', \
-				(node.parentid, node.name, True, None, \
+				(self.getCurrentParentId(), node.name, True, None, \
 				None, None, None, None, node.nodeid))
 		else:
 			self.__dbcon.execute('update nodes set ' + self.__databaseUpdateString + \
 				' where nodeid=?', \
-				(node.parentid, node.name, False, node.info.size, \
+				(self.getCurrentParentId(), node.name, False, node.info.size, \
 				node.info.ctime, node.info.atime, node.info.mtime, \
 				node.info.checksum.getBinary(), node.nodeid))
 
@@ -161,7 +161,7 @@ class DatabaseTree(Tree):
 	def getNodeByName(self, name):
 		cursor = self.__dbcon.cursor()
 		cursor.execute('select ' + self.__databaseSelectString + \
-			' from nodes where parent=? and name=?', (self.getCurrentNodeId(), name))
+			' from nodes where parent=? and name=?', (self.getCurrentParentId(), name))
 		node = Node()
 		self.fetch(node, cursor.fetchone())
 		cursor.close()
@@ -170,7 +170,7 @@ class DatabaseTree(Tree):
 	def __iter__(self):
 		cursor = self.__dbcon.cursor()
 		cursor.execute('select ' + self.__databaseSelectString + \
-			' from nodes where parent=?', (self.getCurrentNodeId(),))
+			' from nodes where parent=?', (self.getCurrentParentId(),))
 		for row in cursor:
 			node = Node()
 			self.fetch(node, row)
@@ -211,5 +211,5 @@ class DatabaseTree(Tree):
 		self.__dbcon.close()
 		self.__dbcon = None
 
-	def getCurrentNodeId(self):
+	def getCurrentParentId(self):
 		return self.__parentIdStack[-1]
