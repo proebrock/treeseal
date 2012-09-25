@@ -2,9 +2,9 @@ import os
 import sqlite3
 import sys
 
-from tree import Tree
 from misc import MyException, Checksum
 from node import NodeInfo, Node
+from tree import Tree
 
 
 

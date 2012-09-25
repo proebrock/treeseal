@@ -98,3 +98,6 @@ class Tree(object):
 	def copyTo(self, dest):
 		self.__copyTo(dest)
 		dest.commit()
+
+	def compare(self, other, result):
+		pass
