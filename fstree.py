@@ -2,9 +2,9 @@ import datetime
 import os
 import platform
 
-from tree import Tree
 from misc import MyException, Checksum
 from node import NodeInfo, Node
+from tree import Tree
 
 
 
@@ -60,7 +60,7 @@ class FilesystemTree(Tree):
 		print('FilesystemTree.update(\'' + os.path.join(self.getPath(), node.name) + '\') is not implemented.')
 
 	def delete(self, node):
-		fullpath = os.path.join(self.__rootDir, node.path)
+		fullpath = os.path.join(self.__rootDir, self.__currentPath, node.name)
 		if node.isDirectory():
 			os.rmdir(fullpath)
 		else:
@@ -70,7 +70,7 @@ class FilesystemTree(Tree):
 		pass
 
 	def fetch(self, node):
-		fullpath = os.path.join(self.__rootDir, node.path)
+		fullpath = os.path.join(self.__rootDir, self.__currentPath, node.name)
 		if not os.path.isdir(fullpath):
 			node.info = NodeInfo()
 			node.info.size = os.path.getsize(fullpath)
@@ -85,21 +85,20 @@ class FilesystemTree(Tree):
 			node.info.mtime = datetime.datetime.fromtimestamp(os.path.getmtime(fullpath))
 
 	def calculate(self, node):
+		path = os.path.join(self.__currentPath, node.name)
 		if node.isDirectory():
 			if self.signalNewFile is not None:
-				self.signalNewFile(node.path, 0)
+				self.signalNewFile(path, 0)
 		else:
 			if self.signalNewFile is not None:
-				self.signalNewFile(node.path, node.info.size)
-			fullpath = os.path.join(self.__rootDir, node.path)
+				self.signalNewFile(path, node.info.size)
+			fullpath = os.path.join(self.__rootDir, path)
 			node.info.checksum = Checksum()
 			node.info.checksum.calculateForFile(fullpath, self.signalBytesDone)
 
 	def getNodeByName(self, name):
-		path = os.path.join(self.__currentPath, name)
 		node = Node()
 		node.name = name
-		node.path = path
 		self.fetch(node)
 		return node
 
@@ -110,7 +109,6 @@ class FilesystemTree(Tree):
 				continue
 			node = Node()
 			node.name = name
-			node.path = path
 			self.fetch(node)
 			yield node
 
