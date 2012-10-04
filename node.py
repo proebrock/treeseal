@@ -1,3 +1,4 @@
+import copy
 import os
 from misc import sizeToString, MyException
 
@@ -68,6 +69,24 @@ class NodeInfo(object):
 	def __ne__(self, other):
 		return not self.__eq__(other)
 
+	def __copy__(self):
+		result = NodeInfo()
+		result.size = self.size
+		result.ctime = self.ctime
+		result.atime = self.atime
+		result.mtime = self.mtime
+		result.checksum = self.checksum
+		return result
+
+	def __deepcopy__(self, memo):
+		result = NodeInfo()
+		result.size = copy.deepcopy(self.size, memo)
+		result.ctime = copy.deepcopy(self.ctime, memo)
+		result.atime = copy.deepcopy(self.atime, memo)
+		result.mtime = copy.deepcopy(self.mtime, memo)
+		result.checksum = copy.deepcopy(self.checksum, memo)
+		return result
+
 	def getSizeString(self, abbreviate=True):
 		if self.size is None:
 			return self.NoneString
@@ -135,6 +154,30 @@ class Node(object):
 			'path="' + self.getPathString() + '", ' + \
 			'info="' + self.getInfoString() + '", ' + \
 			')'
+
+	def __copy__(self):
+		result = Node()
+		result.status = self.status
+		result.nodeid = self.nodeid
+		result.parentid = self.parentid
+		result.name = self.name
+		result.path = self.path
+		result.info = self.info
+		result.children = self.children
+		result.other = self.other
+		return result
+
+	def __deepcopy__(self, memo):
+		result = Node()
+		result.status = copy.deepcopy(self.status, memo)
+		result.nodeid = copy.deepcopy(self.nodeid, memo)
+		result.parentid = copy.deepcopy(self.parentid, memo)
+		result.name = copy.deepcopy(self.name, memo)
+		result.path = copy.deepcopy(self.path, memo)
+		result.info = copy.deepcopy(self.info, memo)
+		result.children = copy.deepcopy(self.children, memo)
+		result.other = copy.deepcopy(self.other, memo)
+		return result
 
 	def chainWithParent(self, parent):
 		if not parent.path is None:

@@ -1,4 +1,5 @@
 import binascii
+import copy
 import hashlib
 import wx
 
@@ -80,6 +81,16 @@ class Checksum(object):
 
 	def __ne__(self, other):
 		return not self.__eq__(other)
+
+	def __copy__(self):
+		result = Checksum()
+		result.__checksum = self.__checksum
+		return result
+
+	def __deepcopy__(self, memo):
+		result = Checksum()
+		result.__checksum = self.__checksum[:]
+		return result
 
 	def setBinary(self, checksum):
 		if not len(checksum) == self.__checksumbits/8:
