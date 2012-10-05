@@ -6,6 +6,15 @@ from tree import Tree
 
 
 
+class MemoryTreeNode():
+
+	def __init__(self, node):
+		self.node = node
+		if node.isDirectory():
+			self.children = {}
+
+
+
 class MemoryTree(Tree):
 
 	def __init__(self):
@@ -15,52 +24,53 @@ class MemoryTree(Tree):
 	### implementation of base class methods, please keep order
 
 	def getDepth(self):
-		return len(self.__parentNodeStack) - 1
+		return len(self.__parentMTNStack) - 1
 
 	def getPath(self):
 		path = ''
-		for n in self.__parentNodeStack:
-			path = os.path.join(path, n.name)
+		for n in self.__parentMTNStack:
+			path = os.path.join(path, n.node.name)
 		return path
 
 	def reset(self):
-		rootnode = Node()
-		rootnode.name = ''
-		rootnode.children = {}
-		self.__parentNodeStack = [ rootnode ]
+		self.__parentMTNStack = [ MemoryTreeNode(Node('')) ]
 
 	def gotoRoot(self):
-		self.__parentNodeStack = [ self.__parentNodeStack[0] ]
+		self.__parentMTNStack = [ self.__parentMTNStack[0] ]
 
 	def up(self):
 		if self.isRoot():
-			raise MyException('\'up\' on root node not allowed.', 3)
-		self.__parentNodeStack.pop()
+			raise MyException('\'up\' on root node is not possible.', 3)
+		self.__parentMTNStack.pop()
 
-	def down(self, node):
-		if not node.isDirectory():
-			raise MyException('\'down\' on file not allowed.', 3)
-		self.__parentNodeStack.append(node)
+	def down(self, name):
+		if name not in self.__parentMTNStack[-1].children:
+			raise MyException('No node \'' + name + '\' in current dir.', 3)
+		mtn = self.__parentMTNStack[-1].children[name]
+		if not mtn.node.isDirectory():
+			raise MyException('\'down\' on file \'' + name + '\' is not possible.', 3)
+		self.__parentMTNStack.append(mtn)
 
 	def insert(self, node):
-		if node.isDirectory():
-			node.children = {}
-		self.__parentNodeStack[-1].children[node.name] = node
+		self.__parentMTNStack[-1].children[node.name] = MemoryTreeNode(node)
 
 	def update(self, node):
-		self.__parentNodeStack[-1].children[node.name] = node
+		self.__parentMTNStack[-1].children[node.name].node = node
 
-	def delete(self, node):
-		del self.__parentNodeStack[-1].children[node.name]
+	def delete(self, name):
+		del self.__parentMTNStack[-1].children[name]
 
 	def commit(self):
 		pass
 
 	def getNodeByName(self, name):
-		return self.__parentNodeStack[-1].children[name]
+		if name in self.__parentMTNStack[-1].children:
+			return self.__parentMTNStack[-1].children[name].node
+		else:
+			return None
 
 	def __iter__(self):
-		for name in self.__parentNodeStack[-1].children.keys():
-			yield self.__parentNodeStack[-1].children[name]
+		for name in self.__parentMTNStack[-1].children.keys():
+			yield self.__parentMTNStack[-1].children[name].node
 
 	### the following methods are not implementations of base class methods

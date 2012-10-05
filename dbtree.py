@@ -72,21 +72,21 @@ class DatabaseTree(Tree):
 		self.gotoRoot()
 
 	def gotoRoot(self):
-		cursor = self.__dbcon.cursor()
-		cursor.execute('select nodeid from nodes where parent is null')
-		self.__parentIdStack = [ cursor.fetchone()[0] ]
+		self.__parentIdStack = [ self.getRootId() ]
 		self.__parentNameStack = [ '' ]
-		cursor.close()
 
 	def up(self):
 		if self.isRoot():
-			raise MyException('\'up\' on root node not allowed.', 3)
+			raise MyException('\'up\' on root node is not possible.', 3)
 		self.__parentIdStack.pop()
 		self.__parentNameStack.pop()
 
-	def down(self, node):
+	def down(self, name):
+		node = self.getNodeByName(name)
+		if node is None:
+			raise MyException('No node \'' + name + '\' in current dir.', 3)
 		if not node.isDirectory():
-			raise MyException('\'down\' on file not allowed.', 3)
+			raise MyException('\'down\' on file \'' + name + '\' is not possible.', 3)
 		self.__parentIdStack.append(node.nodeid)
 		self.__parentNameStack.append(node.name)
 
@@ -125,45 +125,19 @@ class DatabaseTree(Tree):
 				node.info.ctime, node.info.atime, node.info.mtime, \
 				node.info.checksum.getBinary(), node.nodeid))
 
-	def delete(self, node):
-		self.__dbcon.execute('delete from nodes where nodeid=?', (node.nodeid,))
+	def delete(self, name):
+		self.__dbcon.execute('delete from nodes where parent=? and name=?', (self.getCurrentParentId(),name))
 
 	def commit(self):
 		self.__dbcon.commit()
 		self.__dbcon.execute('vacuum')
-
-	def fetch(self, node, row):
-		node.nodeid = row[0]
-		node.parentid = row[1]
-		node.name = row[2]
-		if not row[3]:
-			node.info = NodeInfo()
-			node.info.size = row[4]
-			node.info.ctime = row[5]
-			node.info.atime = row[6]
-			node.info.mtime = row[7]
-			node.info.checksum = Checksum()
-			node.info.checksum.setBinary(row[8])
-		if self.calculateUponFetch:
-			self.calculate(node)
-
-	def calculate(self, node):
-		if node.isDirectory():
-			if self.signalNewFile is not None:
-				self.signalNewFile(node.path, 0)
-		else:
-			# nothing to do, just signal that the job is done if necessary
-			if self.signalNewFile is not None:
-				self.signalNewFile(node.path, node.info.size)
-			if self.signalBytesDone is not None:
-				self.signalBytesDone(node.info.size)
 
 	def getNodeByName(self, name):
 		cursor = self.__dbcon.cursor()
 		cursor.execute('select ' + self.__databaseSelectString + \
 			' from nodes where parent=? and name=?', (self.getCurrentParentId(), name))
 		node = Node()
-		self.fetch(node, cursor.fetchone())
+		self.__fetch(node, cursor.fetchone())
 		cursor.close()
 		return node
 
@@ -173,7 +147,7 @@ class DatabaseTree(Tree):
 			' from nodes where parent=?', (self.getCurrentParentId(),))
 		for row in cursor:
 			node = Node()
-			self.fetch(node, row)
+			self.__fetch(node, row)
 			yield node
 		cursor.close()
 
@@ -213,3 +187,47 @@ class DatabaseTree(Tree):
 
 	def getCurrentParentId(self):
 		return self.__parentIdStack[-1]
+
+	def getRootId(self):
+		cursor = self.__dbcon.cursor()
+		cursor.execute('select nodeid from nodes where parent is null')
+		result = cursor.fetchone()[0]
+		cursor.close()
+		return result
+
+	def __fetch(self, node, row):
+		node.nodeid = row[0]
+		#node.parentid = row[1] # TODO: remove later
+		node.name = row[2]
+		if not row[3]:
+			node.info = NodeInfo()
+			node.info.size = row[4]
+			node.info.ctime = row[5]
+			node.info.atime = row[6]
+			node.info.mtime = row[7]
+			node.info.checksum = Checksum()
+			node.info.checksum.setBinary(row[8])
+		if self.doCalculate:
+			self.__calculate(node)
+
+	def __calculate(self, node):
+		if node.isDirectory():
+			if self.signalNewFile is not None:
+				self.signalNewFile(node.path, 0)
+		else:
+			# nothing to do, just signal that the job is done if necessary
+			if self.signalNewFile is not None:
+				self.signalNewFile(node.path, node.info.size)
+			if self.signalBytesDone is not None:
+				self.signalBytesDone(node.info.size)
+
+
+
+
+
+
+
+
+
+
+

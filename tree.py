@@ -1,5 +1,5 @@
 from misc import MyException
-from node import NodeStatistics
+from node import NodeStatistics, NodeStatus
 
 
 
@@ -8,7 +8,7 @@ class Tree(object):
 	def __init__(self):
 		self.signalNewFile = None
 		self.signalBytesDone = None
-		self.calculateUponFetch = True
+		self.doCalculate = True
 
 	### those basic methods should be implemented in derived classes
 
@@ -27,7 +27,7 @@ class Tree(object):
 	def up(self):
 		raise MyException('Not implemented.', 3)
 
-	def down(self, node):
+	def down(self, name):
 		raise MyException('Not implemented.', 3)
 
 	def insert(self, node):
@@ -36,7 +36,7 @@ class Tree(object):
 	def update(self, node):
 		raise MyException('Not implemented.', 3)
 
-	def delete(self, node):
+	def delete(self, name):
 		raise MyException('Not implemented.', 3)
 
 	def commit(self):
@@ -57,14 +57,14 @@ class Tree(object):
 		for node in self:
 			func(self, node, param)
 			if recurse and node.isDirectory():
-				self.down(node)
+				self.down(node.name)
 				self.preOrderApply(func, param, recurse)
 				self.up()
 
 	def postOrderApply(self, func, param=None, recurse=True):
 		for node in self:
 			if recurse and node.isDirectory():
-				self.down(node)
+				self.down(node.name)
 				self.postOrderApply(func, param, recurse)
 				self.up()
 			func(self, node, param)
@@ -89,8 +89,8 @@ class Tree(object):
 		for node in self:
 			dest.insert(node)
 			if node.isDirectory():
-				self.down(node)
-				dest.down(node)
+				self.down(node.name)
+				dest.down(node.name)
 				self.__copyTo(dest)
 				dest.up()
 				self.up()
@@ -99,5 +99,34 @@ class Tree(object):
 		self.__copyTo(dest)
 		dest.commit()
 
-	def compare(self, other, result):
-		pass
+	def compare(self, other, result, removeOkNodes=False):
+		for snode in self:
+			onode = other.getNodeByName(snode.name)
+			if (onode is not None) and (snode.isDirectory() == onode.isDirectory()):
+				# nodes existing in selfnodes and othernodes: already known nodes
+				rnode = snode
+				if snode.isDirectory():
+					# recurse
+					self.down(snode)
+					other.down(onode)
+					result.insert(rnode) # just to be able to do a "down"
+					result.down(rnode)
+					self.compare(other, result, removeOkNodes)
+					result.up()
+					other.up()
+					self.up()
+				else:
+					# compare snode and onode and set status
+					if snode.info == onode.info:
+						if snode.info.checksum == onode.info.checksum:
+							rnode.status = NodeStatus.OK
+						else:
+							rnode.status = NodeStatus.Error
+					else:
+						rnode.status = NodeStatus.Warn
+					# add result node if necessary
+					if not (removeOkNodes and rnode.status == NodeStatus.OK):
+						result.insert(rnode)
+			else:
+				# nodes existing in selfnodes but not in othernodes: new nodes
+				pass

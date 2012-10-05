@@ -131,12 +131,12 @@ class NodeInfo(object):
 
 class Node(object):
 
-	def __init__(self):
+	def __init__(self, name=None):
 		self.status = NodeStatus.Undefined
 		self.pythonid = id(self)
 		self.nodeid = None
 		self.parentid = None
-		self.name = None
+		self.name = name
 		self.path = None
 
 		self.info = None

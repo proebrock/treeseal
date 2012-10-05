@@ -19,10 +19,10 @@ class FilesystemTree(Tree):
 	### implementation of base class methods, please keep order
 
 	def getDepth(self):
-		return self.__currentDepth
+		return len(self.__parentNameStack) - 1
 
 	def getPath(self):
-		return self.__currentPath
+		return reduce(lambda x, y: os.path.join(x, y), self.__parentNameStack)
 
 	def reset(self):
 		if not os.path.exists(self.__metaDir):
@@ -34,33 +34,29 @@ class FilesystemTree(Tree):
 		self.gotoRoot()
 
 	def gotoRoot(self):
-		self.__currentPath = ''
-		self.__currentDepth = 0
+		self.__parentNameStack = [ '' ]
 
 	def up(self):
 		if self.isRoot():
-			raise MyException('\'up\' on root node not allowed.', 3)
-		self.__currentPath = os.path.split(self.__currentPath)[0]
-		self.__currentDepth -= 1
+			raise MyException('\'up\' on root node is not possible.', 3)
+		self.__parentNameStack.pop()
 
-	def down(self, node):
+	def down(self, name):
+		node = self.getNodeByName(name)
+		if node is None:
+			raise MyException('No node \'' + name + '\' in current dir.', 3)
 		if not node.isDirectory():
-			raise MyException('\'down\' on file not allowed.', 3)
-		self.__currentPath = os.path.join(self.__currentPath, node.name)
-		self.__currentDepth += 1
+			raise MyException('\'down\' on file \'' + name + '\' is not possible.', 3)
+		self.__parentNameStack.append(node.name)
 
 	def insert(self, node):
-		# a node contains the metadata necessary to create the file,
-		# but instead of the file content just its checksum...
-		print('FilesystemTree.insert(\'' + os.path.join(self.getPath(), node.name) + '\') is not implemented.')
+		pass
 
 	def update(self, node):
-		# a node contains the metadata necessary to update the file,
-		# but instead of the file content just its checksum...
-		print('FilesystemTree.update(\'' + os.path.join(self.getPath(), node.name) + '\') is not implemented.')
+		pass
 
 	def delete(self, node):
-		fullpath = os.path.join(self.__rootDir, self.__currentPath, node.name)
+		fullpath = self.getFullPath(node.name)
 		if node.isDirectory():
 			os.rmdir(fullpath)
 		else:
@@ -69,54 +65,40 @@ class FilesystemTree(Tree):
 	def commit(self):
 		pass
 
-	def fetch(self, node):
-		fullpath = os.path.join(self.__rootDir, self.__currentPath, node.name)
-		if not os.path.isdir(fullpath):
+	def getNodeByName(self, name):
+		fullpath = self.getFullPath(name)
+		if fullpath == self.__metaDir:
+			return None
+		if not os.path.exists(self.getFullPath(name)):
+			return None
+		node = Node(name)
+		path = os.path.join(self.getPath(), node.name)
+		if os.path.isdir(fullpath):
+			if self.signalNewFile is not None:
+				self.signalNewFile(path, 0)
+		else:
 			node.info = NodeInfo()
 			node.info.size = os.path.getsize(fullpath)
-		if self.calculateUponFetch:
-			self.calculate(node)
-		if not os.path.isdir(fullpath):
+			if self.signalNewFile is not None:
+				self.signalNewFile(path, node.info.size)
+			if self.doCalculate:
+				node.info.checksum = Checksum()
+				node.info.checksum.calculateForFile(fullpath, self.signalBytesDone)
 			# determine date AFTER calculating the checksum, otherwise opening
 			# the file might change the access time (OS dependent)
 			# this conversion from unix time stamp to local date/time might fail after year 2038...
 			node.info.ctime = datetime.datetime.fromtimestamp(os.path.getctime(fullpath))
 			node.info.atime = datetime.datetime.fromtimestamp(os.path.getatime(fullpath))
 			node.info.mtime = datetime.datetime.fromtimestamp(os.path.getmtime(fullpath))
-
-	def calculate(self, node):
-		path = os.path.join(self.__currentPath, node.name)
-		if node.isDirectory():
-			if self.signalNewFile is not None:
-				self.signalNewFile(path, 0)
-		else:
-			if self.signalNewFile is not None:
-				self.signalNewFile(path, node.info.size)
-			fullpath = os.path.join(self.__rootDir, path)
-			node.info.checksum = Checksum()
-			node.info.checksum.calculateForFile(fullpath, self.signalBytesDone)
-
-	def getNodeByName(self, name):
-		node = Node()
-		node.name = name
-		self.fetch(node)
 		return node
 
 	def __iter__(self):
-		for name in os.listdir(os.path.join(self.__rootDir, self.__currentPath)):
-			path = os.path.join(self.__currentPath, name)
-			if self.__isBlacklisted(path):
-				continue
-			node = Node()
-			node.name = name
-			self.fetch(node)
-			yield node
+		for name in os.listdir(self.getFullPath()):
+			node = self.getNodeByName(name)
+			if node is not None:
+				yield node
 
 	### the following methods are not implementations of base class methods
 
-	def __isBlacklisted(self, path):
-		fullpath = os.path.join(self.__rootDir, path)
-		# skip the metadir, we do not want to add that to the database
-		if fullpath == self.__metaDir:
-			return True
-		return False
+	def getFullPath(self, name=''):
+		return os.path.join(self.__rootDir, self.getPath(), name)
