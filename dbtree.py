@@ -132,6 +132,13 @@ class DatabaseTree(Tree):
 		self.__dbcon.commit()
 		self.__dbcon.execute('vacuum')
 
+	def exists(self, name):
+		cursor = self.__dbcon.cursor()
+		cursor.execute('select nodeid from nodes where parent=? and name=?', (self.getCurrentParentId(), name))
+		result = cursor.fetchone() == None
+		cursor.close()
+		return result
+
 	def getNodeByName(self, name):
 		cursor = self.__dbcon.cursor()
 		cursor.execute('select ' + self.__databaseSelectString + \

@@ -42,6 +42,9 @@ class Tree(object):
 	def commit(self):
 		raise MyException('Not implemented.', 3)
 
+	def exists(self, name):
+		raise MyException('Not implemented.', 3)
+
 	def getNodeByName(self, name):
 		raise MyException('Not implemented.', 3)
 

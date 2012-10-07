@@ -65,11 +65,14 @@ class FilesystemTree(Tree):
 	def commit(self):
 		pass
 
+	def exists(self, name):
+		return os.path.exists(self.getFullPath(name))
+
 	def getNodeByName(self, name):
 		fullpath = self.getFullPath(name)
 		if fullpath == self.__metaDir:
 			return None
-		if not os.path.exists(self.getFullPath(name)):
+		if not self.exists(name):
 			return None
 		node = Node(name)
 		path = os.path.join(self.getPath(), node.name)

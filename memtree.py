@@ -63,11 +63,13 @@ class MemoryTree(Tree):
 	def commit(self):
 		pass
 
+	def exists(self, name):
+		return name in self.__parentMTNStack[-1].children
+
 	def getNodeByName(self, name):
-		if name in self.__parentMTNStack[-1].children:
-			return self.__parentMTNStack[-1].children[name].node
-		else:
+		if not self.exists(name):
 			return None
+		return self.__parentMTNStack[-1].children[name].node
 
 	def __iter__(self):
 		for name in self.__parentMTNStack[-1].children.keys():
