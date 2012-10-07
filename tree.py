@@ -1,3 +1,5 @@
+from sets import Set
+
 from misc import MyException
 from node import NodeStatistics, NodeStatus
 
@@ -56,64 +58,79 @@ class Tree(object):
 	def isRoot(self):
 		return self.getDepth() == 0
 
-	def preOrderApply(self, func, param=None, recurse=True):
+	def __preOrderApply(self, func, param=None, recurse=True):
 		for node in self:
 			func(self, node, param)
 			if recurse and node.isDirectory():
 				self.down(node.name)
-				self.preOrderApply(func, param, recurse)
+				self.__preOrderApply(func, param, recurse)
 				self.up()
 
-	def postOrderApply(self, func, param=None, recurse=True):
-		for node in self:
+	def preOrderApply(self, func, node=None, param=None, recurse=True):
+		if node is None:
+			self.__preOrderApply(func, param, recurse)
+		else:
+			func(self, node, param)
 			if recurse and node.isDirectory():
 				self.down(node.name)
-				self.postOrderApply(func, param, recurse)
+				self.__preOrderApply(func, param, recurse)
 				self.up()
-			func(self, node, param)
 
 	def __prettyPrintFunc(self, node, param):
 		node.prettyPrint(self.getDepth() * '    ')
 		print('')
 
-	def prettyPrint(self, recurse=True):
-		self.preOrderApply(Tree.__prettyPrintFunc, None, recurse)
+	def prettyPrint(self, node=None, recurse=True):
+		self.preOrderApply(Tree.__prettyPrintFunc, node, None, recurse)
 
 	def __getStatisticsFunc(self, node, param):
-		stats = param
-		stats.update(node)
+		param.update(node)
 
-	def getStatistics(self, recurse=True):
+	def getStatistics(self, node=None, recurse=True):
 		stats = NodeStatistics()
-		self.preOrderApply(Tree.__getStatisticsFunc, stats, recurse)
+		self.preOrderApply(Tree.__getStatisticsFunc, node, stats, recurse)
 		return stats
 
-	def __copyTo(self, dest):
+	def __setNodeStatus(self, node, param):
+		node.status = param
+		self.update(node)
+
+	def setNodeStatus(self, status, node=None, recurse=True):
+		self.preOrderApply(Tree.__setNodeStatus, node, status, recurse)
+
+	def copyTo(self, dest):
 		for node in self:
 			dest.insert(node)
 			if node.isDirectory():
 				self.down(node.name)
 				dest.down(node.name)
-				self.__copyTo(dest)
+				self.copyTo(dest)
 				dest.up()
 				self.up()
 
-	def copyTo(self, dest):
-		self.__copyTo(dest)
-		dest.commit()
+	def copyNodeTo(self, dest, snode):
+		# snode must be current node of self!
+		dest.insert(snode)
+		if snode.isDirectory():
+			self.down(snode.name)
+			dest.down(snode.name)
+			self.copyTo(dest)
+			dest.up()
+			self.up()
 
 	def compare(self, other, result, removeOkNodes=False):
+		snames = {}
 		for snode in self:
 			onode = other.getNodeByName(snode.name)
 			if (onode is not None) and (snode.isDirectory() == onode.isDirectory()):
-				# nodes existing in selfnodes and othernodes: already known nodes
+				# nodes existing in self and othern: already known nodes
 				rnode = snode
 				if snode.isDirectory():
 					# recurse
-					self.down(snode)
-					other.down(onode)
+					self.down(snode.name)
+					other.down(onode.name)
 					result.insert(rnode) # just to be able to do a "down"
-					result.down(rnode)
+					result.down(rnode.name)
 					self.compare(other, result, removeOkNodes)
 					result.up()
 					other.up()
@@ -127,9 +144,25 @@ class Tree(object):
 							rnode.status = NodeStatus.Error
 					else:
 						rnode.status = NodeStatus.Warn
+					# append other node to rnode
+					if not rnode.status == NodeStatus.OK:
+						rnode.other = onode
 					# add result node if necessary
 					if not (removeOkNodes and rnode.status == NodeStatus.OK):
 						result.insert(rnode)
 			else:
-				# nodes existing in selfnodes but not in othernodes: new nodes
-				pass
+				# nodes existing in self but not in other: missing nodes
+				self.copyNodeTo(result, snode)
+				result.setNodeStatus(NodeStatus.Missing, snode)
+			# buffer that info for later determining new nodes
+			snames[snode.name] = snode.isDirectory()
+		# nodes existing in other but not in self: new nodes
+		for onode in other:
+			if onode.name in snames:
+				if snames[onode.name] == onode.isDirectory():
+					continue
+			other.copyNodeTo(result, onode)
+			result.setNodeStatus(NodeStatus.New, onode)
+
+
+
