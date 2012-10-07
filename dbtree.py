@@ -136,8 +136,11 @@ class DatabaseTree(Tree):
 		cursor = self.__dbcon.cursor()
 		cursor.execute('select ' + self.__databaseSelectString + \
 			' from nodes where parent=? and name=?', (self.getCurrentParentId(), name))
+		row = cursor.fetchone()
+		if row is None:
+			return None
 		node = Node()
-		self.__fetch(node, cursor.fetchone())
+		self.__fetch(node, row)
 		cursor.close()
 		return node
 
