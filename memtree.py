@@ -26,11 +26,14 @@ class MemoryTree(Tree):
 	def getDepth(self):
 		return len(self.__parentMTNStack) - 1
 
-	def getPath(self):
+	def getPath(self, name=None):
 		path = ''
 		for n in self.__parentMTNStack:
 			path = os.path.join(path, n.node.name)
-		return path
+		if name is None:
+			return path
+		else:
+			return os.path.join(path, name)
 
 	def reset(self):
 		self.__parentMTNStack = [ MemoryTreeNode(Node('')) ]
@@ -43,12 +46,12 @@ class MemoryTree(Tree):
 			raise MyException('\'up\' on root node is not possible.', 3)
 		self.__parentMTNStack.pop()
 
-	def down(self, name):
-		if name not in self.__parentMTNStack[-1].children:
-			raise MyException('No node \'' + name + '\' in current dir.', 3)
-		mtn = self.__parentMTNStack[-1].children[name]
+	def down(self, node):
+		if node.name not in self.__parentMTNStack[-1].children:
+			raise MyException('No node \'' + node.name + '\' in current dir.', 3)
+		mtn = self.__parentMTNStack[-1].children[node.name]
 		if not mtn.node.isDirectory():
-			raise MyException('\'down\' on file \'' + name + '\' is not possible.', 3)
+			raise MyException('\'down\' on file \'' + node.name + '\' is not possible.', 3)
 		self.__parentMTNStack.append(mtn)
 
 	def insert(self, node):
@@ -74,5 +77,16 @@ class MemoryTree(Tree):
 	def __iter__(self):
 		for name in self.__parentMTNStack[-1].children.keys():
 			yield self.__parentMTNStack[-1].children[name].node
+
+	def calculate(self, node):
+		# nothing to do, just signal that the job is done if necessary
+		if node.isDirectory():
+			if self.signalNewFile is not None:
+				self.signalNewFile(self.getPath(node.name), 0)
+		else:
+			if self.signalNewFile is not None:
+				self.signalNewFile(self.getPath(node.name), node.info.size)
+			if self.signalBytesDone is not None:
+				self.signalBytesDone(node.info.size)
 
 	### the following methods are not implementations of base class methods

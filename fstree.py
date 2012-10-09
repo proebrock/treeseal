@@ -21,8 +21,12 @@ class FilesystemTree(Tree):
 	def getDepth(self):
 		return len(self.__parentNameStack) - 1
 
-	def getPath(self):
-		return reduce(lambda x, y: os.path.join(x, y), self.__parentNameStack)
+	def getPath(self, name=None):
+		path = reduce(lambda x, y: os.path.join(x, y), self.__parentNameStack)
+		if name is None:
+			return path
+		else:
+			return os.path.join(path, name)
 
 	def reset(self):
 		if not os.path.exists(self.__metaDir):
@@ -41,12 +45,9 @@ class FilesystemTree(Tree):
 			raise MyException('\'up\' on root node is not possible.', 3)
 		self.__parentNameStack.pop()
 
-	def down(self, name):
-		node = self.getNodeByName(name)
-		if node is None:
-			raise MyException('No node \'' + name + '\' in current dir.', 3)
+	def down(self, node):
 		if not node.isDirectory():
-			raise MyException('\'down\' on file \'' + name + '\' is not possible.', 3)
+			raise MyException('\'down\' on file \'' + node.name + '\' is not possible.', 3)
 		self.__parentNameStack.append(node.name)
 
 	def insert(self, node):
@@ -69,31 +70,7 @@ class FilesystemTree(Tree):
 		return os.path.exists(self.getFullPath(name))
 
 	def getNodeByName(self, name):
-		fullpath = self.getFullPath(name)
-		if fullpath == self.__metaDir:
-			return None
-		if not self.exists(name):
-			return None
-		node = Node(name)
-		path = os.path.join(self.getPath(), node.name)
-		if os.path.isdir(fullpath):
-			if self.signalNewFile is not None:
-				self.signalNewFile(path, 0)
-		else:
-			node.info = NodeInfo()
-			node.info.size = os.path.getsize(fullpath)
-			if self.signalNewFile is not None:
-				self.signalNewFile(path, node.info.size)
-			if self.doCalculate:
-				node.info.checksum = Checksum()
-				node.info.checksum.calculateForFile(fullpath, self.signalBytesDone)
-			# determine date AFTER calculating the checksum, otherwise opening
-			# the file might change the access time (OS dependent)
-			# this conversion from unix time stamp to local date/time might fail after year 2038...
-			node.info.ctime = datetime.datetime.fromtimestamp(os.path.getctime(fullpath))
-			node.info.atime = datetime.datetime.fromtimestamp(os.path.getatime(fullpath))
-			node.info.mtime = datetime.datetime.fromtimestamp(os.path.getmtime(fullpath))
-		return node
+		return self.__fetch(name)
 
 	def __iter__(self):
 		for name in os.listdir(self.getFullPath()):
@@ -101,7 +78,37 @@ class FilesystemTree(Tree):
 			if node is not None:
 				yield node
 
+	def calculate(self, node):
+		if node.isDirectory():
+			if self.signalNewFile is not None:
+				self.signalNewFile(self.getPath(node.name), 0)
+		else:
+			if self.signalNewFile is not None:
+				self.signalNewFile(self.getPath(node.name), node.info.size)
+			fullpath = self.getFullPath(node.name)
+			# calculate checksum
+			node.info.checksum = Checksum()
+			node.info.checksum.calculateForFile(fullpath, self.signalBytesDone)
+			# determine file timestamps AFTER calculating the checksum, otherwise opening
+			# the file might change the access time (OS dependent)
+			# this conversion from unix time stamp to local date/time might fail after year 2038...
+			node.info.ctime = datetime.datetime.fromtimestamp(os.path.getctime(fullpath))
+			node.info.atime = datetime.datetime.fromtimestamp(os.path.getatime(fullpath))
+			node.info.mtime = datetime.datetime.fromtimestamp(os.path.getmtime(fullpath))
+
 	### the following methods are not implementations of base class methods
 
 	def getFullPath(self, name=''):
 		return os.path.join(self.__rootDir, self.getPath(), name)
+
+	def __fetch(self, name):
+		fullpath = self.getFullPath(name)
+		if fullpath == self.__metaDir:
+			return None
+		if not self.exists(name):
+			return None
+		node = Node(name)
+		if not os.path.isdir(fullpath):
+			node.info = NodeInfo()
+			node.info.size = os.path.getsize(fullpath)
+		return node

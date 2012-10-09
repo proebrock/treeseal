@@ -1,5 +1,4 @@
 import copy
-import os
 from misc import sizeToString, MyException
 
 
@@ -132,16 +131,13 @@ class NodeInfo(object):
 class Node(object):
 
 	def __init__(self, name=None):
-		self.status = NodeStatus.Undefined
-		self.pythonid = id(self)
+		# unique (at least at dir level) node identifier in database and filesystem
 		self.nodeid = None
-		self.parentid = None
 		self.name = name
-		self.path = None
-
+		# node information
 		self.info = None
-		self.children = None
-		self.other = None
+		# node status
+		self.status = NodeStatus.Undefined
 
 		self.NoneString = ''
 
@@ -149,9 +145,7 @@ class Node(object):
 		return '(' + \
 			'status="' + self.getStatusString() + '", ' + \
 			'nodeid="' + self.getNodeIDString() + '", ' + \
-			'parentid="' + self.getParentIDString() + '", ' + \
 			'name="' + self.getNameString() + '", ' + \
-			'path="' + self.getPathString() + '", ' + \
 			'info="' + self.getInfoString() + '", ' + \
 			')'
 
@@ -159,31 +153,17 @@ class Node(object):
 		result = Node()
 		result.status = self.status
 		result.nodeid = self.nodeid
-		result.parentid = self.parentid
 		result.name = self.name
-		result.path = self.path
 		result.info = self.info
-		result.children = self.children
-		result.other = self.other
 		return result
 
 	def __deepcopy__(self, memo):
 		result = Node()
 		result.status = copy.deepcopy(self.status, memo)
 		result.nodeid = copy.deepcopy(self.nodeid, memo)
-		result.parentid = copy.deepcopy(self.parentid, memo)
 		result.name = copy.deepcopy(self.name, memo)
-		result.path = copy.deepcopy(self.path, memo)
 		result.info = copy.deepcopy(self.info, memo)
-		result.children = copy.deepcopy(self.children, memo)
-		result.other = copy.deepcopy(self.other, memo)
 		return result
-
-	def chainWithParent(self, parent):
-		if not parent.path is None:
-			self.path = os.path.join(parent.path, self.name)
-		if not parent.nodeid is None:
-			self.parentid = parent.nodeid
 
 	def isDirectory(self):
 		return self.info is None
@@ -200,12 +180,6 @@ class Node(object):
 		else:
 			return '{0:d}'.format(self.nodeid)
 
-	def getParentIDString(self):
-		if self.parentid is None:
-			return self.NoneString
-		else:
-			return '{0:d}'.format(self.parentid)
-
 	def getNameString(self):
 		if self.name is None:
 			return self.NoneString
@@ -214,12 +188,6 @@ class Node(object):
 
 	def getUniqueKey(self):
 		return '{0:b}{1:s}'.format(not self.isDirectory(), self.name)
-
-	def getPathString(self):
-		if self.path is None:
-			return self.NoneString
-		else:
-			return self.path
 
 	def getInfoString(self):
 		if self.info is None:
@@ -230,9 +198,7 @@ class Node(object):
 	def prettyPrint(self, prefix=''):
 		print('{0:s}status              {1:s}'.format(prefix, self.getStatusString()))
 		print('{0:s}nodeid              {1:s}'.format(prefix, self.getNodeIDString()))
-		print('{0:s}parentid            {1:s}'.format(prefix, self.getParentIDString()))
 		print('{0:s}name                {1:s}'.format(prefix, self.getNameString()))
-		print('{0:s}path                {1:s}'.format(prefix, self.getPathString()))
 		if self.info is not None:
 			self.info.prettyPrint(prefix)
 
@@ -269,144 +235,3 @@ class NodeStatistics:
 
 	def getNodeSize(self):
 		return sum(self.__filesize)
-
-
-
-class NodeContainer(object):
-
-	def __init__(self):
-		pass
-
-	def __preOrderApply(self, nodes, func, param, depth):
-		for node in nodes:
-			func(self, node, param, depth)
-			if not node.children is None:
-				node.children.__preOrderApply(node.children, func, param, depth + 1)
-
-	def preOrderApply(self, func, param):
-		self.__preOrderApply(self, func, param, 0)
-
-	def __postOrderApply(self, nodes, func, param, depth):
-		for node in nodes:
-			if not node.children is None:
-				node.children.__postOrderApply(node.children, func, param, depth + 1)
-			func(self, node, param, depth)
-
-	def postOrderApply(self, func, param):
-		self.__postOrderApply(self, func, param, 0)
-
-	def __setStatusFunc(self, node, param, depth):
-		node.status = param
-
-	def setStatus(self, status):
-		self.preOrderApply(NodeContainer.__setStatusFunc, status)
-
-	def splitByStatus(self):
-		result = [ self.__class__() for i in range(NodeStatus.NumStatuses) ]
-		for node in self:
-			result[node.status].append(node)
-		return result
-
-	def __prettyPrintFunc(self, node, param, depth):
-		node.prettyPrint(depth * '    ')
-		print('')
-
-	def prettyPrint(self):
-		self.preOrderApply(NodeContainer.__prettyPrintFunc, None)
-
-	def __getStatisticsFunc(self, node, param, depth):
-		stats = param
-		stats.update(node)
-
-	def getStatistics(self):
-		stats = NodeStatistics()
-		self.preOrderApply(NodeContainer.__getStatisticsFunc, stats)
-		return stats
-
-	def __deviceInsertFunc(self, node, param, depth):
-		dest = param
-		dest.insertNode(node)
-
-	def deviceInsert(self, dest):
-		self.preOrderApply(NodeContainer.__deviceInsertFunc, dest)
-		dest.commit()
-
-	def __deviceUpdateFunc(self, node, param, depth):
-		dest = param
-		dest.updateNode(node)
-
-	def deviceUpdate(self, dest):
-		self.preOrderApply(NodeContainer.__deviceUpdateFunc, dest)
-		dest.commit()
-
-	def __deviceDeleteFunc(self, node, param, depth):
-		dest = param
-		dest.deleteNode(node)
-
-	def deviceDelete(self, dest):
-		self.preOrderApply(NodeContainer.__deviceDeleteFunc, dest)
-		dest.commit()
-
-
-
-class NodeList(NodeContainer, list):
-
-	def __init__(self):
-		super(NodeList, self).__init__()
-
-
-
-class NodeDict(NodeContainer):
-
-	def __init__(self):
-		super(NodeDict, self).__init__()
-		self.__dictByUniqueID = {}
-		self.__dictByPythonID = {}
-
-	def __iter__(self):
-		for key in sorted(self.__dictByUniqueID.keys()):
-			yield self.__dictByUniqueID[key]
-
-	def __getitem__(self, key):
-		return self.__dictByUniqueID.values().__getitem__(key)
-
-	def __len__(self):
-		return len(self.__dictByUniqueID)
-
-	def append(self, node):
-		self.__dictByUniqueID[node.getUniqueKey()] = node
-		self.__dictByPythonID[node.pythonid] = node
-
-	def clear(self):
-		self.__dictByUniqueID.clear()
-		self.__dictByPythonID.clear()
-
-	def mergeAndUpdate(self, other):
-		self.__dictByUniqueID.update(other.__dictByUniqueID)
-		self.__dictByPythonID.update(other.__dictByPythonID)
-
-	def getByUniqueID(self, uniqueid):
-		if uniqueid not in self.__dictByUniqueID:
-			return None
-		return self.__dictByUniqueID[uniqueid]
-
-	def getByPythonID(self, pythonid):
-		return self.__dictByPythonID[pythonid]
-
-	def __delNodeFunc(self, node, param, depth):
-		del self.__dictByUniqueID[node.getUniqueKey()]
-		del self.__dictByPythonID[node.pythonid]
-
-	def delByUniqueID(self, uniqueid):
-		node = self.getByUniqueID(uniqueid)
-		if not node.children is None:
-			node.children.postOrderApply(NodeDict.__delNodeFunc, None)
-		self.__delNodeFunc(node, None, 0)
-
-	def delByPythonID(self, pythonid):
-		node = self.getByPythonID(pythonid)
-		if not node.children is None:
-			node.children.postOrderApply(NodeDict.__delNodeFunc, None)
-		self.__delNodeFunc(node, None, 0)
-
-

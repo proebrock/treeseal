@@ -4,10 +4,12 @@ import os
 import sys
 import wx
 
+from dbtree import DatabaseTree
+from fstree import FilesystemTree
 from icons import IconError, IconMissing, IconNew, IconOk, IconUnknown, IconWarning
+from memtree import MemoryTree
 from misc import MyException
-from node import NodeStatus, NodeDict
-from device import Database, Filesystem
+from node import NodeStatus
 from progressdialog import UserCancelledException, FileProcessingProgressDialog
 from comparisondialog import NodeComparisonDialog
 from simplelistctrl import SimpleListControl
@@ -19,94 +21,64 @@ ProgramVersion = '3.0'
 
 class Instance:
 
-	METADIRNAME = '.' + ProgramName
+	def __init__(self, view, src, dest):
+		self.__view = view
+		self.__src = src
+		self.__dest = dest
 
-	def __init__(self, path):
-		# check if specified root dir exists
-		if not os.path.exists(path):
-			raise MyException('Given root directory does not exist.', 3)
-		if not os.path.isdir(path):
-			raise MyException('Given root directory is not a directory.', 3)
-		# get rootdir (full path) and metadir
-		self.__rootDir = path
-		self.__metaDir = os.path.join(self.__rootDir, Instance.METADIRNAME)
-		# initialize two devices, the filesystem and the database
-		self.__fs = Filesystem(self.__rootDir, self.__metaDir)
-		self.__db = Database(self.__rootDir, self.__metaDir)
-		#self.__fs = Database(self.__rootDir, self.__metaDir)
-		#self.__db = Filesystem(self.__rootDir, self.__metaDir)
+	def isRoot(self):
+		return self.__view.isRoot()
 
-	@staticmethod
-	def isRootDir(path):
-		return os.path.exists(os.path.join(path, Instance.METADIRNAME))
+	def getDepth(self):
+		return self.__view.getDepth()
 
-	def getRootDir(self):
-		return self.__rootDir
-
-	def open(self):
-		self.__fs.open()
-		self.__db.open()
-
-	def close(self):
-		self.__fs.close()
-		self.__db.close()
-
-	def reset(self):
-		self.__fs.reset()
-		self.__db.reset()
-
-	def importTree(self, signalNewFile=None, signalBytesDone=None):
-		self.__fs.registerHandlers(signalNewFile, signalBytesDone)
-		if True:
-			# fast and memory saving alternative
-			self.__fs.copyNodeTree(self.__db)
-		else:
-			# slower more memory consuming alternative: first the whole tree is read into memory, then it is written
-			tree = self.__fs.getNodeTree()
-			tree.deviceInsert(self.__db)
-		self.__fs.registerHandlers(None, None)
+	def getPath(self):
+		return self.__view.getPath()
 
 	def getStatistics(self):
-		return self.__fs.getStatistics()
+		return self.__view.getStatistics()
 
-	def getFilesystemTree(self, signalNewFile=None, signalBytesDone=None):
-		self.__fs.registerHandlers(signalNewFile, signalBytesDone)
-		tree = self.__fs.getNodeTree()
-		self.__fs.registerHandlers(None, None)
-		return tree
+	def up(self):
+		self.__view.up()
+		if self.__src is not None:
+			self.__src.up()
+		if self.__dest is not None:
+			self.__dest.up()
 
-	def getDatabaseTree(self, signalNewFile=None, signalBytesDone=None):
-		self.__db.registerHandlers(signalNewFile, signalBytesDone)
-		tree = self.__db.getNodeTree()
-		self.__db.registerHandlers(None, None)
-		return tree
+	def down(self, node):
+		self.__view.down(node)
+		if self.__src is not None:
+			self.__src.down(self.__src.getNodeByName(node.name))
+		if self.__src is not None:
+			self.__src.down(self.__src.getNodeByName(node.name))
 
-	def getPathsByChecksum(self, checksumString):
-		return [ \
-			set(self.__db.getPathsByChecksum(checksumString)), \
-			set(self.__fs.getPathsByChecksum(checksumString)), \
-			]
+	def getNodeByName(self, name):
+		return self.__view.getNodeByName(name)
 
-	def getDiffTree(self, signalNewFile=None, signalBytesDone=None):
-		self.__fs.registerHandlers(signalNewFile, signalBytesDone)
-		tree = self.__fs.recursiveGetDiffTree(self.__db)
-		self.__fs.registerHandlers(None, None)
-		return tree
+	def __iter__(self):
+		for node in self.__view:
+			yield node
 
-	def updateDB(self, nodes):
-		nodelists = nodes.splitByStatus()
-		for i in range(NodeStatus.NumStatuses):
-			if len(nodelists[i]) == 0 or i == NodeStatus.OK:
-				continue
-			elif i == NodeStatus.New:
-				nodelists[i].deviceInsert(self.__db)
-			elif i == NodeStatus.Missing:
-				nodelists[i].deviceDelete(self.__db)
-			elif i == NodeStatus.Warn or i == NodeStatus.Error:
-				nodelists[i].deviceUpdate(self.__db)
-			else:
-				raise Exception('Unable to update database for node container with {0:d} entries and status {1:s}'.format( \
-					len(nodelists[i]), NodeStatus.toString(i)))
+	def ignore(self, nodes):
+		pass
+
+	def accept(self, nodes):
+		pass
+
+#	def sync(self, nodes):
+#		nodelists = nodes.splitByStatus()
+#		for i in range(NodeStatus.NumStatuses):
+#			if len(nodelists[i]) == 0 or i == NodeStatus.OK:
+#				continue
+#			elif i == NodeStatus.New:
+#				nodelists[i].deviceInsert(self.__db)
+#			elif i == NodeStatus.Missing:
+#				nodelists[i].deviceDelete(self.__db)
+#			elif i == NodeStatus.Warn or i == NodeStatus.Error:
+#				nodelists[i].deviceUpdate(self.__db)
+#			else:
+#				raise Exception('Unable to update database for node container with {0:d} entries and status {1:s}'.format( \
+#					len(nodelists[i]), NodeStatus.toString(i)))
 
 
 
@@ -141,10 +113,8 @@ class ListControlPanel(wx.Panel):
 		self.list.Bind(wx.EVT_LIST_ITEM_SELECTED, self.OnItemSelected)
 		self.list.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.OnItemActivated)
 		self.list.Bind(wx.EVT_COMMAND_RIGHT_CLICK, self.OnRightClick) # for wxMSW
-		self.list.Bind(wx.EVT_RIGHT_UP, self.OnRightClick) # for wxGTK		# start with empty node tree
+		self.list.Bind(wx.EVT_RIGHT_UP, self.OnRightClick) # for wxGTK
 
-		self.nodestack = []
-		self.namestack = []
 		self.instance = None
 
 		# some constants
@@ -189,72 +159,66 @@ class ListControlPanel(wx.Panel):
 			self.list.SetStringItem(index, 5, node.info.getATimeString())
 			self.list.SetStringItem(index, 6, node.info.getMTimeString())
 			self.list.SetStringItem(index, 7, node.info.getChecksumString())
-		# assign python id with entry
-		self.list.SetItemData(index, node.pythonid)
 
-	def IsRoot(self):
-		return len(self.nodestack) <= 1
+	def IndexToName(self, index):
+		return self.list.GetItem(index, 2).GetText()
+
+	def getSelectedNodeNames(self):
+		result = []
+		index = self.list.GetFirstSelected()
+		while not index == -1:
+			name = self.IndexToName(index)
+			result.append(name)
+			index = self.list.GetNextSelected(index)
+		return result
+
+	def RefreshTree(self):
+		# clear old contents
+		self.Clear()
+		if not self.instance.isRoot():
+			# for directories other than root show entry to go back to parent
+			index = self.list.InsertStringItem(sys.maxint, '')
+			self.list.SetStringItem(index, 2, self.__parentNameString)
+		for node in self.instance:
+			self.AppendNode(node)
+		if self.list.GetItemCount() == 0:
+			# for an empty list show a special string
+			index = self.list.InsertStringItem(sys.maxint, '')
+			self.list.SetStringItem(index, 2, self.__emptyNameString)
+		# set address line
+		self.GetParent().SetAddressLine(self.instance.getPath())
 
 	def Clear(self):
 		self.list.DeleteAllItems()
 
 	def ClearInstance(self):
-		if not self.instance is None:
-			self.instance.close()
-			self.instance = None
+		self.instance = None
 
-	def RefreshTree(self):
-		# clear old contents
-		self.Clear()
-		if not self.IsRoot():
-			# for directories other than root show entry to go back to parent
-			index = self.list.InsertStringItem(sys.maxint, '')
-			self.list.SetStringItem(index, 2, self.__parentNameString)
-		if len(self.nodestack) == 0:
-			# for an empty list show a special string
-			index = self.list.InsertStringItem(sys.maxint, '')
-			self.list.SetStringItem(index, 2, self.__emptyNameString)
-		else:
-			# otherwise just append all nodes
-			for node in self.nodestack[-1]:
-				self.AppendNode(node)
-		# set address line
-		path = reduce(lambda x, y: os.path.join(x, y), self.namestack)
-		self.GetParent().SetAddressLine(path)
-
-	def ShowNodeTree(self, instance, nodetree):
+	def ShowNodeTree(self, instance):
 		self.list.SetFocus()
-		self.nodestack = []
-		if len(nodetree[0].children) > 0:
-			self.nodestack.append(nodetree[0].children)
-		self.namestack = []
-		self.namestack.append('')
 		self.instance = instance
 		self.RefreshTree()
 
 	def OnItemSelected(self, event):
 		index = event.m_itemIndex
-		namecol = self.list.GetItem(index, 2).GetText()
+		name = self.IndexToName(index)
 		# prevent user from selecting parent dir entry or empty name string
-		if namecol == self.__parentNameString or namecol == self.__emptyNameString:
+		if name == self.__parentNameString or name == self.__emptyNameString:
 			self.list.SetItemState(index, 0, wx.LIST_STATE_SELECTED)
 		event.Skip()
 
 	def OnItemActivated(self, event):
 		index = event.m_itemIndex
-		namecol = self.list.GetItem(index, 2).GetText()
+		name = self.list.GetItem(index, 2).GetText()
 		# navigate to parent directory
-		if namecol == self.__parentNameString:
-			self.nodestack.pop()
-			self.namestack.pop()
+		if name == self.__parentNameString:
+			self.instance.up()
 			self.RefreshTree()
 			return
-		pythonid = self.list.GetItemData(index)
-		node = self.nodestack[-1].getByPythonID(pythonid)
+		node = self.instance.getNodeByName(name)
 		# navigate to child/sub directory
 		if node.isDirectory():
-			self.nodestack.append(node.children)
-			self.namestack.append(node.name)
+			self.instance.down(node)
 			self.RefreshTree()
 		# show comparison dialog
 		else:
@@ -284,27 +248,17 @@ class ListControlPanel(wx.Panel):
 			self.PopupMenu(menu)
 			menu.Destroy()
 
-	def getSelectedNodes(self):
-		result = NodeDict()
-		index = self.list.GetFirstSelected()
-		while not index == -1:
-			pythonid = self.list.GetItemData(index)
-			node = self.nodestack[-1].getByPythonID(pythonid)
-			result.append(node)
-			index = self.list.GetNextSelected(index)
-		return result
-
 	def OnPopupIgnore(self, event):
-		nodes = self.getSelectedNodes()
-		for node in nodes:
-			self.nodestack[-1].delByPythonID(node.pythonid)
+		name = self.getSelectedNodeNames()
+		#for node in nodes:
+		#	self.nodestack[-1].delByPythonID(node.pythonid)
 		self.RefreshTree()
 
 	def OnPopupUpdateDB(self, event):
-		nodes = self.getSelectedNodes()
-		self.instance.updateDB(nodes)
-		for node in nodes:
-			self.nodestack[-1].delByPythonID(node.pythonid)
+		names = self.getSelectedNodeNames()
+		#self.instance.updateDB(nodes)
+		#for node in nodes:
+		#	self.nodestack[-1].delByPythonID(node.pythonid)
 		self.RefreshTree()
 
 
@@ -358,29 +312,32 @@ class MainFrame(wx.Frame):
 			userPath = dirDialog.GetPath()
 		else:
 			return
-		if Instance.isRootDir(userPath):
+		if os.path.exists(os.path.join(userPath, '.dtint')):
 			dial = wx.MessageBox('Path "' + userPath + '" is already a valid root dir.\n\nDo you still want to continue?', \
 				'Warning', wx.YES_NO | wx.ICON_WARNING | wx.NO_DEFAULT)
 			if not dial == wx.YES:
 				return
 		self.Title = self.baseTitle + ' - ' + userPath
 
-		# create and reset instance
-		self.list.ClearInstance()
-		instance = Instance(userPath)
-		instance.reset()
-		instance.open()
+		# create trees
+		fstree = FilesystemTree(userPath)
+		fstree.reset()
+		dbtree = DatabaseTree(userPath)
+		dbtree.reset()
 
 		# create progress dialog
 		progressDialog = FileProcessingProgressDialog(self, 'Importing ' + userPath)
 		progressDialog.Show()
-		stats = instance.getStatistics()
+		stats = fstree.getStatistics()
 		progressDialog.Init(stats.getNodeCount(), stats.getNodeSize())
 
 		# execute task
 		try:
-			instance.importTree(progressDialog.SignalNewFile, \
+			fstree.registerHandlers(progressDialog.SignalNewFile, \
 				progressDialog.SignalBytesDone)
+			fstree.copyTo(dbtree)
+			dbtree.commit()
+			fstree.unRegisterHandlers()
 		except UserCancelledException:
 			self.list.Clear()
 			progressDialog.SignalFinished()
@@ -395,9 +352,8 @@ class MainFrame(wx.Frame):
 		# user stopped the calcuation using the cancel button
 		progressDialog.SignalFinished()
 
-		tree = instance.getDatabaseTree()
-		tree.setStatus(NodeStatus.OK)
-		self.list.ShowNodeTree(instance, tree)
+		self.list.ClearInstance()
+		self.list.ShowNodeTree(Instance(dbtree, None, None))
 
 	def OnCheck(self, event):
 		# get a valid path from user
@@ -409,27 +365,29 @@ class MainFrame(wx.Frame):
 			userPath = dirDialog.GetPath()
 		else:
 			return
-		if not Instance.isRootDir(userPath):
+		if not os.path.exists(os.path.join(userPath, '.dtint')):
 			wx.MessageBox('Path "' + userPath + '" is no valid root dir.', \
 				'Error', wx.OK | wx.ICON_ERROR)
 			return
 		self.Title = self.baseTitle + ' - ' + userPath
 
-		# create and reset instance
-		self.list.ClearInstance()
-		instance = Instance(userPath)
-		instance.open()
+		# create trees
+		fstree = FilesystemTree(userPath)
+		dbtree = DatabaseTree(userPath)
+		memtree = MemoryTree()
 
 		# create progress dialog
 		progressDialog = FileProcessingProgressDialog(self, 'Checking ' + userPath)
 		progressDialog.Show()
-		stats = instance.getStatistics()
+		stats = fstree.getStatistics()
 		progressDialog.Init(stats.getNodeCount(), stats.getNodeSize())
 
 		# execute task
 		try:
-			tree = instance.getDiffTree(progressDialog.SignalNewFile, \
+			fstree.registerHandlers(progressDialog.SignalNewFile, \
 				progressDialog.SignalBytesDone)
+			dbtree.compare(fstree, memtree)
+			fstree.unRegisterHandlers()
 		except UserCancelledException:
 			self.list.Clear()
 			progressDialog.SignalFinished()
@@ -444,7 +402,8 @@ class MainFrame(wx.Frame):
 		# user stopped the calcuation using the cancel button
 		progressDialog.SignalFinished()
 
-		self.list.ShowNodeTree(instance, tree)
+		self.list.ClearInstance()
+		self.list.ShowNodeTree(Instance(memtree, None, None))
 
 	def OnExit(self, event):
 		self.Close(True)

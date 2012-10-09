@@ -16,9 +16,6 @@ class DatabaseTree(Tree):
 		self.__databaseFile = os.path.join(metaDir, 'base.sqlite3')
 		self.__signatureFile = os.path.join(metaDir, 'base.signature')
 
-		self.__dbcon = None
-		self.open()
-
 		# --- SQL strings for database access ---
 		# Always keep in sync with Node and NodeInfo classes!
 		# Careful with changing spaces: some strings are auto-generated!
@@ -38,6 +35,8 @@ class DatabaseTree(Tree):
 		self.__databaseSelectString = ','.join(self.__databaseVarNames)
 		self.__databaseUpdateString = '=?,'.join(self.__databaseVarNames[1:]) + '=?'
 
+		self.__dbcon = None
+		self.open()
 		self.gotoRoot()
 
 	def __del__(self):
@@ -48,8 +47,12 @@ class DatabaseTree(Tree):
 	def getDepth(self):
 		return len(self.__parentIdStack) - 1
 
-	def getPath(self):
-		return reduce(lambda x, y: os.path.join(x, y), self.__parentNameStack)
+	def getPath(self, name=None):
+		path = reduce(lambda x, y: os.path.join(x, y), self.__parentNameStack)
+		if name is None:
+			return path
+		else:
+			return os.path.join(path, name)
 
 	def reset(self):
 		# close database
@@ -81,12 +84,9 @@ class DatabaseTree(Tree):
 		self.__parentIdStack.pop()
 		self.__parentNameStack.pop()
 
-	def down(self, name):
-		node = self.getNodeByName(name)
-		if node is None:
-			raise MyException('No node \'' + name + '\' in current dir.', 3)
+	def down(self, node):
 		if not node.isDirectory():
-			raise MyException('\'down\' on file \'' + name + '\' is not possible.', 3)
+			raise MyException('\'down\' on file \'' + node.name + '\' is not possible.', 3)
 		self.__parentIdStack.append(node.nodeid)
 		self.__parentNameStack.append(node.name)
 
@@ -146,8 +146,7 @@ class DatabaseTree(Tree):
 		row = cursor.fetchone()
 		if row is None:
 			return None
-		node = Node()
-		self.__fetch(node, row)
+		node = self.__fetch(row)
 		cursor.close()
 		return node
 
@@ -156,14 +155,26 @@ class DatabaseTree(Tree):
 		cursor.execute('select ' + self.__databaseSelectString + \
 			' from nodes where parent=?', (self.getCurrentParentId(),))
 		for row in cursor:
-			node = Node()
-			self.__fetch(node, row)
-			yield node
+			yield self.__fetch(row)
 		cursor.close()
+
+	def calculate(self, node):
+		# nothing to do, just signal that the job is done if necessary
+		if node.isDirectory():
+			if self.signalNewFile is not None:
+				self.signalNewFile(self.getPath(node.name), 0)
+		else:
+			if self.signalNewFile is not None:
+				self.signalNewFile(self.getPath(node.name), node.info.size)
+			if self.signalBytesDone is not None:
+				self.signalBytesDone(node.info.size)
 
 	### the following methods are not implementations of base class methods
 
 	def open(self):
+		# if neither database file nor signature file exist, make a silent reset
+		if not (os.path.exists(self.__databaseFile) and os.path.exists(self.__signatureFile)):
+			self.reset()
 		cs = Checksum()
 		cs.calculateForFile(self.__databaseFile)
 		if not cs.isValidUsingSavedFile(self.__signatureFile):
@@ -192,8 +203,9 @@ class DatabaseTree(Tree):
 			self.__dbcon.text_factory = str
 
 	def dbClose(self):
-		self.__dbcon.close()
-		self.__dbcon = None
+		if self.__dbcon is not None:
+			self.__dbcon.close()
+			self.__dbcon = None
 
 	def getCurrentParentId(self):
 		return self.__parentIdStack[-1]
@@ -205,10 +217,9 @@ class DatabaseTree(Tree):
 		cursor.close()
 		return result
 
-	def __fetch(self, node, row):
+	def __fetch(self, row):
+		node = Node(row[2])
 		node.nodeid = row[0]
-		#node.parentid = row[1] # TODO: remove later
-		node.name = row[2]
 		if not row[3]:
 			node.info = NodeInfo()
 			node.info.size = row[4]
@@ -217,27 +228,4 @@ class DatabaseTree(Tree):
 			node.info.mtime = row[7]
 			node.info.checksum = Checksum()
 			node.info.checksum.setBinary(row[8])
-		if self.doCalculate:
-			self.__calculate(node)
-
-	def __calculate(self, node):
-		if node.isDirectory():
-			if self.signalNewFile is not None:
-				self.signalNewFile(node.path, 0)
-		else:
-			# nothing to do, just signal that the job is done if necessary
-			if self.signalNewFile is not None:
-				self.signalNewFile(node.path, node.info.size)
-			if self.signalBytesDone is not None:
-				self.signalBytesDone(node.info.size)
-
-
-
-
-
-
-
-
-
-
-
+		return node

@@ -74,6 +74,26 @@ class FileProcessingProgressDialog(wx.Dialog):
 
 		self.OnPaint()
 
+	def __str__(self):
+		# cancel request
+		result = '(cancel request {0:b}'.format(self.cancelRequest)
+		# current bytes
+		if self. currentBytesDone is not None and \
+			self.currentBytesAll is not None:
+			result += ', current bytes {0:d}/{1:d}'.format( \
+				self. currentBytesDone, self.currentBytesAll)
+		# total files
+		if self. totalFilesDone is not None and \
+			self.totalFilesAll is not None:
+			result += ', total files {0:d}/{1:d}'.format( \
+				self. totalFilesDone, self.totalFilesAll)
+		# total bytes
+		if self. totalBytesDone is not None and \
+			self.totalBytesAll is not None:
+			result += ', total bytes {0:d}/{1:d}'.format( \
+				self. totalBytesDone, self.totalBytesAll)
+		return result + ')'
+
 	def OnClick(self, event):
 		if self.button.GetLabel() == 'OK':
 			self.Destroy()
@@ -110,6 +130,7 @@ class FileProcessingProgressDialog(wx.Dialog):
 
 	def SignalNewFile(self, path, size):
 		#print('signal new file "{0:s}", size {1:d}'.format(path, size))
+
 		if not self.currentBytesDone == self.currentBytesAll:
 			raise MyException('Signaled a new file but the old one is not done yet.', 3)
 		if self.totalBytesDone == 0:
@@ -134,28 +155,30 @@ class FileProcessingProgressDialog(wx.Dialog):
 	def SignalBytesDone(self, bytesDone):
 		#print('signal {0:d} bytes done, current is {1:d}/{2:d}'.format( \
 		#	bytesDone, self.currentBytesDone, self.currentBytesAll))
+
 		# ignore zero byte changes
 		if bytesDone == 0:
 			return
 		# update current bytes
 		self.currentBytesDone += bytesDone
 		if self.currentBytesDone > self.currentBytesAll:
-			raise MyException('Signaled current size larger than full size.', 3)
+			raise MyException('Signaled current file size larger than previously registered current file size.', 3)
 		elif self.currentBytesDone == self.currentBytesAll:
 			# file is complete
 			self.totalFilesDone += 1
 			if self.totalFilesDone > self.totalFilesAll:
-				raise MyException('Signaled number of files larger than full size.', 3)
+				raise MyException('Signaled total number of files larger than previously registered total number of files.', 3)
 		# update total bytes
 		self.totalBytesDone += bytesDone
 		if self.totalBytesDone > self.totalBytesAll:
-			raise MyException('Signaled total size larger than full size.', 3)
+			raise MyException('Signaled total files size larger than previously registered total files size.', 3)
 		self.OnPaint()
 		if self.cancelRequest:
 			raise UserCancelledException()
 
 	def SignalFinished(self):
-		#print('signal finished, cancel request is {0:b}'.format(self.cancelRequest))
+		#print('signal finished: ' + str(self))
+
 		self.button.SetLabel('OK')
 		if self.cancelRequest:
 			self.processingText.SetLabel('Canceled by user.')

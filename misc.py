@@ -1,6 +1,6 @@
 import binascii
-import copy
 import hashlib
+import os
 import wx
 
 
@@ -117,6 +117,8 @@ class Checksum(object):
 	def calculateForFile(self, path, signalBytesDone=None):
 		checksum = hashlib.sha256()
 		buffersize = 2**24
+		if not os.path.exists(path):
+			raise MyException('Unable to open signature file \'' + path + '\'.', 3)
 		f = open(path,'rb')
 		while True:
 			data = f.read(buffersize)

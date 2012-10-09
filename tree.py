@@ -1,5 +1,3 @@
-from sets import Set
-
 from misc import MyException
 from node import NodeStatistics, NodeStatus
 
@@ -10,14 +8,13 @@ class Tree(object):
 	def __init__(self):
 		self.signalNewFile = None
 		self.signalBytesDone = None
-		self.doCalculate = True
 
 	### those basic methods should be implemented in derived classes
 
 	def getDepth(self):
 		raise MyException('Not implemented.', 3)
 
-	def getPath(self):
+	def getPath(self, name=None):
 		raise MyException('Not implemented.', 3)
 
 	def reset():
@@ -29,7 +26,7 @@ class Tree(object):
 	def up(self):
 		raise MyException('Not implemented.', 3)
 
-	def down(self, name):
+	def down(self, node):
 		raise MyException('Not implemented.', 3)
 
 	def insert(self, node):
@@ -53,16 +50,27 @@ class Tree(object):
 	def __iter__(self):
 		raise MyException('Not implemented.', 3)
 
+	def calculate(self, node):
+		raise MyException('Not implemented.', 3)
+
 	### generic methods using basic methods
 
 	def isRoot(self):
 		return self.getDepth() == 0
 
+	def registerHandlers(self, signalNewFile, signalBytesDone):
+		self.signalNewFile = signalNewFile
+		self.signalBytesDone = signalBytesDone
+
+	def unRegisterHandlers(self):
+		self.signalNewFile = None
+		self.signalBytesDone = None
+
 	def __preOrderApply(self, func, param=None, recurse=True):
 		for node in self:
 			func(self, node, param)
 			if recurse and node.isDirectory():
-				self.down(node.name)
+				self.down(node)
 				self.__preOrderApply(func, param, recurse)
 				self.up()
 
@@ -72,7 +80,7 @@ class Tree(object):
 		else:
 			func(self, node, param)
 			if recurse and node.isDirectory():
-				self.down(node.name)
+				self.down(node)
 				self.__preOrderApply(func, param, recurse)
 				self.up()
 
@@ -100,20 +108,22 @@ class Tree(object):
 
 	def copyTo(self, dest):
 		for node in self:
+			self.calculate(node)
 			dest.insert(node)
 			if node.isDirectory():
-				self.down(node.name)
-				dest.down(node.name)
+				self.down(node)
+				dest.down(dest.getNodeByName(node.name))
 				self.copyTo(dest)
 				dest.up()
 				self.up()
 
 	def copyNodeTo(self, dest, snode):
 		# snode must be current node of self!
+		dest.calculate(snode)
 		dest.insert(snode)
 		if snode.isDirectory():
-			self.down(snode.name)
-			dest.down(snode.name)
+			self.down(snode)
+			dest.down(dest.getNodeByName(snode.name))
 			self.copyTo(dest)
 			dest.up()
 			self.up()
@@ -121,16 +131,18 @@ class Tree(object):
 	def compare(self, other, result, removeOkNodes=False):
 		snames = {}
 		for snode in self:
+			self.calculate(snode)
 			onode = other.getNodeByName(snode.name)
 			if (onode is not None) and (snode.isDirectory() == onode.isDirectory()):
-				# nodes existing in self and othern: already known nodes
+				# nodes existing in self and other: already known nodes
+				other.calculate(onode)
 				rnode = snode
 				if snode.isDirectory():
 					# recurse
-					self.down(snode.name)
-					other.down(onode.name)
+					self.down(snode)
+					other.down(onode)
 					result.insert(rnode) # just to be able to do a "down"
-					result.down(rnode.name)
+					result.down(rnode)
 					self.compare(other, result, removeOkNodes)
 					result.up()
 					other.up()
@@ -161,6 +173,7 @@ class Tree(object):
 			if onode.name in snames:
 				if snames[onode.name] == onode.isDirectory():
 					continue
+			other.calculate(onode)
 			other.copyNodeTo(result, onode)
 			result.setNodeStatus(NodeStatus.New, onode)
 
