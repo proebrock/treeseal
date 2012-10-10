@@ -34,6 +34,15 @@ class NodeStatus:
 		else:
 			raise MyException('Not existing node status {0:d}'.format(status), 3)
 
+	@staticmethod
+	def updateStatus(oldstatus, status):
+		if oldstatus == NodeStatus.Undefined:
+			return status
+		elif oldstatus == status:
+			return oldstatus
+		else:
+			return NodeStatus.Unknown
+
 
 
 class NodeInfo(object):

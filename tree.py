@@ -130,6 +130,7 @@ class Tree(object):
 
 	def compare(self, other, result, removeOkNodes=False):
 		snames = {}
+		totalstatus = NodeStatus.Undefined
 		for snode in self:
 			self.calculate(snode)
 			onode = other.getNodeByName(snode.name)
@@ -137,13 +138,15 @@ class Tree(object):
 				# nodes existing in self and other: already known nodes
 				other.calculate(onode)
 				rnode = snode
+				result.insert(rnode)
 				if snode.isDirectory():
-					# recurse
+					# tree descent
 					self.down(snode)
 					other.down(onode)
-					result.insert(rnode) # just to be able to do a "down"
 					result.down(rnode)
-					self.compare(other, result, removeOkNodes)
+					# recurse
+					rnode.status = self.compare(other, result, removeOkNodes)
+					# tree ascent
 					result.up()
 					other.up()
 					self.up()
@@ -156,16 +159,17 @@ class Tree(object):
 							rnode.status = NodeStatus.Error
 					else:
 						rnode.status = NodeStatus.Warn
-					# append other node to rnode
-					if not rnode.status == NodeStatus.OK:
-						rnode.other = onode
-					# add result node if necessary
-					if not (removeOkNodes and rnode.status == NodeStatus.OK):
-						result.insert(rnode)
+				# process status of child node
+				if removeOkNodes and rnode.status == NodeStatus.OK:
+					result.delete(rnode.name)
+				else:
+					totalstatus = NodeStatus.updateStatus(totalstatus, rnode.status)
+					result.update(rnode)
 			else:
 				# nodes existing in self but not in other: missing nodes
 				self.copyNodeTo(result, snode)
 				result.setNodeStatus(NodeStatus.Missing, snode)
+				totalstatus = NodeStatus.updateStatus(totalstatus, NodeStatus.Missing)
 			# buffer that info for later determining new nodes
 			snames[snode.name] = snode.isDirectory()
 		# nodes existing in other but not in self: new nodes
@@ -176,6 +180,11 @@ class Tree(object):
 			other.calculate(onode)
 			other.copyNodeTo(result, onode)
 			result.setNodeStatus(NodeStatus.New, onode)
+			totalstatus = NodeStatus.updateStatus(totalstatus, NodeStatus.New)
+		if totalstatus == NodeStatus.Undefined:
+			return NodeStatus.OK
+		else:
+			return totalstatus
 
 
 
