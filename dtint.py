@@ -21,10 +21,22 @@ ProgramVersion = '3.0'
 
 class Instance:
 
-	def __init__(self, view, src, dest):
+	def __init__(self, view, old, new):
 		self.__view = view
-		self.__src = src
-		self.__dest = dest
+		self.__old = old
+		self.__new = new
+
+	def __str__(self):
+		result = '('
+		result += '<view> depth={0:d} path=\'{1:s}\'' \
+			.format(self.__view.getDepth(), self.__view.getPath())
+		if self.__old is not None:
+			result += ', <old> depth={0:d} path=\'{1:s}\'' \
+				.format(self.__old.getDepth(), self.__old.getPath())
+		if self.__new is not None:
+			result += ', <new> depth={0:d} path=\'{1:s}\'' \
+				.format(self.__new.getDepth(), self.__new.getPath())
+		return result + ')'
 
 	def isRoot(self):
 		return self.__view.isRoot()
@@ -39,18 +51,22 @@ class Instance:
 		return self.__view.getStatistics()
 
 	def up(self):
+		if self.__old is not None:
+			if self.__old.getDepth() == self.__view.getDepth():
+				self.__old.up()
+		if self.__new is not None:
+			if self.__new.getDepth() == self.__view.getDepth():
+				self.__new.up()
 		self.__view.up()
-		if self.__src is not None:
-			self.__src.up()
-		if self.__dest is not None:
-			self.__dest.up()
 
 	def down(self, node):
 		self.__view.down(node)
-		if self.__src is not None:
-			self.__src.down(self.__src.getNodeByName(node.name))
-		if self.__src is not None:
-			self.__src.down(self.__src.getNodeByName(node.name))
+		if self.__old is not None:
+			if not node.status == NodeStatus.New:
+				self.__old.down(self.__old.getNodeByName(node.name))
+		if self.__new is not None:
+			if not node.status == NodeStatus.Missing:
+				self.__new.down(self.__new.getNodeByName(node.name))
 
 	def getNodeByName(self, name):
 		return self.__view.getNodeByName(name)
@@ -403,7 +419,7 @@ class MainFrame(wx.Frame):
 		progressDialog.SignalFinished()
 
 		self.list.ClearInstance()
-		self.list.ShowNodeTree(Instance(memtree, None, None))
+		self.list.ShowNodeTree(Instance(memtree, dbtree, fstree))
 
 	def OnExit(self, event):
 		self.Close(True)
