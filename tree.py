@@ -84,6 +84,24 @@ class Tree(object):
 				self.__preOrderApply(func, param, recurse)
 				self.up()
 
+	def __postOrderApply(self, func, param=None, recurse=True):
+		for node in self:
+			if recurse and node.isDirectory():
+				self.down(node)
+				self.__preOrderApply(func, param, recurse)
+				self.up()
+			func(self, node, param)
+
+	def postOrderApply(self, func, node=None, param=None, recurse=True):
+		if node is None:
+			self.__postOrderApply(func, param, recurse)
+		else:
+			if recurse and node.isDirectory():
+				self.down(node)
+				self.__postOrderApply(func, param, recurse)
+				self.up()
+			func(self, node, param)
+
 	def __prettyPrintFunc(self, node, param):
 		node.prettyPrint(self.getDepth() * '    ')
 		print('')
@@ -106,6 +124,12 @@ class Tree(object):
 	def setNodeStatus(self, status, node=None, recurse=True):
 		self.preOrderApply(Tree.__setNodeStatus, node, status, recurse)
 
+	def __deleteNode(self, node, param):
+		self.delete(node.name)
+
+	def deleteNode(self, node=None, recurse=True):
+		self.postOrderApply(Tree.__deleteNode, node, None, recurse)
+
 	def copyTo(self, dest):
 		for node in self:
 			self.calculate(node)
@@ -127,6 +151,45 @@ class Tree(object):
 			self.copyTo(dest)
 			dest.up()
 			self.up()
+
+	def syncTo(self, dest):
+		snames = {}
+		for snode in self:
+			dnode = dest.getNodeByName(snode.name)
+			if (dnode is not None) and (snode.isDirectory() == dnode.isDirectory()):
+				# nodes existing in source and destination: update
+				dest.update(snode)
+				if snode.isDirectory():
+					# recurse
+					self.down(snode)
+					dest.down(dnode)
+					self.syncTo(dest)
+					dest.up()
+					self.up()
+			else:
+				# nodes existing in self but not in dest: copy
+				self.copyNodeTo(dest, snode)
+			snames[snode.name] = snode.isDirectory()
+		for dnode in dest:
+			if dnode.name in snames:
+				if snames[dnode.name] == dnode.isDirectory():
+					continue
+			# nodes existing in dest but not in self: delete
+			dest.deleteNode(dnode)
+
+	def syncNodeTo(self, dest, snode):
+		dnode = dest.getNodeByName(snode.name)
+		if (dnode is not None) and (snode.isDirectory() == dnode.isDirectory()):
+				dest.update(snode)
+				if snode.isDirectory():
+					# recurse
+					self.down(snode)
+					dest.down(dnode)
+					self.syncTo(dest)
+					dest.up()
+					self.up()
+		else:
+			self.copyNodeTo(dest, snode)
 
 	def compare(self, other, result, removeOkNodes=False):
 		snames = {}
@@ -172,11 +235,11 @@ class Tree(object):
 				totalstatus = NodeStatus.updateStatus(totalstatus, NodeStatus.Missing)
 			# buffer that info for later determining new nodes
 			snames[snode.name] = snode.isDirectory()
-		# nodes existing in other but not in self: new nodes
 		for onode in other:
 			if onode.name in snames:
 				if snames[onode.name] == onode.isDirectory():
 					continue
+			# nodes existing in other but not in self: new nodes
 			other.calculate(onode)
 			other.copyNodeTo(result, onode)
 			result.setNodeStatus(NodeStatus.New, onode)

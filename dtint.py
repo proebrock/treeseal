@@ -19,9 +19,17 @@ ProgramVersion = '3.0'
 
 
 
-class Instance:
+class UserConfig(object):
 
-	def __init__(self, view, old, new):
+	def __init__(self):
+		self.removeOkNodes = False
+
+
+
+class Instance(object):
+
+	def __init__(self, config, view, old, new):
+		self.__config = config
 		self.__view = view
 		self.__old = old
 		self.__new = new
@@ -62,11 +70,13 @@ class Instance:
 	def down(self, node):
 		self.__view.down(node)
 		if self.__old is not None:
-			if not node.status == NodeStatus.New:
-				self.__old.down(self.__old.getNodeByName(node.name))
+			n = self.__old.getNodeByName(node.name)
+			if n is not None:
+				self.__old.down(n)
 		if self.__new is not None:
-			if not node.status == NodeStatus.Missing:
-				self.__new.down(self.__new.getNodeByName(node.name))
+			n = self.__new.getNodeByName(node.name)
+			if n is not None:
+				self.__new.down(n)
 
 	def getNodeByName(self, name):
 		return self.__view.getNodeByName(name)
@@ -75,10 +85,18 @@ class Instance:
 		for node in self.__view:
 			yield node
 
-	def ignore(self, nodes):
-		pass
+	def ignore(self, names):
+		for name in names:
+			vnode = self.__view.getNodeByName(name)
+			nnode = self.__new.getNodeByName(name)
+			if nnode is None or self.__config.removeOkNodes:
+				self.__view.deleteNode(vnode)
+			else:
+				self.__new.syncNodeTo(self.__view, nnode)
+				if nnode is not None:
+					self.__view.setNodeStatus(NodeStatus.OK, vnode)
 
-	def accept(self, nodes):
+	def fix(self, names):
 		pass
 
 #	def sync(self, nodes):
@@ -265,16 +283,13 @@ class ListControlPanel(wx.Panel):
 			menu.Destroy()
 
 	def OnPopupIgnore(self, event):
-		name = self.getSelectedNodeNames()
-		#for node in nodes:
-		#	self.nodestack[-1].delByPythonID(node.pythonid)
+		names = self.getSelectedNodeNames()
+		self.instance.ignore(names)
 		self.RefreshTree()
 
 	def OnPopupUpdateDB(self, event):
 		names = self.getSelectedNodeNames()
-		#self.instance.updateDB(nodes)
-		#for node in nodes:
-		#	self.nodestack[-1].delByPythonID(node.pythonid)
+		self.instance.fix(names)
 		self.RefreshTree()
 
 
@@ -310,6 +325,8 @@ class MainFrame(wx.Frame):
 		sizer.Add(self.address, 0, wx.ALL | wx.EXPAND, 5)
 		sizer.Add(self.list, 1, wx.ALL | wx.EXPAND, 5)
 		self.SetSizer(sizer)
+
+		self.config = UserConfig()
 
 		self.CreateStatusBar()
 
@@ -369,7 +386,7 @@ class MainFrame(wx.Frame):
 		progressDialog.SignalFinished()
 
 		self.list.ClearInstance()
-		self.list.ShowNodeTree(Instance(dbtree, None, None))
+		self.list.ShowNodeTree(Instance(self.config, dbtree, None, None))
 
 	def OnCheck(self, event):
 		# get a valid path from user
@@ -402,7 +419,7 @@ class MainFrame(wx.Frame):
 		try:
 			fstree.registerHandlers(progressDialog.SignalNewFile, \
 				progressDialog.SignalBytesDone)
-			dbtree.compare(fstree, memtree)
+			dbtree.compare(fstree, memtree, self.config.removeOkNodes)
 			fstree.unRegisterHandlers()
 		except UserCancelledException:
 			self.list.Clear()
@@ -419,7 +436,7 @@ class MainFrame(wx.Frame):
 		progressDialog.SignalFinished()
 
 		self.list.ClearInstance()
-		self.list.ShowNodeTree(Instance(memtree, dbtree, fstree))
+		self.list.ShowNodeTree(Instance(self.config, memtree, dbtree, fstree))
 
 	def OnExit(self, event):
 		self.Close(True)
