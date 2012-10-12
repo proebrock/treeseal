@@ -16,17 +16,24 @@ class FilesystemTree(Tree):
 		self.__metaDir = os.path.join(self.__rootDir, '.dtint')
 		self.gotoRoot()
 
+	def __str__(self):
+		result = '('
+		result += 'FilesystemTree: '
+		result += 'depth=\'' + str(self.getDepth()) + '\''
+		result += ', path=\'' + self.getPath() + '\''
+		return result + ')'
+
 	### implementation of base class methods, please keep order
 
 	def getDepth(self):
 		return len(self.__parentNameStack) - 1
 
-	def getPath(self, name=None):
+	def getPath(self, filename=None):
 		path = reduce(lambda x, y: os.path.join(x, y), self.__parentNameStack)
-		if name is None:
+		if filename is None:
 			return path
 		else:
-			return os.path.join(path, name)
+			return os.path.join(path, filename)
 
 	def reset(self):
 		if not os.path.exists(self.__metaDir):
@@ -56,9 +63,11 @@ class FilesystemTree(Tree):
 	def update(self, node):
 		pass
 
-	def delete(self, node):
-		fullpath = self.getFullPath(node.name)
-		if node.isDirectory():
+	def delete(self, nid):
+		if not self.exists(nid):
+			raise MyException('Node does not exist for deletion.', 1)
+		fullpath = self.getFullPath(Node.nid2Name(nid))
+		if os.path.isdir(fullpath):
 			os.rmdir(fullpath)
 		else:
 			os.remove(fullpath)
@@ -66,15 +75,19 @@ class FilesystemTree(Tree):
 	def commit(self):
 		pass
 
-	def exists(self, name):
-		return os.path.exists(self.getFullPath(name))
+	def exists(self, nid):
+		fullpath = self.getFullPath(Node.nid2Name(nid))
+		return os.path.exists(fullpath) and os.path.isdir(fullpath) == Node.nid2IsDirectory(nid)
 
-	def getNodeByName(self, name):
-		return self.__fetch(name)
+	def getNodeByNid(self, nid):
+		if not self.exists(nid):
+			return None
+		else:
+			return self.__fetch(Node.nid2Name(nid))
 
 	def __iter__(self):
 		for name in os.listdir(self.getFullPath()):
-			node = self.getNodeByName(name)
+			node = self.__fetch(name)
 			if node is not None:
 				yield node
 
@@ -88,6 +101,7 @@ class FilesystemTree(Tree):
 			fullpath = self.getFullPath(node.name)
 			# calculate checksum
 			node.info.checksum = Checksum()
+			print('### expensive calculation for node \'' + self.getPath(node.name) + '\' ...')
 			node.info.checksum.calculateForFile(fullpath, self.signalBytesDone)
 			# determine file timestamps AFTER calculating the checksum, otherwise opening
 			# the file might change the access time (OS dependent)
@@ -104,8 +118,6 @@ class FilesystemTree(Tree):
 	def __fetch(self, name):
 		fullpath = self.getFullPath(name)
 		if fullpath == self.__metaDir:
-			return None
-		if not self.exists(name):
 			return None
 		node = Node(name)
 		if not os.path.isdir(fullpath):

@@ -174,8 +174,49 @@ class Node(object):
 		result.info = copy.deepcopy(self.info, memo)
 		return result
 
+	def __eq__(self, other):
+		# does not check equality of node info (!), see getNid()
+		return self.getNid() == other.getNid()
+
+	def __ne__(self, other):
+		# does not check equality of node info (!), see getNid()
+		return not self.__eq__(other)
+
+	def getNid(self):
+		# --------------------------------------
+		# A note about the 'Node Identifier' (NID)
+		# --------------------------------------
+		# The NID identifies a node unambiguously among all children of the
+		# same node in the tree. Looking at the filesystem, the name itself
+		# would suffice, there is no way of creating a directory and a file
+		# with the same name in the same directory (at least not for the
+		# OSes known to me and supported by this application). The problem
+		# occurres when using diff trees between the database containing
+		# a directory 'foo' (old status) and the filesystem containing a
+		# file 'foo' (new status). The diff tree would contain two entries
+		# with directory 'foo' of status 'Missing' and of file 'foo' of
+		# state 'New', therefore two nodes with the same name. This is the
+		# reason to use the Nid as identifier containing a isdir flag and
+		# the name. Node comparison is based on this method, too.
+		return Node.constructNid(self.name, self.isDirectory())
+
+	@staticmethod
+	def constructNid(name, isdir):
+		return '{0:b}{1:s}'.format(not isdir, name)
+
+	@staticmethod
+	def nid2Name(nid):
+		return nid[1:]
+
+	@staticmethod
+	def nid2IsDirectory(nid):
+		return nid[0] == '0'
+
 	def isDirectory(self):
 		return self.info is None
+
+	def getIsDirString(self):
+		return '{0:b}'.format(self.isDirectory())
 
 	def getStatusString(self):
 		if self.status is None:
@@ -195,9 +236,6 @@ class Node(object):
 		else:
 			return self.name
 
-	def getUniqueKey(self):
-		return '{0:b}{1:s}'.format(not self.isDirectory(), self.name)
-
 	def getInfoString(self):
 		if self.info is None:
 			return self.NoneString
@@ -208,6 +246,7 @@ class Node(object):
 		print('{0:s}status              {1:s}'.format(prefix, self.getStatusString()))
 		print('{0:s}nodeid              {1:s}'.format(prefix, self.getNodeIDString()))
 		print('{0:s}name                {1:s}'.format(prefix, self.getNameString()))
+		print('{0:s}isdir               {1:s}'.format(prefix, self.getIsDirString()))
 		if self.info is not None:
 			self.info.prettyPrint(prefix)
 

@@ -9,7 +9,7 @@ from fstree import FilesystemTree
 from icons import IconError, IconMissing, IconNew, IconOk, IconUnknown, IconWarning
 from memtree import MemoryTree
 from misc import MyException
-from node import NodeStatus
+from node import Node, NodeStatus
 from progressdialog import UserCancelledException, FileProcessingProgressDialog
 from comparisondialog import NodeComparisonDialog
 from simplelistctrl import SimpleListControl
@@ -55,8 +55,8 @@ class Instance(object):
 	def getPath(self):
 		return self.__view.getPath()
 
-	def getStatistics(self):
-		return self.__view.getStatistics()
+	def getNodeStatistics(self):
+		return self.__view.getNodeStatistics()
 
 	def up(self):
 		if self.__old is not None:
@@ -70,49 +70,36 @@ class Instance(object):
 	def down(self, node):
 		self.__view.down(node)
 		if self.__old is not None:
-			n = self.__old.getNodeByName(node.name)
+			n = self.__old.getNodeByNid(node.getNid())
 			if n is not None:
 				self.__old.down(n)
 		if self.__new is not None:
-			n = self.__new.getNodeByName(node.name)
+			n = self.__new.getNodeByNid(node.getNid())
 			if n is not None:
 				self.__new.down(n)
 
-	def getNodeByName(self, name):
-		return self.__view.getNodeByName(name)
+	def getNodeByNid(self, name):
+		return self.__view.getNodeByNid(name)
 
 	def __iter__(self):
 		for node in self.__view:
 			yield node
 
-	def ignore(self, names):
-		for name in names:
-			vnode = self.__view.getNodeByName(name)
-			nnode = self.__new.getNodeByName(name)
+	def ignore(self, nids):
+		for nid in nids:
+			vnode = self.__view.getNodeByNid(nid)
+			if vnode is None:
+				raise Exception('Tree inconsistency; that should never happen.', 3)
+			nnode = self.__new.getNodeByNid(nid)
 			if nnode is None or self.__config.removeOkNodes:
 				self.__view.deleteNode(vnode)
 			else:
 				self.__new.syncNodeTo(self.__view, nnode)
-				if nnode is not None:
-					self.__view.setNodeStatus(NodeStatus.OK, vnode)
+				self.__view.setNodeStatus(NodeStatus.OK, vnode)
+		self.__view.commit()
 
-	def fix(self, names):
+	def fix(self, nids):
 		pass
-
-#	def sync(self, nodes):
-#		nodelists = nodes.splitByStatus()
-#		for i in range(NodeStatus.NumStatuses):
-#			if len(nodelists[i]) == 0 or i == NodeStatus.OK:
-#				continue
-#			elif i == NodeStatus.New:
-#				nodelists[i].deviceInsert(self.__db)
-#			elif i == NodeStatus.Missing:
-#				nodelists[i].deviceDelete(self.__db)
-#			elif i == NodeStatus.Warn or i == NodeStatus.Error:
-#				nodelists[i].deviceUpdate(self.__db)
-#			else:
-#				raise Exception('Unable to update database for node container with {0:d} entries and status {1:s}'.format( \
-#					len(nodelists[i]), NodeStatus.toString(i)))
 
 
 
@@ -154,6 +141,7 @@ class ListControlPanel(wx.Panel):
 		# some constants
 		self.__emptyNameString = '<empty>'
 		self.__parentNameString = '..'
+		self.__dirMarkerString = '>'
 
 		# prepare image list
 		self.imagelist = wx.ImageList(16, 16)
@@ -182,11 +170,11 @@ class ListControlPanel(wx.Panel):
 		elif node.status == NodeStatus.Error:
 			index = self.list.InsertImageItem(sys.maxint, self.iconError)
 		else:
-			raise Exception('Unknown node status {0:d}'.format(node.status))
+			raise Exception('Unknown node status {0:d}'.format(node.status), 3)
 		# fill in rest of information
 		self.list.SetStringItem(index, 2, node.name)
 		if node.isDirectory():
-			self.list.SetStringItem(index, 1, '>')
+			self.list.SetStringItem(index, 1, self.__dirMarkerString)
 		else:
 			self.list.SetStringItem(index, 3, node.info.getSizeString())
 			self.list.SetStringItem(index, 4, node.info.getCTimeString())
@@ -197,12 +185,17 @@ class ListControlPanel(wx.Panel):
 	def IndexToName(self, index):
 		return self.list.GetItem(index, 2).GetText()
 
-	def getSelectedNodeNames(self):
+	def IndexToNid(self, index):
+		name = self.list.GetItem(index, 2).GetText()
+		isdir = self.list.GetItem(index, 1).GetText() == self.__dirMarkerString
+		return Node.constructNid(name, isdir)
+
+	def getSelectedNodeNids(self):
 		result = []
 		index = self.list.GetFirstSelected()
 		while not index == -1:
-			name = self.IndexToName(index)
-			result.append(name)
+			nid = self.IndexToNid(index)
+			result.append(nid)
 			index = self.list.GetNextSelected(index)
 		return result
 
@@ -243,13 +236,14 @@ class ListControlPanel(wx.Panel):
 
 	def OnItemActivated(self, event):
 		index = event.m_itemIndex
-		name = self.list.GetItem(index, 2).GetText()
+		name = self.IndexToName(index)
 		# navigate to parent directory
 		if name == self.__parentNameString:
 			self.instance.up()
 			self.RefreshTree()
 			return
-		node = self.instance.getNodeByName(name)
+		nid = self.IndexToNid(index)
+		node = self.instance.getNodeByNid(nid)
 		# navigate to child/sub directory
 		if node.isDirectory():
 			self.instance.down(node)
@@ -283,13 +277,13 @@ class ListControlPanel(wx.Panel):
 			menu.Destroy()
 
 	def OnPopupIgnore(self, event):
-		names = self.getSelectedNodeNames()
-		self.instance.ignore(names)
+		nids = self.getSelectedNodeNids()
+		self.instance.ignore(nids)
 		self.RefreshTree()
 
 	def OnPopupUpdateDB(self, event):
-		names = self.getSelectedNodeNames()
-		self.instance.fix(names)
+		nids = self.getSelectedNodeNids()
+		self.instance.fix(nids)
 		self.RefreshTree()
 
 
@@ -361,7 +355,7 @@ class MainFrame(wx.Frame):
 		# create progress dialog
 		progressDialog = FileProcessingProgressDialog(self, 'Importing ' + userPath)
 		progressDialog.Show()
-		stats = fstree.getStatistics()
+		stats = fstree.getNodeStatistics()
 		progressDialog.Init(stats.getNodeCount(), stats.getNodeSize())
 
 		# execute task
@@ -412,14 +406,15 @@ class MainFrame(wx.Frame):
 		# create progress dialog
 		progressDialog = FileProcessingProgressDialog(self, 'Checking ' + userPath)
 		progressDialog.Show()
-		stats = fstree.getStatistics()
+		stats = fstree.getNodeStatistics()
 		progressDialog.Init(stats.getNodeCount(), stats.getNodeSize())
 
 		# execute task
 		try:
 			fstree.registerHandlers(progressDialog.SignalNewFile, \
 				progressDialog.SignalBytesDone)
-			dbtree.compare(fstree, memtree, self.config.removeOkNodes)
+			fstree.compare(dbtree, memtree, self.config.removeOkNodes)
+			memtree.commit()
 			fstree.unRegisterHandlers()
 		except UserCancelledException:
 			self.list.Clear()

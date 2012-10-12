@@ -14,7 +14,7 @@ class Tree(object):
 	def getDepth(self):
 		raise MyException('Not implemented.', 3)
 
-	def getPath(self, name=None):
+	def getPath(self, filename=None):
 		raise MyException('Not implemented.', 3)
 
 	def reset():
@@ -35,16 +35,16 @@ class Tree(object):
 	def update(self, node):
 		raise MyException('Not implemented.', 3)
 
-	def delete(self, name):
+	def delete(self, nid):
 		raise MyException('Not implemented.', 3)
 
 	def commit(self):
 		raise MyException('Not implemented.', 3)
 
-	def exists(self, name):
+	def exists(self, nid):
 		raise MyException('Not implemented.', 3)
 
-	def getNodeByName(self, name):
+	def getNodeByNid(self, nid):
 		raise MyException('Not implemented.', 3)
 
 	def __iter__(self):
@@ -109,26 +109,26 @@ class Tree(object):
 	def prettyPrint(self, node=None, recurse=True):
 		self.preOrderApply(Tree.__prettyPrintFunc, node, None, recurse)
 
-	def __getStatisticsFunc(self, node, param):
+	def __getNodeStatisticsFunc(self, node, param):
 		param.update(node)
 
-	def getStatistics(self, node=None, recurse=True):
+	def getNodeStatistics(self, node=None, recurse=True):
 		stats = NodeStatistics()
-		self.preOrderApply(Tree.__getStatisticsFunc, node, stats, recurse)
+		self.preOrderApply(Tree.__getNodeStatisticsFunc, node, stats, recurse)
 		return stats
 
-	def __setNodeStatus(self, node, param):
+	def __setNodeStatusFunc(self, node, param):
 		node.status = param
 		self.update(node)
 
 	def setNodeStatus(self, status, node=None, recurse=True):
-		self.preOrderApply(Tree.__setNodeStatus, node, status, recurse)
+		self.preOrderApply(Tree.__setNodeStatusFunc, node, status, recurse)
 
-	def __deleteNode(self, node, param):
-		self.delete(node.name)
+	def __deleteNodeFunc(self, node, param):
+		self.delete(node.getNid())
 
 	def deleteNode(self, node=None, recurse=True):
-		self.postOrderApply(Tree.__deleteNode, node, None, recurse)
+		self.postOrderApply(Tree.__deleteNodeFunc, node, None, recurse)
 
 	def copyTo(self, dest):
 		for node in self:
@@ -136,7 +136,7 @@ class Tree(object):
 			dest.insert(node)
 			if node.isDirectory():
 				self.down(node)
-				dest.down(dest.getNodeByName(node.name))
+				dest.down(dest.getNodeByNid(node.getNid()))
 				self.copyTo(dest)
 				dest.up()
 				self.up()
@@ -147,7 +147,7 @@ class Tree(object):
 		dest.insert(snode)
 		if snode.isDirectory():
 			self.down(snode)
-			dest.down(dest.getNodeByName(snode.name))
+			dest.down(dest.getNodeByNid(snode.getNid()))
 			self.copyTo(dest)
 			dest.up()
 			self.up()
@@ -155,8 +155,8 @@ class Tree(object):
 	def syncTo(self, dest):
 		snames = {}
 		for snode in self:
-			dnode = dest.getNodeByName(snode.name)
-			if (dnode is not None) and (snode.isDirectory() == dnode.isDirectory()):
+			dnode = dest.getNodeByNid(snode.getNid())
+			if dnode is not None:
 				# nodes existing in source and destination: update
 				dest.update(snode)
 				if snode.isDirectory():
@@ -178,8 +178,8 @@ class Tree(object):
 			dest.deleteNode(dnode)
 
 	def syncNodeTo(self, dest, snode):
-		dnode = dest.getNodeByName(snode.name)
-		if (dnode is not None) and (snode.isDirectory() == dnode.isDirectory()):
+		dnode = dest.getNodeByNid(snode.getNid())
+		if dnode is not None:
 				dest.update(snode)
 				if snode.isDirectory():
 					# recurse
@@ -196,8 +196,8 @@ class Tree(object):
 		totalstatus = NodeStatus.Undefined
 		for snode in self:
 			self.calculate(snode)
-			onode = other.getNodeByName(snode.name)
-			if (onode is not None) and (snode.isDirectory() == onode.isDirectory()):
+			onode = other.getNodeByNid(snode.getNid())
+			if onode is not None:
 				# nodes existing in self and other: already known nodes
 				other.calculate(onode)
 				rnode = snode
@@ -224,26 +224,26 @@ class Tree(object):
 						rnode.status = NodeStatus.Warn
 				# process status of child node
 				if removeOkNodes and rnode.status == NodeStatus.OK:
-					result.delete(rnode.name)
+					result.delete(rnode.getNid())
 				else:
 					totalstatus = NodeStatus.updateStatus(totalstatus, rnode.status)
 					result.update(rnode)
 			else:
-				# nodes existing in self but not in other: missing nodes
+				# nodes existing in self but not in other: new nodes
 				self.copyNodeTo(result, snode)
-				result.setNodeStatus(NodeStatus.Missing, snode)
-				totalstatus = NodeStatus.updateStatus(totalstatus, NodeStatus.Missing)
+				result.setNodeStatus(NodeStatus.New, snode)
+				totalstatus = NodeStatus.updateStatus(totalstatus, NodeStatus.New)
 			# buffer that info for later determining new nodes
 			snames[snode.name] = snode.isDirectory()
 		for onode in other:
 			if onode.name in snames:
 				if snames[onode.name] == onode.isDirectory():
 					continue
-			# nodes existing in other but not in self: new nodes
+			# nodes existing in other but not in self: missing nodes
 			other.calculate(onode)
 			other.copyNodeTo(result, onode)
-			result.setNodeStatus(NodeStatus.New, onode)
-			totalstatus = NodeStatus.updateStatus(totalstatus, NodeStatus.New)
+			result.setNodeStatus(NodeStatus.Missing, onode)
+			totalstatus = NodeStatus.updateStatus(totalstatus, NodeStatus.Missing)
 		if totalstatus == NodeStatus.Undefined:
 			return NodeStatus.OK
 		else:

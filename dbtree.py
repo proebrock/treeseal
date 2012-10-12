@@ -42,17 +42,25 @@ class DatabaseTree(Tree):
 	def __del__(self):
 		self.close()
 
+	def __str__(self):
+		result = '('
+		result += 'DatabaseTree: '
+		result += 'depth=\'' + str(self.getDepth()) + '\''
+		result += ', path=\'' + self.getPath() + '\''
+		result += ', id stack=\'' + ', '.join(str(id) for id in self.__parentIdStack) + '\''
+		return result + ')'
+
 	### implementation of base class methods, please keep order
 
 	def getDepth(self):
 		return len(self.__parentIdStack) - 1
 
-	def getPath(self, name=None):
+	def getPath(self, filename=None):
 		path = reduce(lambda x, y: os.path.join(x, y), self.__parentNameStack)
-		if name is None:
+		if filename is None:
 			return path
 		else:
-			return os.path.join(path, name)
+			return os.path.join(path, filename)
 
 	def reset(self):
 		# close database
@@ -125,24 +133,27 @@ class DatabaseTree(Tree):
 				node.info.ctime, node.info.atime, node.info.mtime, \
 				node.info.checksum.getBinary(), node.nodeid))
 
-	def delete(self, name):
-		self.__dbcon.execute('delete from nodes where parent=? and name=?', (self.getCurrentParentId(),name))
+	def delete(self, nid):
+		self.__dbcon.execute('delete from nodes where parent=? and name=? and isdir=?', \
+			(self.getCurrentParentId(), Node.nid2Name(nid), Node.nid2IsDirectory(nid)))
 
 	def commit(self):
 		self.__dbcon.commit()
 		self.__dbcon.execute('vacuum')
 
-	def exists(self, name):
+	def exists(self, nid):
 		cursor = self.__dbcon.cursor()
-		cursor.execute('select nodeid from nodes where parent=? and name=?', (self.getCurrentParentId(), name))
+		cursor.execute('select nodeid from nodes where parent=? and name=? and isdir=?', \
+			(self.getCurrentParentId(), Node.nid2Name(nid), Node.nid2IsDirectory(nid)))
 		result = cursor.fetchone() == None
 		cursor.close()
 		return result
 
-	def getNodeByName(self, name):
+	def getNodeByNid(self, nid):
 		cursor = self.__dbcon.cursor()
 		cursor.execute('select ' + self.__databaseSelectString + \
-			' from nodes where parent=? and name=?', (self.getCurrentParentId(), name))
+			' from nodes where parent=? and name=? and isdir=?', \
+			(self.getCurrentParentId(), Node.nid2Name(nid), Node.nid2IsDirectory(nid)))
 		row = cursor.fetchone()
 		if row is None:
 			return None
