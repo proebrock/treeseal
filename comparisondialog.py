@@ -94,7 +94,7 @@ class NodeComparisonDialog(wx.Dialog):
 			]
 		entries = [ \
 			[node.getPathString()], \
-			[node.getNodeIDString()], \
+			[node.getDbKeyString()], \
 			[node.getParentIDString()], \
 			[node.getStatusString()], \
 			]

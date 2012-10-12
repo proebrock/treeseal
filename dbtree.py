@@ -20,8 +20,8 @@ class DatabaseTree(Tree):
 		# Always keep in sync with Node and NodeInfo classes!
 		# Careful with changing spaces: some strings are auto-generated!
 		self.__databaseCreateString = \
-			'nodeid integer primary key,' + \
-			'parent integer,' + \
+			'nodekey integer primary key,' + \
+			'parentkey integer,' + \
 			'name text,' + \
 			'isdir boolean,' + \
 			'size integer,' + \
@@ -47,13 +47,13 @@ class DatabaseTree(Tree):
 		result += 'DatabaseTree: '
 		result += 'depth=\'' + str(self.getDepth()) + '\''
 		result += ', path=\'' + self.getPath() + '\''
-		result += ', id stack=\'' + ', '.join(str(id) for id in self.__parentIdStack) + '\''
+		result += ', id stack=\'' + ', '.join(str(id) for id in self.__parentKeyStack) + '\''
 		return result + ')'
 
 	### implementation of base class methods, please keep order
 
 	def getDepth(self):
-		return len(self.__parentIdStack) - 1
+		return len(self.__parentKeyStack) - 1
 
 	def getPath(self, filename=None):
 		path = reduce(lambda x, y: os.path.join(x, y), self.__parentNameStack)
@@ -83,23 +83,23 @@ class DatabaseTree(Tree):
 		self.gotoRoot()
 
 	def gotoRoot(self):
-		self.__parentIdStack = [ self.getRootId() ]
+		self.__parentKeyStack = [ self.getRootId() ]
 		self.__parentNameStack = [ '' ]
 
 	def up(self):
 		if self.isRoot():
 			raise MyException('\'up\' on root node is not possible.', 3)
-		self.__parentIdStack.pop()
+		self.__parentKeyStack.pop()
 		self.__parentNameStack.pop()
 
 	def down(self, node):
 		if not node.isDirectory():
 			raise MyException('\'down\' on file \'' + node.name + '\' is not possible.', 3)
-		self.__parentIdStack.append(node.nodeid)
+		self.__parentKeyStack.append(node.dbkey)
 		self.__parentNameStack.append(node.name)
 
 	def insert(self, node):
-		if not node.nodeid is None:
+		if not node.dbkey is None:
 			raise MyException('Node already contains a valid node id, ' + \
 				'so maybe you want to update instead of insert?', 3)
 		cursor = self.__dbcon.cursor()
@@ -114,27 +114,27 @@ class DatabaseTree(Tree):
 				(self.getCurrentParentId(), node.name, False, node.info.size, \
 				node.info.ctime, node.info.atime, node.info.mtime, \
 				node.info.checksum.getBinary()))
-		node.nodeid = cursor.lastrowid
+		node.dbkey = cursor.lastrowid
 		cursor.close()
 
 	def update(self, node):
-		if node.nodeid is None:
+		if node.dbkey is None:
 			raise MyException('Node does not contain a valid node id, ' + \
 				'so maybe you want to insert instead of update?', 3)
 		if node.isDirectory():
 			self.__dbcon.execute('update nodes set ' + self.__databaseUpdateString + \
-				' where nodeid=?', \
+				' where nodekey=?', \
 				(self.getCurrentParentId(), node.name, True, None, \
-				None, None, None, None, node.nodeid))
+				None, None, None, None, node.dbkey))
 		else:
 			self.__dbcon.execute('update nodes set ' + self.__databaseUpdateString + \
-				' where nodeid=?', \
+				' where nodekey=?', \
 				(self.getCurrentParentId(), node.name, False, node.info.size, \
 				node.info.ctime, node.info.atime, node.info.mtime, \
-				node.info.checksum.getBinary(), node.nodeid))
+				node.info.checksum.getBinary(), node.dbkey))
 
 	def delete(self, nid):
-		self.__dbcon.execute('delete from nodes where parent=? and name=? and isdir=?', \
+		self.__dbcon.execute('delete from nodes where parentkey=? and name=? and isdir=?', \
 			(self.getCurrentParentId(), Node.nid2Name(nid), Node.nid2IsDirectory(nid)))
 
 	def commit(self):
@@ -143,7 +143,7 @@ class DatabaseTree(Tree):
 
 	def exists(self, nid):
 		cursor = self.__dbcon.cursor()
-		cursor.execute('select nodeid from nodes where parent=? and name=? and isdir=?', \
+		cursor.execute('select nodekey from nodes where parentkey=? and name=? and isdir=?', \
 			(self.getCurrentParentId(), Node.nid2Name(nid), Node.nid2IsDirectory(nid)))
 		result = cursor.fetchone() == None
 		cursor.close()
@@ -152,7 +152,7 @@ class DatabaseTree(Tree):
 	def getNodeByNid(self, nid):
 		cursor = self.__dbcon.cursor()
 		cursor.execute('select ' + self.__databaseSelectString + \
-			' from nodes where parent=? and name=? and isdir=?', \
+			' from nodes where parentkey=? and name=? and isdir=?', \
 			(self.getCurrentParentId(), Node.nid2Name(nid), Node.nid2IsDirectory(nid)))
 		row = cursor.fetchone()
 		if row is None:
@@ -164,7 +164,7 @@ class DatabaseTree(Tree):
 	def __iter__(self):
 		cursor = self.__dbcon.cursor()
 		cursor.execute('select ' + self.__databaseSelectString + \
-			' from nodes where parent=?', (self.getCurrentParentId(),))
+			' from nodes where parentkey=?', (self.getCurrentParentId(),))
 		for row in cursor:
 			yield self.__fetch(row)
 		cursor.close()
@@ -219,18 +219,18 @@ class DatabaseTree(Tree):
 			self.__dbcon = None
 
 	def getCurrentParentId(self):
-		return self.__parentIdStack[-1]
+		return self.__parentKeyStack[-1]
 
 	def getRootId(self):
 		cursor = self.__dbcon.cursor()
-		cursor.execute('select nodeid from nodes where parent is null')
+		cursor.execute('select nodekey from nodes where parentkey is null')
 		result = cursor.fetchone()[0]
 		cursor.close()
 		return result
 
 	def __fetch(self, row):
 		node = Node(row[2])
-		node.nodeid = row[0]
+		node.dbkey = row[0]
 		if not row[3]:
 			node.info = NodeInfo()
 			node.info.size = row[4]

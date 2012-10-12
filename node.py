@@ -141,7 +141,7 @@ class Node(object):
 
 	def __init__(self, name=None):
 		# unique (at least at dir level) node identifier in database and filesystem
-		self.nodeid = None
+		self.dbkey = None
 		self.name = name
 		# node information
 		self.info = None
@@ -153,7 +153,7 @@ class Node(object):
 	def __str__(self):
 		return '(' + \
 			'status="' + self.getStatusString() + '", ' + \
-			'nodeid="' + self.getNodeIDString() + '", ' + \
+			'dbkey="' + self.getDbKeyString() + '", ' + \
 			'name="' + self.getNameString() + '", ' + \
 			'info="' + self.getInfoString() + '", ' + \
 			')'
@@ -161,7 +161,7 @@ class Node(object):
 	def __copy__(self):
 		result = Node()
 		result.status = self.status
-		result.nodeid = self.nodeid
+		result.dbkey = self.dbkey
 		result.name = self.name
 		result.info = self.info
 		return result
@@ -169,7 +169,7 @@ class Node(object):
 	def __deepcopy__(self, memo):
 		result = Node()
 		result.status = copy.deepcopy(self.status, memo)
-		result.nodeid = copy.deepcopy(self.nodeid, memo)
+		result.dbkey = copy.deepcopy(self.dbkey, memo)
 		result.name = copy.deepcopy(self.name, memo)
 		result.info = copy.deepcopy(self.info, memo)
 		return result
@@ -224,11 +224,11 @@ class Node(object):
 		else:
 			return NodeStatus.toString(self.status)
 
-	def getNodeIDString(self):
-		if self.nodeid is None:
+	def getDbKeyString(self):
+		if self.dbkey is None:
 			return self.NoneString
 		else:
-			return '{0:d}'.format(self.nodeid)
+			return '{0:d}'.format(self.dbkey)
 
 	def getNameString(self):
 		if self.name is None:
@@ -244,7 +244,7 @@ class Node(object):
 
 	def prettyPrint(self, prefix=''):
 		print('{0:s}status              {1:s}'.format(prefix, self.getStatusString()))
-		print('{0:s}nodeid              {1:s}'.format(prefix, self.getNodeIDString()))
+		print('{0:s}dbkey               {1:s}'.format(prefix, self.getDbKeyString()))
 		print('{0:s}name                {1:s}'.format(prefix, self.getNameString()))
 		print('{0:s}isdir               {1:s}'.format(prefix, self.getIsDirString()))
 		if self.info is not None:
