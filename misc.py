@@ -118,7 +118,7 @@ class Checksum(object):
 		checksum = hashlib.sha256()
 		buffersize = 2**24
 		if not os.path.exists(path):
-			raise MyException('Unable to open signature file \'' + path + '\'.', 3)
+			raise MyException('Unable to open file for checksum calculation \'' + path + '\'.', 3)
 		f = open(path,'rb')
 		while True:
 			data = f.read(buffersize)
@@ -136,6 +136,8 @@ class Checksum(object):
 		f.close()
 
 	def isValidUsingSavedFile(self, path):
+		if not os.path.exists(path):
+			raise MyException('Unable to signature file \'' + path + '\'.', 3)
 		f = open(path, 'r')
 		csum = f.read()
 		f.close()
