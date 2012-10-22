@@ -94,14 +94,16 @@ class TestDir(object):
 
 	def changefile(self, path, newcontent=None, keeptimes=False):
 		fullpath = os.path.join(self.__path, path)
-		st = os.stat(fullpath)
+		if keeptimes:
+			st = os.stat(fullpath)
 		f = open(fullpath, 'w')
 		if newcontent is None:
 			f.write(os.urandom(self.__testFileLength))
 		else:
 			f.write(newcontent)
 		f.close()
-		os.utime(fullpath, (st.st_atime, st.st_mtime))
+		if keeptimes:
+			os.utime(fullpath, (st.st_atime, st.st_mtime))
 
 	def rmfile(self, path):
 		os.remove(os.path.join(self.__path, path))
