@@ -28,7 +28,8 @@ class ContentListControlPanel(wx.Panel):
 class NodeComparisonDialog(wx.Dialog):
 
 	def __init__(self, parent, node, instance):
-		if node.other is None:
+
+		if node.otherinfo is None:
 			height = 600
 		else:
 			height = 800
@@ -39,15 +40,15 @@ class NodeComparisonDialog(wx.Dialog):
 
 		# header information
 		rowlabels = [ \
-			'Path', \
-			'ID', \
-			'Parent ID', \
+			'Name', \
+			'IsDir', \
+			'Database Key', \
 			'Status', \
 			]
 		entries = [ \
-			[node.getPathString()], \
+			[node.getNameString()], \
+			[node.getIsDirString()], \
 			[node.getDbKeyString()], \
-			[node.getParentIDString()], \
 			[node.getStatusString()], \
 			]
 		headerGrid = SimpleGrid(self, entries, rowlabels)
@@ -57,57 +58,22 @@ class NodeComparisonDialog(wx.Dialog):
 		headerBoxSizer.Add(headerGrid, 1, wx.ALL | wx.EXPAND, self.border)
 
 		if not node.isDirectory():
-			# diff information
-			rowlabels = [ \
-				'Size', \
-				'Creation time', \
-				'Access time', \
-				'Modification time', \
-				'Checksum', \
-				]
-			entries = [ \
-					[node.info.getSizeString(False)], \
-					[node.info.getCTimeString()], \
-					[node.info.getATimeString()], \
-					[node.info.getMTimeString()], \
-					[node.info.getChecksumString()], \
-					]
-			if node.other is None:
-				boxstring = 'Details'
-				collabels = None
-				markers = None
-			else:
-				boxstring = 'Differences'
-				collabels = ['Database', 'Filesystem']
-				otherstr = [\
-						[node.other.info.getSizeString(False)], \
-						[node.other.info.getCTimeString()], \
-						[node.other.info.getATimeString()], \
-						[node.other.info.getMTimeString()], \
-						[node.other.info.getChecksumString()], \
-						]
-				markers = []
-				for i in range(len(entries)):
-					entries[i].insert(0, otherstr[i][0])
-					if not entries[i][0] == entries[i][1]:
-						markers.append([ True, True ])
-					else:
-						markers.append([ False, False ])
-
-			diffGrid = SimpleGrid(self, entries, rowlabels, collabels, markers)
 			# static box with contents
-			diffBox = wx.StaticBox(self, -1, boxstring)
+			if node.otherinfo is None:
+				diffGrid = self.GetDiffGrid([node.info])
+				diffBox = wx.StaticBox(self, -1, 'Details')
+			else:
+				diffGrid = self.GetDiffGrid([node.otherinfo, node.info])
+				diffBox = wx.StaticBox(self, -1, 'Differences')
 			diffBoxSizer = wx.StaticBoxSizer(diffBox, wx.VERTICAL)
 			diffBoxSizer.Add(diffGrid, 0, wx.ALL | wx.EXPAND, self.border)
 
-			# list box with other occurrences of file content
-
-			if node.other is None:
+			if node.otherinfo is None:
 				contentBoxSizer = self.ContentBox(node.info.checksum, instance)
 				contentBoxSizerOther = None
 			else:
 				contentBoxSizer = self.ContentBox(node.info.checksum, instance, 'New content')
-				contentBoxSizerOther = self.ContentBox(node.other.info.checksum, instance, 'Old content')
+				contentBoxSizerOther = self.ContentBox(node.otherinfo.checksum, instance, 'Old content')
 
 		# button
 		button = wx.Button(self, label='OK')
@@ -125,6 +91,33 @@ class NodeComparisonDialog(wx.Dialog):
 		sizer.Add(button, 0, wx.ALL | wx.ALIGN_CENTER, self.border)
 		self.SetSizer(sizer)
 		self.CenterOnScreen()
+
+	def GetDiffGrid(self, infos):
+		entries = []
+		entries.append([ info.getSizeString(False) for info in infos ])
+		entries.append([ info.getCTimeString() for info in infos ])
+		entries.append([ info.getATimeString() for info in infos ])
+		entries.append([ info.getMTimeString() for info in infos ])
+		entries.append([ info.getChecksumString() for info in infos ])
+		rowlabels = [ \
+			'Size', \
+			'Creation time', \
+			'Access time', \
+			'Modification time', \
+			'Checksum', \
+			]
+		if len(infos) == 1:
+			collabels = None
+			markers = None
+		else:
+			collabels = ['Database', 'Filesystem']
+			markers = []
+			for i in range(len(entries)):
+				if not entries[i][0] == entries[i][1]:
+					markers.append([ True, True ])
+				else:
+					markers.append([ False, False ])
+		return SimpleGrid(self, entries, rowlabels, collabels, markers)
 
 	def ContentBox(self, checksum, instance, comment=None):
 		# showing number of instances

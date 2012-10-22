@@ -201,6 +201,7 @@ class Tree(object):
 				# nodes existing in self and other: already known nodes
 				other.calculate(onode)
 				rnode = snode
+				rnode.dbkey = onode.dbkey
 				result.insert(rnode)
 				if snode.isDirectory():
 					# tree descent
@@ -215,13 +216,15 @@ class Tree(object):
 					self.up()
 				else:
 					# compare snode and onode and set status
-					if snode.info == onode.info:
-						if snode.info.checksum == onode.info.checksum:
-							rnode.status = NodeStatus.OK
-						else:
-							rnode.status = NodeStatus.Error
+					if snode.info.checksum == onode.info.checksum:
+						rnode.status = NodeStatus.OK
 					else:
-						rnode.status = NodeStatus.Warn
+						if snode.info.mtime == onode.info.mtime:
+							rnode.status = NodeStatus.Error
+						else:
+							rnode.status = NodeStatus.Warn
+					# always keep the other node info (even for OK nodes)
+					rnode.otherinfo = onode.info
 				# process status of child node
 				if removeOkNodes and rnode.status == NodeStatus.OK:
 					result.delete(rnode.getNid())

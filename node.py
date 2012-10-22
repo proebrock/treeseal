@@ -145,6 +145,7 @@ class Node(object):
 		self.name = name
 		# node information
 		self.info = None
+		self.otherinfo = None
 		# node status
 		self.status = NodeStatus.Undefined
 
@@ -216,7 +217,10 @@ class Node(object):
 		return self.info is None
 
 	def getIsDirString(self):
-		return '{0:b}'.format(self.isDirectory())
+		if self.isDirectory():
+			return 'True'
+		else:
+			return 'False'
 
 	def getStatusString(self):
 		if self.status is None:
