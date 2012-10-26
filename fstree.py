@@ -14,6 +14,11 @@ class FilesystemTree(Tree):
 		super(FilesystemTree, self).__init__()
 		self.__rootDir = path
 		self.__metaDir = os.path.join(self.__rootDir, '.dtint')
+
+		# buffering of the contents of a directory might speedup some
+		# operations and allows sorting of the entries
+		self.__useBuffer = True
+
 		self.gotoRoot()
 
 	def __str__(self):
@@ -46,16 +51,22 @@ class FilesystemTree(Tree):
 
 	def gotoRoot(self):
 		self.__parentNameStack = [ '' ]
+		if self.__useBuffer:
+			self.readCurrentDir()
 
 	def up(self):
 		if self.isRoot():
 			raise MyException('\'up\' on root node is not possible.', 3)
 		self.__parentNameStack.pop()
+		if self.__useBuffer:
+			self.readCurrentDir()
 
 	def down(self, node):
 		if not node.isDirectory():
 			raise MyException('\'down\' on file \'' + node.name + '\' is not possible.', 3)
 		self.__parentNameStack.append(node.name)
+		if self.__useBuffer:
+			self.readCurrentDir()
 
 	def insert(self, node):
 		pass
@@ -71,25 +82,38 @@ class FilesystemTree(Tree):
 			os.rmdir(fullpath)
 		else:
 			os.remove(fullpath)
+		# remove node from buffer
+		if self.__useBuffer:
+			del self.__buffer[nid]
 
 	def commit(self):
 		pass
 
 	def exists(self, nid):
-		fullpath = self.getFullPath(Node.nid2Name(nid))
-		return os.path.exists(fullpath) and os.path.isdir(fullpath) == Node.nid2IsDirectory(nid)
+		if self.__useBuffer:
+			return nid in self.__buffer
+		else:
+			fullpath = self.getFullPath(Node.nid2Name(nid))
+			return os.path.exists(fullpath) and os.path.isdir(fullpath) == Node.nid2IsDirectory(nid)
 
 	def getNodeByNid(self, nid):
 		if not self.exists(nid):
 			return None
 		else:
-			return self.__fetch(Node.nid2Name(nid))
+			if self.__useBuffer:
+				return self.__buffer[nid]
+			else:
+				return self.__fetch(Node.nid2Name(nid))
 
 	def __iter__(self):
-		for name in os.listdir(self.getFullPath()):
-			node = self.__fetch(name)
-			if node is not None:
-				yield node
+		if self.__useBuffer:
+			for nid in sorted(self.__buffer.keys()):
+				yield self.__buffer[nid]
+		else:
+			for name in os.listdir(self.getFullPath()):
+				node = self.__fetch(name)
+				if node is not None:
+					yield node
 
 	def calculate(self, node):
 		if node.isDirectory():
@@ -101,7 +125,7 @@ class FilesystemTree(Tree):
 			fullpath = self.getFullPath(node.name)
 			# calculate checksum
 			node.info.checksum = Checksum()
-			print('### expensive calculation for node \'' + self.getPath(node.name) + '\' ...')
+			#print('### expensive calculation for node \'' + self.getPath(node.name) + '\' ...')
 			node.info.checksum.calculateForFile(fullpath, self.signalBytesDone)
 			# determine file timestamps AFTER calculating the checksum, otherwise opening
 			# the file might change the access time (OS dependent)
@@ -112,13 +136,22 @@ class FilesystemTree(Tree):
 
 	### the following methods are not implementations of base class methods
 
+	def readCurrentDir(self):
+		self.__buffer = {}
+		for name in os.listdir(self.getFullPath()):
+			node = self.__fetch(name)
+			if node is not None:
+				self.__buffer[node.getNid()] = node
+
 	def getFullPath(self, name=''):
 		return os.path.join(self.__rootDir, self.getPath(), name)
 
 	def __fetch(self, name):
 		fullpath = self.getFullPath(name)
+		# check blacklist
 		if fullpath == self.__metaDir:
 			return None
+		# fetch node information
 		node = Node(name)
 		if not os.path.isdir(fullpath):
 			node.info = NodeInfo()

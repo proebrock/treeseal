@@ -16,6 +16,10 @@ class DatabaseTree(Tree):
 		self.__databaseFile = os.path.join(metaDir, 'base.sqlite3')
 		self.__signatureFile = os.path.join(metaDir, 'base.signature')
 
+		# buffering of the contents of a directory might speedup some
+		# operations and allows sorting of the entries
+		self.__useBuffer = True
+
 		# --- SQL strings for database access ---
 		# Always keep in sync with Node and NodeInfo classes!
 		# Careful with changing spaces: some strings are auto-generated!
@@ -85,18 +89,24 @@ class DatabaseTree(Tree):
 	def gotoRoot(self):
 		self.__parentKeyStack = [ self.getRootId() ]
 		self.__parentNameStack = [ '' ]
+		if self.__useBuffer:
+			self.readCurrentDir()
 
 	def up(self):
 		if self.isRoot():
 			raise MyException('\'up\' on root node is not possible.', 3)
 		self.__parentKeyStack.pop()
 		self.__parentNameStack.pop()
+		if self.__useBuffer:
+			self.readCurrentDir()
 
 	def down(self, node):
 		if not node.isDirectory():
 			raise MyException('\'down\' on file \'' + node.name + '\' is not possible.', 3)
 		self.__parentKeyStack.append(node.dbkey)
 		self.__parentNameStack.append(node.name)
+		if self.__useBuffer:
+			self.readCurrentDir()
 
 	def insert(self, node):
 		if not node.dbkey is None:
@@ -116,6 +126,9 @@ class DatabaseTree(Tree):
 				node.info.checksum.getBinary()))
 		node.dbkey = cursor.lastrowid
 		cursor.close()
+		# insert info buffer
+		if self.__useBuffer:
+			self.__buffer[node.getNid()] = node
 
 	def update(self, node):
 		if node.dbkey is None:
@@ -132,42 +145,61 @@ class DatabaseTree(Tree):
 				(self.getCurrentParentId(), node.name, False, node.info.size, \
 				node.info.ctime, node.info.atime, node.info.mtime, \
 				node.info.checksum.getBinary(), node.dbkey))
+		# update buffer
+		if self.__useBuffer:
+			self.__buffer[node.getNid()] = node
 
 	def delete(self, nid):
 		self.__dbcon.execute('delete from nodes where parentkey=? and name=? and isdir=?', \
 			(self.getCurrentParentId(), Node.nid2Name(nid), Node.nid2IsDirectory(nid)))
+		# remove from buffer
+		if self.__useBuffer:
+			del self.__buffer[nid]
 
 	def commit(self):
 		self.__dbcon.commit()
 		self.__dbcon.execute('vacuum')
 
 	def exists(self, nid):
-		cursor = self.__dbcon.cursor()
-		cursor.execute('select nodekey from nodes where parentkey=? and name=? and isdir=?', \
-			(self.getCurrentParentId(), Node.nid2Name(nid), Node.nid2IsDirectory(nid)))
-		result = cursor.fetchone() == None
-		cursor.close()
-		return result
+		if self.__useBuffer:
+			return nid in self.__buffer
+		else:
+			cursor = self.__dbcon.cursor()
+			cursor.execute('select nodekey from nodes where parentkey=? and name=? and isdir=?', \
+				(self.getCurrentParentId(), Node.nid2Name(nid), Node.nid2IsDirectory(nid)))
+			result = cursor.fetchone() == None
+			cursor.close()
+			return result
 
 	def getNodeByNid(self, nid):
-		cursor = self.__dbcon.cursor()
-		cursor.execute('select ' + self.__databaseSelectString + \
-			' from nodes where parentkey=? and name=? and isdir=?', \
-			(self.getCurrentParentId(), Node.nid2Name(nid), Node.nid2IsDirectory(nid)))
-		row = cursor.fetchone()
-		if row is None:
-			return None
-		node = self.__fetch(row)
-		cursor.close()
-		return node
+		if self.__useBuffer:
+			if self.exists(nid):
+				return self.__buffer[nid]
+			else:
+				return None
+		else:
+			cursor = self.__dbcon.cursor()
+			cursor.execute('select ' + self.__databaseSelectString + \
+				' from nodes where parentkey=? and name=? and isdir=?', \
+				(self.getCurrentParentId(), Node.nid2Name(nid), Node.nid2IsDirectory(nid)))
+			row = cursor.fetchone()
+			if row is None:
+				return None
+			node = self.__fetch(row)
+			cursor.close()
+			return node
 
 	def __iter__(self):
-		cursor = self.__dbcon.cursor()
-		cursor.execute('select ' + self.__databaseSelectString + \
-			' from nodes where parentkey=?', (self.getCurrentParentId(),))
-		for row in cursor:
-			yield self.__fetch(row)
-		cursor.close()
+		if self.__useBuffer:
+			for nid in sorted(self.__buffer.keys()):
+				yield self.__buffer[nid]
+		else:
+			cursor = self.__dbcon.cursor()
+			cursor.execute('select ' + self.__databaseSelectString + \
+				' from nodes where parentkey=?', (self.getCurrentParentId(),))
+			for row in cursor:
+				yield self.__fetch(row)
+			cursor.close()
 
 	def calculate(self, node):
 		# nothing to do, just signal that the job is done if necessary
@@ -227,6 +259,16 @@ class DatabaseTree(Tree):
 		result = cursor.fetchone()[0]
 		cursor.close()
 		return result
+
+	def readCurrentDir(self):
+		self.__buffer = {}
+		cursor = self.__dbcon.cursor()
+		cursor.execute('select ' + self.__databaseSelectString + \
+			' from nodes where parentkey=?', (self.getCurrentParentId(),))
+		for row in cursor:
+			node = self.__fetch(row)
+			self.__buffer[node.getNid()] = node
+		cursor.close()
 
 	def __fetch(self, row):
 		node = Node(row[2])

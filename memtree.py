@@ -81,10 +81,11 @@ class MemoryTree(Tree):
 	def getNodeByNid(self, nid):
 		if not self.exists(nid):
 			return None
-		return self.__parentMTNStack[-1].children[nid].node
+		else:
+			return self.__parentMTNStack[-1].children[nid].node
 
 	def __iter__(self):
-		for nid in self.__parentMTNStack[-1].children.keys():
+		for nid in sorted(self.__parentMTNStack[-1].children.keys()):
 			yield self.__parentMTNStack[-1].children[nid].node
 
 	def calculate(self, node):
