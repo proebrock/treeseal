@@ -35,6 +35,7 @@ class TestDir(object):
 		self.up()
 
 		self.down('ZeroSize')
+		self.mkfile('AlwaysZeroSize', '')
 		self.mkfile('HadZeroSize', '')
 		self.mkfile('HasZeroSize'	)
 
@@ -52,7 +53,7 @@ class TestDir(object):
 		self.mkfile(os.path.join('DirNew', 'FileNew'))
 		self.rmfile(os.path.join('DirMissing', 'FileMissing'))
 		self.changefile(os.path.join('DirWarning', 'FileWarning'))
-		self.changefile(os.path.join('DirError', 'FileError'))
+		self.changefile(os.path.join('DirError', 'FileError'), None, True)
 		self.up()
 
 		self.down('FileDirChanges')
