@@ -94,7 +94,7 @@ class ListControlPanel(wx.Panel):
 		elif node.status == NodeStatus.Error:
 			index = self.list.InsertImageItem(sys.maxint, self.iconError)
 		else:
-			raise Exception('Unknown node status {0:d}'.format(node.status), 3)
+			raise MyException('Unknown node status {0:d}'.format(node.status), 3)
 		# fill in rest of information
 		self.list.SetStringItem(index, 2, node.name)
 		if node.isDirectory():
@@ -115,8 +115,11 @@ class ListControlPanel(wx.Panel):
 		return Node.constructNid(name, isdir)
 
 	def getSelectedNodeNids(self):
-		result = []
 		index = self.list.GetFirstSelected()
+		if index == -1:
+			# no listctrl entries selected
+			return []
+		result = []
 		while not index == -1:
 			nid = self.IndexToNid(index)
 			result.append(nid)
@@ -178,36 +181,66 @@ class ListControlPanel(wx.Panel):
 			comparisonDialog.Show()
 
 	def OnRightClick(self, event):
-		index = self.list.GetFirstSelected()
-		if index == -1:
+		nids = self.getSelectedNodeNids()
+		if len(nids) == 0:
 			event.Skip()
 			return
 
 		# only do this part the first time so the events are only bound once
 		if not hasattr(self, "popupID1"):
-			self.popupIdIgnore = wx.NewId()
-			self.popupIdUpdateDB = wx.NewId()
-
-			self.Bind(wx.EVT_MENU, self.OnPopupIgnore, id=self.popupIdIgnore)
-			self.Bind(wx.EVT_MENU, self.OnPopupUpdateDB, id=self.popupIdUpdateDB)
-
 			menu = wx.Menu()
+
+			if len(nids) == 1:
+				if self.instance.getNodeByNid(nids[0]).isDirectory():
+					self.popupIdChangeTo = wx.NewId()
+					self.Bind(wx.EVT_MENU, self.OnPopupChangeTo, id=self.popupIdChangeTo)
+					menu.Append(self.popupIdChangeTo, "Change to")
+
+				self.popupIdInfo = wx.NewId()
+				self.Bind(wx.EVT_MENU, self.OnPopupInfo, id=self.popupIdInfo)
+				menu.Append(self.popupIdInfo, "Info")
+
+				menu.AppendSeparator()
+
+			self.popupIdIgnore = wx.NewId()
+			self.Bind(wx.EVT_MENU, self.OnPopupIgnore, id=self.popupIdIgnore)
 			menu.Append(self.popupIdIgnore, "Ignore")
-			menu.Append(self.popupIdUpdateDB, "Update DB")
+
+			self.popupIdUpdateDB = wx.NewId()
+			self.Bind(wx.EVT_MENU, self.OnPopupUpdateDB, id=self.popupIdUpdateDB)
+			menu.Append(self.popupIdUpdateDB, "Update database")
 
 			# Popup the menu.  If an item is selected then its handler
 			# will be called before PopupMenu returns.
 			self.PopupMenu(menu)
 			menu.Destroy()
 
+	def OnPopupChangeTo(self, event):
+		nids = self.getSelectedNodeNids()
+		if len(nids) != 1:
+			raise MyException('Operation only possible for single selection.', 3)
+		node = self.instance.getNodeByNid(nids[0])
+		if not node.isDirectory():
+			raise MyException('Cannot change to file.', 3)
+		self.instance.down(node)
+		self.RefreshTree()
+
+	def OnPopupInfo(self, event):
+		nids = self.getSelectedNodeNids()
+		if len(nids) != 1:
+			raise MyException('Operation only possible for single selection.', 3)
+		node = self.instance.getNodeByNid(nids[0])
+		comparisonDialog = NodeComparisonDialog(self, node, self.instance)
+		comparisonDialog.Show()
+
 	def OnPopupIgnore(self, event):
 		nids = self.getSelectedNodeNids()
-		self.instance.ignore(nids)
+		self.instance.fix(nids, False)
 		self.RefreshTree()
 
 	def OnPopupUpdateDB(self, event):
 		nids = self.getSelectedNodeNids()
-		self.instance.fix(nids)
+		self.instance.fix(nids, True)
 		self.RefreshTree()
 
 

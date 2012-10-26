@@ -152,45 +152,6 @@ class Tree(object):
 			dest.up()
 			self.up()
 
-	def syncTo(self, dest):
-		snames = {}
-		for snode in self:
-			dnode = dest.getNodeByNid(snode.getNid())
-			if dnode is not None:
-				# nodes existing in source and destination: update
-				dest.update(snode)
-				if snode.isDirectory():
-					# recurse
-					self.down(snode)
-					dest.down(dnode)
-					self.syncTo(dest)
-					dest.up()
-					self.up()
-			else:
-				# nodes existing in self but not in dest: copy
-				self.copyNodeTo(dest, snode)
-			snames[snode.name] = snode.isDirectory()
-		for dnode in dest:
-			if dnode.name in snames:
-				if snames[dnode.name] == dnode.isDirectory():
-					continue
-			# nodes existing in dest but not in self: delete
-			dest.deleteNode(dnode)
-
-	def syncNodeTo(self, dest, snode):
-		dnode = dest.getNodeByNid(snode.getNid())
-		if dnode is not None:
-				dest.update(snode)
-				if snode.isDirectory():
-					# recurse
-					self.down(snode)
-					dest.down(dnode)
-					self.syncTo(dest)
-					dest.up()
-					self.up()
-		else:
-			self.copyNodeTo(dest, snode)
-
 	def compare(self, other, result, removeOkNodes=False):
 		snames = {}
 		totalstatus = NodeStatus.Undefined

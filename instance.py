@@ -1,4 +1,5 @@
 from sets import Set
+from misc import MyException
 from node import NodeStatus
 
 
@@ -65,18 +66,39 @@ class Instance(object):
 	def getPathsByChecksum(self, csumstr):
 		return Set([]), Set([]) # TODO
 
-	def ignore(self, nids):
+	def __fixFunc(self, node, updateOld=False):
+		# recurse
+		if node.isDirectory():
+			self.down(node)
+			for n in self:
+				self.__fixFunc(n, updateOld)
+			self.up()
+		# post-order: fixing of node
+		if node.status == NodeStatus.OK:
+			pass # nothing to do
+		elif node.status == NodeStatus.New:
+			if updateOld:
+				self.__old.insert(node)
+			node.status = NodeStatus.OK
+			self.__view.update(node)
+		elif node.status == NodeStatus.Missing:
+			if updateOld:
+				self.__old.delete(node.getNid())
+			self.__view.delete(node.getNid())
+		elif node.status == NodeStatus.Warn or node.status == NodeStatus.Error:
+			if updateOld:
+				self.__old.update(node)
+			node.status = NodeStatus.OK
+			self.__view.update(node)
+		else:
+			raise MyException('Cannot fix node of status {0:d}'.format(node.status), 3)
+
+	def fix(self, nids, updateOld=False):
 		for nid in nids:
 			vnode = self.__view.getNodeByNid(nid)
 			if vnode is None:
 				raise Exception('Tree inconsistency; that should never happen.', 3)
-			nnode = self.__new.getNodeByNid(nid)
-			if nnode is None or self.__config.removeOkNodes:
-				self.__view.deleteNode(vnode)
-			else:
-				self.__new.syncNodeTo(self.__view, nnode)
-				self.__view.setNodeStatus(NodeStatus.OK, vnode)
+			self.__fixFunc(vnode, updateOld)
+		if updateOld:
+			self.__old.commit()
 		self.__view.commit()
-
-	def fix(self, nids):
-		pass

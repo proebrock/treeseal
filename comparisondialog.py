@@ -29,10 +29,14 @@ class NodeComparisonDialog(wx.Dialog):
 
 	def __init__(self, parent, node, instance):
 
-		if node.otherinfo is None:
-			height = 600
+		if node.isDirectory():
+			height = 210
 		else:
-			height = 800
+			if node.otherinfo is None:
+				height = 600
+			else:
+				height = 800
+
 		wx.Dialog.__init__(self, parent, title='Node information', size=(500,height), \
 			style=wx.CAPTION | wx.RESIZE_BORDER | wx.STAY_ON_TOP)
 
