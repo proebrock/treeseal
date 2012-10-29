@@ -4,7 +4,7 @@ import wx
 
 class SimpleGrid(wx.FlexGridSizer):
 
-	def __init__(self, parent, entries, rowlabels=None, collabels=None, markers=None):
+	def __init__(self, parent, entries, rowlabels=None, collabels=None, colors=None):
 		numRows = len(entries)
 		if rowlabels is None:
 			haveRowLabels = 0
@@ -41,9 +41,9 @@ class SimpleGrid(wx.FlexGridSizer):
 			# print entries itself
 			for j in range(numCols):
 				entry = wx.TextCtrl(parent, -1, entries[i][j], style=wx.TE_READONLY)
-				if markers is not None:
-					if markers[i][j]:
-						entry.SetBackgroundColour('Yellow')
+				if colors is not None:
+					if colors[i][j] is not None:
+						entry.SetBackgroundColour(colors[i][j])
 				self.Add(entry, 0, otherColAlign, self.border)
 
 		# make all columns growable (except first one if we have row labels)

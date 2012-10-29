@@ -118,9 +118,9 @@ class NodeComparisonDialog(wx.Dialog):
 			markers = []
 			for i in range(len(entries)):
 				if not entries[i][0] == entries[i][1]:
-					markers.append([ True, True ])
+					markers.append([ 'Yellow', 'Yellow' ])
 				else:
-					markers.append([ False, False ])
+					markers.append([ None, None ])
 		return SimpleGrid(self, entries, rowlabels, collabels, markers)
 
 	def ContentBox(self, checksum, instance, comment=None):
