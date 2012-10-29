@@ -32,10 +32,11 @@ class NodeComparisonDialog(wx.Dialog):
 		if node.isDirectory():
 			height = 210
 		else:
-			if node.otherinfo is None:
-				height = 600
-			else:
+			if (node.otherinfo is not None) and \
+				(not node.info.checksum == node.otherinfo.checksum):
 				height = 800
+			else:
+				height = 600
 
 		wx.Dialog.__init__(self, parent, title='Node information', size=(560,height), \
 			style=wx.CAPTION | wx.RESIZE_BORDER | wx.STAY_ON_TOP)
@@ -63,21 +64,22 @@ class NodeComparisonDialog(wx.Dialog):
 
 		if not node.isDirectory():
 			# static box with contents
-			if node.otherinfo is None:
-				diffGrid = self.GetDiffGrid([node.info])
-				diffBox = wx.StaticBox(self, -1, 'Details')
-			else:
+			if node.otherinfo is not None:
 				diffGrid = self.GetDiffGrid([node.otherinfo, node.info])
 				diffBox = wx.StaticBox(self, -1, 'Differences')
+			else:
+				diffGrid = self.GetDiffGrid([node.info])
+				diffBox = wx.StaticBox(self, -1, 'Details')
 			diffBoxSizer = wx.StaticBoxSizer(diffBox, wx.VERTICAL)
 			diffBoxSizer.Add(diffGrid, 0, wx.ALL | wx.EXPAND, self.border)
 
-			if node.otherinfo is None:
-				contentBoxSizer = self.ContentBox(node.info.checksum, instance)
-				contentBoxSizerOther = None
-			else:
-				contentBoxSizer = self.ContentBox(node.info.checksum, instance, 'New content')
+			if (node.otherinfo is not None) and \
+				(not node.info.checksum == node.otherinfo.checksum):
 				contentBoxSizerOther = self.ContentBox(node.otherinfo.checksum, instance, 'Old content')
+				contentBoxSizer = self.ContentBox(node.info.checksum, instance, 'New content')
+			else:
+				contentBoxSizerOther = None
+				contentBoxSizer = self.ContentBox(node.info.checksum, instance)
 
 		# button
 		button = wx.Button(self, label='OK')
