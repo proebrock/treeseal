@@ -44,6 +44,7 @@ class MemoryTree(Tree):
 
 	def reset(self):
 		self.__parentMTNStack = [ MemoryTreeNode(Node('')) ]
+		self.__checksumToPathsMap = {}
 
 	def gotoRoot(self):
 		self.__parentMTNStack = [ self.__parentMTNStack[0] ]
@@ -63,6 +64,11 @@ class MemoryTree(Tree):
 
 	def insert(self, node):
 		self.__parentMTNStack[-1].children[node.getNid()] = MemoryTreeNode(node)
+		if not node.isDirectory():
+			csumstr = node.info.checksum.getString()
+			if not csumstr in self.__checksumToPathsMap:
+				self.__checksumToPathsMap[csumstr] = set()
+			self.__checksumToPathsMap[csumstr].add(self.getPath(node.name))
 
 	def update(self, node):
 		self.__parentMTNStack[-1].children[node.getNid()].node = node
@@ -70,6 +76,14 @@ class MemoryTree(Tree):
 	def delete(self, nid):
 		if not self.exists(nid):
 			raise MyException('Node does not exist for deletion.', 1)
+		# remove node from checksum buffer
+		node = self.__parentMTNStack[-1].children[nid].node
+		if not node.isDirectory():
+			csumstr = node.info.checksum.getString()
+			self.__checksumToPathsMap[csumstr].remove(self.getPath(node.name))
+			if len(self.__checksumToPathsMap[csumstr]) == 0:
+				del self.__checksumToPathsMap[csumstr]
+		# remove node from buffer
 		del self.__parentMTNStack[-1].children[nid]
 
 	def commit(self):
@@ -98,5 +112,11 @@ class MemoryTree(Tree):
 				self.signalNewFile(self.getPath(node.name), node.info.size)
 			if self.signalBytesDone is not None:
 				self.signalBytesDone(node.info.size)
+
+	def globalGetPathsByChecksum(self, checksumString):
+		if checksumString in self.__checksumToPathsMap:
+			return self.__checksumToPathsMap[checksumString]
+		else:
+			return set()
 
 	### the following methods are not implementations of base class methods

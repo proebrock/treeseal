@@ -119,6 +119,8 @@ class TestDir(object):
 path = '/home/phil/Projects/dtint-example'
 td = TestDir(path)
 if not os.path.exists(os.path.join(path, '.dtint')):
+	print('creating initial version of testdir ...')
 	td.create()
 else:
+	print('creating modified version of testdir ...')
 	td.change()

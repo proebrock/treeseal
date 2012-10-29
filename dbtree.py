@@ -16,8 +16,10 @@ class DatabaseTree(Tree):
 		self.__databaseFile = os.path.join(metaDir, 'base.sqlite3')
 		self.__signatureFile = os.path.join(metaDir, 'base.signature')
 
-		# buffering of the contents of a directory might speedup some
-		# operations and allows sorting of the entries
+		# Buffering of the contents of a directory speeds up some operations
+		# like exists() and getNodeByNid(), slows down some others like up()
+		# and down() due to prefetching at that time. Besides it allows
+		# sorting of entries in the generator
 		self.__useBuffer = True
 
 		# --- SQL strings for database access ---
@@ -212,6 +214,15 @@ class DatabaseTree(Tree):
 			if self.signalBytesDone is not None:
 				self.signalBytesDone(node.info.size)
 
+	def globalGetPathsByChecksum(self, checksumString):
+		result = set()
+		cursor = self.__dbcon.cursor()
+		cursor.execute('select nodekey from nodes where checksum=X\'{0:s}\''.format(checksumString))
+		for row in cursor:
+			result.add(self.IdToPath(row[0]))
+		cursor.close()
+		return result
+
 	### the following methods are not implementations of base class methods
 
 	def open(self):
@@ -259,6 +270,19 @@ class DatabaseTree(Tree):
 		result = cursor.fetchone()[0]
 		cursor.close()
 		return result
+
+	def IdToPath(self, nodeid):
+		rootid = self.getRootId()
+		currentid = nodeid
+		namelist = []
+		while not currentid == rootid:
+			cursor = self.__dbcon.cursor()
+			cursor.execute('select name,parentkey from nodes where nodekey=?', (currentid,))
+			row = cursor.fetchone()
+			namelist.append(row[0])
+			currentid = row[1]
+			cursor.close()
+		return reduce(lambda x, y: os.path.join(x, y), reversed(namelist))
 
 	def readCurrentDir(self):
 		self.__buffer = {}

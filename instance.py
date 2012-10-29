@@ -1,4 +1,3 @@
-from sets import Set
 from misc import MyException
 from node import NodeStatus
 
@@ -64,7 +63,8 @@ class Instance(object):
 			yield node
 
 	def getPathsByChecksum(self, csumstr):
-		return Set([]), Set([]) # TODO
+		return self.__old.globalGetPathsByChecksum(csumstr), \
+			self.__new.globalGetPathsByChecksum(csumstr)
 
 	def __fixFunc(self, node, updateOld=False):
 		# recurse

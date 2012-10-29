@@ -15,9 +15,7 @@ class FilesystemTree(Tree):
 		self.__rootDir = path
 		self.__metaDir = os.path.join(self.__rootDir, '.dtint')
 
-		# buffering of the contents of a directory might speedup some
-		# operations and allows sorting of the entries
-		self.__useBuffer = True
+		self.__checksumToPathsMap = {}
 
 		self.gotoRoot()
 
@@ -47,26 +45,24 @@ class FilesystemTree(Tree):
 			# if on windows platform, hide directory
 			if platform.system() == 'Windows':
 				os.system('attrib +h "' + self.__metaDir + '"')
+		self.__checksumToPathsMap = {}
 		self.gotoRoot()
 
 	def gotoRoot(self):
 		self.__parentNameStack = [ '' ]
-		if self.__useBuffer:
-			self.readCurrentDir()
+		self.readCurrentDir()
 
 	def up(self):
 		if self.isRoot():
 			raise MyException('\'up\' on root node is not possible.', 3)
 		self.__parentNameStack.pop()
-		if self.__useBuffer:
-			self.readCurrentDir()
+		self.readCurrentDir()
 
 	def down(self, node):
 		if not node.isDirectory():
 			raise MyException('\'down\' on file \'' + node.name + '\' is not possible.', 3)
 		self.__parentNameStack.append(node.name)
-		if self.__useBuffer:
-			self.readCurrentDir()
+		self.readCurrentDir()
 
 	def insert(self, node):
 		pass
@@ -77,43 +73,37 @@ class FilesystemTree(Tree):
 	def delete(self, nid):
 		if not self.exists(nid):
 			raise MyException('Node does not exist for deletion.', 1)
+		# remove on disk
 		fullpath = self.getFullPath(Node.nid2Name(nid))
 		if os.path.isdir(fullpath):
 			os.rmdir(fullpath)
 		else:
 			os.remove(fullpath)
+		# remove node from checksum buffer
+		node = self.__buffer[nid]
+		if not node.isDirectory():
+			csumstr = node.info.checksum.getString()
+			self.__checksumToPathsMap[csumstr].remove(self.getPath(node.name))
+			if len(self.__checksumToPathsMap[csumstr]) == 0:
+				del self.__checksumToPathsMap[csumstr]
 		# remove node from buffer
-		if self.__useBuffer:
-			del self.__buffer[nid]
+		del self.__buffer[nid]
 
 	def commit(self):
 		pass
 
 	def exists(self, nid):
-		if self.__useBuffer:
-			return nid in self.__buffer
-		else:
-			fullpath = self.getFullPath(Node.nid2Name(nid))
-			return os.path.exists(fullpath) and os.path.isdir(fullpath) == Node.nid2IsDirectory(nid)
+		return nid in self.__buffer
 
 	def getNodeByNid(self, nid):
 		if not self.exists(nid):
 			return None
 		else:
-			if self.__useBuffer:
-				return self.__buffer[nid]
-			else:
-				return self.__fetch(Node.nid2Name(nid))
+			return self.__buffer[nid]
 
 	def __iter__(self):
-		if self.__useBuffer:
-			for nid in sorted(self.__buffer.keys()):
-				yield self.__buffer[nid]
-		else:
-			for name in os.listdir(self.getFullPath()):
-				node = self.__fetch(name)
-				if node is not None:
-					yield node
+		for nid in sorted(self.__buffer.keys()):
+			yield self.__buffer[nid]
 
 	def calculate(self, node):
 		if node.isDirectory():
@@ -127,12 +117,23 @@ class FilesystemTree(Tree):
 			node.info.checksum = Checksum()
 			#print('### expensive calculation for node \'' + self.getPath(node.name) + '\' ...')
 			node.info.checksum.calculateForFile(fullpath, self.signalBytesDone)
+			# buffering of checksums
+			csumstr = node.info.checksum.getString()
+			if not csumstr in self.__checksumToPathsMap:
+				self.__checksumToPathsMap[csumstr] = set()
+			self.__checksumToPathsMap[csumstr].add(self.getPath(node.name))
 			# determine file timestamps AFTER calculating the checksum, otherwise opening
 			# the file might change the access time (OS dependent)
 			# this conversion from unix time stamp to local date/time might fail after year 2038...
 			node.info.ctime = datetime.datetime.fromtimestamp(os.path.getctime(fullpath))
 			node.info.atime = datetime.datetime.fromtimestamp(os.path.getatime(fullpath))
 			node.info.mtime = datetime.datetime.fromtimestamp(os.path.getmtime(fullpath))
+
+	def globalGetPathsByChecksum(self, checksumString):
+		if checksumString in self.__checksumToPathsMap:
+			return self.__checksumToPathsMap[checksumString]
+		else:
+			return set()
 
 	### the following methods are not implementations of base class methods
 
