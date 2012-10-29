@@ -128,10 +128,11 @@ class NodeComparisonDialog(wx.Dialog):
 		[ dbpaths, fspaths ] = instance.getPathsByChecksum(checksum.getString())
 		instancesGrid = SimpleGrid(self, \
 			[ ['{0:d}'.format(len(dbpaths)), '{0:d}'.format(len(fspaths))] ], \
-			['Number of occurrences'], ['Database', 'Filesystem'], None)
+			['Number of occurrences'], ['Database', 'Filesystem'], \
+			[ [ None,  'Red' if len(fspaths)==0 else None ] ])
 		# show list control with list of files
 		contentList = ContentListControlPanel(self)
-		paths = list(dbpaths | fspaths)
+		paths = sorted(list(dbpaths | fspaths))
 		for path in paths:
 			index = contentList.list.InsertStringItem(sys.maxint, path)
 			if path in dbpaths:
