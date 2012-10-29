@@ -37,7 +37,7 @@ class NodeComparisonDialog(wx.Dialog):
 			else:
 				height = 800
 
-		wx.Dialog.__init__(self, parent, title='Node information', size=(500,height), \
+		wx.Dialog.__init__(self, parent, title='Node information', size=(560,height), \
 			style=wx.CAPTION | wx.RESIZE_BORDER | wx.STAY_ON_TOP)
 
 		self.border = 5
@@ -99,9 +99,9 @@ class NodeComparisonDialog(wx.Dialog):
 	def GetDiffGrid(self, infos):
 		entries = []
 		entries.append([ info.getSizeString(False) for info in infos ])
-		entries.append([ info.getCTimeString() for info in infos ])
-		entries.append([ info.getATimeString() for info in infos ])
-		entries.append([ info.getMTimeString() for info in infos ])
+		entries.append([ info.getCTimeString(False) for info in infos ])
+		entries.append([ info.getATimeString(False) for info in infos ])
+		entries.append([ info.getMTimeString(False) for info in infos ])
 		entries.append([ info.getChecksumString() for info in infos ])
 		rowlabels = [ \
 			'Size', \

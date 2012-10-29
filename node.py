@@ -104,23 +104,32 @@ class NodeInfo(object):
 			else:
 				return '{0:,}'.format(self.size)
 
-	def getCTimeString(self):
+	def getCTimeString(self, abbreviate=True):
 		if self.ctime is None:
 			return self.NoneString
 		else:
-			return self.ctime.strftime('%Y-%m-%d %H:%M:%S')
+			if abbreviate:
+				return self.ctime.strftime('%Y-%m-%d %H:%M:%S')
+			else:
+				return str(self.ctime)
 
-	def getATimeString(self):
+	def getATimeString(self, abbreviate=True):
 		if self.atime is None:
 			return self.NoneString
 		else:
-			return self.atime.strftime('%Y-%m-%d %H:%M:%S')
+			if abbreviate:
+				return self.atime.strftime('%Y-%m-%d %H:%M:%S')
+			else:
+				return str(self.atime)
 
-	def getMTimeString(self):
+	def getMTimeString(self, abbreviate=True):
 		if self.mtime is None:
 			return self.NoneString
 		else:
-			return self.mtime.strftime('%Y-%m-%d %H:%M:%S')
+			if abbreviate:
+				return self.mtime.strftime('%Y-%m-%d %H:%M:%S')
+			else:
+				return str(self.mtime)
 
 	def getChecksumString(self, abbreviate=True):
 		if self.checksum is None:
