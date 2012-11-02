@@ -1,18 +1,14 @@
-* make getPathsByChecksum and getNodesByChecksum compatible with short checksum strings
-  (various length support, tree-like data structure and warning for non-unique user params)
-* Status bar with statistics of currently displayed tree
+Mid-term
+--------
+* Status bar with statistics of currently displayed dir or tree
   (size/number of file/dir for each status, with 5 statuses we get 20 values!)
 * Before import, check if no upper or lower node has already .dtint
 * Right-Click menu
   - Dependent on previous action, e.g. import, check, ...)
-  - Working with multi-select
-  - Functions: Refresh (diff of sub-tree), Accept (update db), Compare
-    (side-by-side comparison (gridview?), colored differences,
-    Database (previous state) vs. Filesystem (current state))
-* Double-Click on nodes (dir: change to, file: compare)
+  - Functions: Refresh (diff of sub-tree)
 * Proper key navigation of listview (including CTRL-A, multiselect, background menu)
 * Program name and artwork (icon, splash screen)
-* Help Github, in-program (HTML viewer) and About dialog
+* Help: Github, in-program (HTML viewer) and About dialog
 * Globally resolving issues via main menu (Accept all, accept all added, accept all deleted,
   accept all renamed, accept all ops not leading to data loss (think of multiple copies of a file
   ... or  using radiobox)
@@ -24,11 +20,15 @@
   - Hide valid nodes in diff view: on/off
   - Default dir for opening directories: path
   - Black listed file patterns or paths
-* Unicode support for filenames (db stores just strings?, check display of umlaute in win
+  - gpg signature options
+* Unicode support for filenames (db stores just ansi strings?, check display of umlaute in win
 * Continuously check and keep portability (Linux, Win, Mac)
 
-* Should container classes like NodeDict be derived from Device? (really big '?')
-  There is a getParent getRoot, getChildren, insert, update, delete, ...
+Long-term
+---------
+* make getPathsByChecksum and getNodesByChecksum compatible with short checksum strings
+  (various length support, warning for non-unique user params, optimal data structure
+  for this are the so-called "Suffix-Trees")
 * Copying from instance to instance
   - What can you trust, how paranoid do you have to be?
   - src checked, make dest the same VS. two or more defect copies, create one with max recovery
@@ -36,3 +36,4 @@
 * Sign database contents using gpg instead of just using a checksum
 * Client-server architecture for copying, using rsync technology
   (e.g. with rolling checksums)
+* Python 3 compatibility
