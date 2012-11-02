@@ -59,6 +59,7 @@ class ListControlPanel(wx.Panel):
 		self.list.Bind(wx.EVT_RIGHT_UP, self.OnRightClick) # for wxGTK
 
 		self.instance = None
+		self.readonly = True
 
 		# some constants
 		self.__emptyNameString = '<empty>'
@@ -196,15 +197,16 @@ class ListControlPanel(wx.Panel):
 				self.Bind(wx.EVT_MENU, self.OnPopupInfo, id=self.popupIdInfo)
 				menu.Append(self.popupIdInfo, "Info")
 
+			if not self.readonly:
 				menu.AppendSeparator()
 
-			self.popupIdIgnore = wx.NewId()
-			self.Bind(wx.EVT_MENU, self.OnPopupIgnore, id=self.popupIdIgnore)
-			menu.Append(self.popupIdIgnore, "Ignore")
+				self.popupIdIgnore = wx.NewId()
+				self.Bind(wx.EVT_MENU, self.OnPopupIgnore, id=self.popupIdIgnore)
+				menu.Append(self.popupIdIgnore, "Ignore")
 
-			self.popupIdUpdateDB = wx.NewId()
-			self.Bind(wx.EVT_MENU, self.OnPopupUpdateDB, id=self.popupIdUpdateDB)
-			menu.Append(self.popupIdUpdateDB, "Update database")
+				self.popupIdUpdateDB = wx.NewId()
+				self.Bind(wx.EVT_MENU, self.OnPopupUpdateDB, id=self.popupIdUpdateDB)
+				menu.Append(self.popupIdUpdateDB, "Update database")
 
 			# Popup the menu.  If an item is selected then its handler
 			# will be called before PopupMenu returns.
@@ -386,6 +388,7 @@ class MainFrame(wx.Frame):
 
 		self.list.ClearInstance()
 		self.list.ShowNodeTree(Instance(self.config, memtree, dbtree, fstree))
+		self.list.readonly = False
 
 	def OnExit(self, event):
 		self.Close(True)
