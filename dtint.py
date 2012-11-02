@@ -42,10 +42,8 @@ class ListControlPanel(wx.Panel):
 				('', 22), \
 				('', 22), \
 				('Name', None), \
-				('Size', 130), \
-				('CTime', 142), \
-				('ATime', 142), \
-				('MTime', 142), \
+				('Size', 150), \
+				('Modfication Time', 142), \
 				('Checksum', 80), \
 			])
 
@@ -101,10 +99,8 @@ class ListControlPanel(wx.Panel):
 			self.list.SetStringItem(index, 1, self.__dirMarkerString)
 		else:
 			self.list.SetStringItem(index, 3, node.info.getSizeString())
-			self.list.SetStringItem(index, 4, node.info.getCTimeString())
-			self.list.SetStringItem(index, 5, node.info.getATimeString())
-			self.list.SetStringItem(index, 6, node.info.getMTimeString())
-			self.list.SetStringItem(index, 7, node.info.getChecksumString())
+			self.list.SetStringItem(index, 4, node.info.getMTimeString())
+			self.list.SetStringItem(index, 5, node.info.getChecksumString())
 
 	def IndexToName(self, index):
 		return self.list.GetItem(index, 2).GetText()
@@ -248,7 +244,7 @@ class ListControlPanel(wx.Panel):
 class MainFrame(wx.Frame):
 	def __init__(self, parent):
 		self.baseTitle = ProgramName + ' ' + ProgramVersion
-		wx.Frame.__init__(self, parent, title=self.baseTitle, size=(1024,300))
+		wx.Frame.__init__(self, parent, title=self.baseTitle, size=(800,300))
 
 		# main menue definition
 		fileMenu = wx.Menu()
