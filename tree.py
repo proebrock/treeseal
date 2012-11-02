@@ -127,6 +127,18 @@ class Tree(object):
 	def setNodeStatus(self, status, node=None, recurse=True):
 		self.preOrderApply(Tree.__setNodeStatusFunc, node, status, recurse)
 
+	def getTotalNodeStatus(self):
+		totalstatus = NodeStatus.Undefined
+		for node in self:
+			if totalstatus == NodeStatus.Undefined:
+				totalstatus = node.status
+			elif not totalstatus == node.status:
+				totalstatus = NodeStatus.Unknown
+		if totalstatus == NodeStatus.Undefined:
+			return NodeStatus.OK
+		else:
+			return totalstatus
+
 	def __deleteNodeFunc(self, node, param):
 		self.delete(node.getNid())
 
@@ -157,7 +169,6 @@ class Tree(object):
 
 	def compare(self, other, result, removeOkNodes=False):
 		snames = {}
-		totalstatus = NodeStatus.Undefined
 		for snode in self:
 			self.calculate(snode)
 			onode = other.getNodeByNid(snode.getNid())
@@ -181,8 +192,11 @@ class Tree(object):
 				else:
 					# compare snode and onode and set status
 					if snode.info.checksum == onode.info.checksum:
+						# this program is about checksums, if the checksum is valid, the status is OK
 						rnode.status = NodeStatus.OK
 					else:
+						# otherwise we check if someone has willingly (?) changed the file,
+						# if that is not the case, we have a serious error
 						if snode.info.mtime == onode.info.mtime:
 							rnode.status = NodeStatus.Error
 						else:
@@ -193,13 +207,11 @@ class Tree(object):
 				if removeOkNodes and rnode.status == NodeStatus.OK:
 					result.delete(rnode.getNid())
 				else:
-					totalstatus = NodeStatus.updateStatus(totalstatus, rnode.status)
 					result.update(rnode)
 			else:
 				# nodes existing in self but not in other: new nodes
 				self.copyNodeTo(result, snode)
 				result.setNodeStatus(NodeStatus.New, snode)
-				totalstatus = NodeStatus.updateStatus(totalstatus, NodeStatus.New)
 			# buffer that info for later determining new nodes
 			snames[snode.name] = snode.isDirectory()
 		for onode in other:
@@ -210,11 +222,7 @@ class Tree(object):
 			other.calculate(onode)
 			other.copyNodeTo(result, onode)
 			result.setNodeStatus(NodeStatus.Missing, onode)
-			totalstatus = NodeStatus.updateStatus(totalstatus, NodeStatus.Missing)
-		if totalstatus == NodeStatus.Undefined:
-			return NodeStatus.OK
-		else:
-			return totalstatus
+		return result.getTotalNodeStatus()
 
 
 

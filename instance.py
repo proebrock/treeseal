@@ -36,20 +36,33 @@ class Instance(object):
 		return self.__view.getNodeStatistics()
 
 	def up(self):
+		# ascent in old tree
 		if self.__old is not None:
 			if self.__old.getDepth() == self.__view.getDepth():
 				self.__old.up()
+		# ascent in new tree
 		if self.__new is not None:
 			if self.__new.getDepth() == self.__view.getDepth():
 				self.__new.up()
-		self.__view.up()
+		# ascent in view tree, update status of parent directory we are returning from in view tree
+		status = self.__view.getTotalNodeStatus()
+		name = self.__view.up()
+		nid = Node.constructNid(name, True)
+		node = self.__view.getNodeByNid(nid)
+		if node is None:
+			raise Exception('Tree inconsistency; that should never happen.', 3)
+		node.status = status
+		self.__view.update(node)
 
 	def down(self, node):
+		# descent in view tree
 		self.__view.down(node)
+		# descent in old tree if possible
 		if self.__old is not None:
 			n = self.__old.getNodeByNid(node.getNid())
 			if n is not None:
 				self.__old.down(n)
+		# descent in new tree if possible
 		if self.__new is not None:
 			n = self.__new.getNodeByNid(node.getNid())
 			if n is not None:
@@ -91,7 +104,7 @@ class Instance(object):
 			node.status = NodeStatus.OK
 			self.__view.update(node)
 		else:
-			raise MyException('Cannot fix node of status {0:d}'.format(node.status), 3)
+			raise MyException('Cannot fix node \'{0:s}\'of status {1:d}'.format(node.name, node.status), 3)
 
 	def fix(self, nids, updateOld=False):
 		for nid in nids:
