@@ -1,5 +1,5 @@
 from misc import MyException
-from node import NodeStatus
+from node import Node, NodeStatus
 
 
 
