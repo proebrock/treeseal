@@ -292,7 +292,7 @@ class MainFrame(wx.Frame):
 			userPath = dirDialog.GetPath()
 		else:
 			return
-		if os.path.exists(os.path.join(userPath, '.dtint')):
+		if os.path.exists(os.path.join(userPath, '.' + ProgramName)):
 			dial = wx.MessageBox('Path "' + userPath + '" is already a valid root dir.\n\nDo you still want to continue?', \
 				'Warning', wx.YES_NO | wx.ICON_WARNING | wx.NO_DEFAULT)
 			if not dial == wx.YES:
@@ -345,7 +345,7 @@ class MainFrame(wx.Frame):
 			userPath = dirDialog.GetPath()
 		else:
 			return
-		if not os.path.exists(os.path.join(userPath, '.dtint')):
+		if not os.path.exists(os.path.join(userPath, '.' + ProgramName)):
 			wx.MessageBox('Path "' + userPath + '" is no valid root dir.', \
 				'Error', wx.OK | wx.ICON_ERROR)
 			return
