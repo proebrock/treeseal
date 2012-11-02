@@ -333,7 +333,8 @@ class MainFrame(wx.Frame):
 		progressDialog.SignalFinished()
 
 		self.list.ClearInstance()
-		self.list.ShowNodeTree(Instance(self.config, dbtree, None, None))
+		self.list.ShowNodeTree(Instance(self.config, dbtree, dbtree, fstree))
+		self.list.readonly = True
 
 	def OnCheck(self, event):
 		# get a valid path from user
