@@ -98,9 +98,10 @@ class DatabaseTree(Tree):
 		if self.isRoot():
 			raise MyException('\'up\' on root node is not possible.', 3)
 		self.__parentKeyStack.pop()
-		self.__parentNameStack.pop()
+		name = self.__parentNameStack.pop()
 		if self.__useBuffer:
 			self.readCurrentDir()
+		return name
 
 	def down(self, node):
 		if not node.isDirectory():

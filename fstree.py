@@ -55,8 +55,9 @@ class FilesystemTree(Tree):
 	def up(self):
 		if self.isRoot():
 			raise MyException('\'up\' on root node is not possible.', 3)
-		self.__parentNameStack.pop()
+		name = self.__parentNameStack.pop()
 		self.readCurrentDir()
+		return name
 
 	def down(self, node):
 		if not node.isDirectory():

@@ -52,7 +52,7 @@ class MemoryTree(Tree):
 	def up(self):
 		if self.isRoot():
 			raise MyException('\'up\' on root node is not possible.', 3)
-		self.__parentMTNStack.pop()
+		return self.__parentMTNStack.pop().node.name
 
 	def down(self, node):
 		if node.getNid() not in self.__parentMTNStack[-1].children:
