@@ -1,5 +1,6 @@
 import datetime
 import os
+import re
 import platform
 
 from misc import MyException, Checksum
@@ -14,6 +15,11 @@ class FilesystemTree(Tree):
 		super(FilesystemTree, self).__init__()
 		self.__rootDir = path
 		self.__metaDir = os.path.join(self.__rootDir, '.dtint')
+
+		self.__winForbiddenDirs = [ \
+			re.compile('[a-zA-Z]:\\\\System Volume Information'), \
+			re.compile('[a-zA-Z]:\\\\\$RECYCLE.BIN'), \
+			]
 
 		self.__checksumToPathsMap = {}
 
@@ -150,9 +156,14 @@ class FilesystemTree(Tree):
 
 	def __fetch(self, name):
 		fullpath = self.getFullPath(name)
-		# check blacklist
+		# check blacklists
 		if fullpath == self.__metaDir:
 			return None
+		if platform.system() == 'Windows':
+			apath = os.path.abspath(fullpath)
+			for regex in self.__winForbiddenDirs:
+				if regex.match(apath):
+					return None
 		# fetch node information
 		node = Node(name)
 		if not os.path.isdir(fullpath):
