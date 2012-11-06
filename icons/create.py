@@ -3,7 +3,7 @@
 
 
 import os
-import sys
+import re
 from wx.tools import img2py
 
 
@@ -34,8 +34,9 @@ for entry in dirlist:
 	else:
 		param = otherparam
 	# run converter
-	variablename = 'Icon' + name[0].upper() + name[1:].lower()
+	camelCaseName = re.sub('_([a-z])', lambda p: p.group(1).upper(), name.lower())
+	variablename = camelCaseName[0].upper() + camelCaseName[1:]
 	cmdline = param + ' ' + variablename + ' ' + path + ' ' + outfile
 	args = cmdline.split()
 	img2py.main(args)
-	
+

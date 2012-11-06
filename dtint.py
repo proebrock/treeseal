@@ -6,7 +6,7 @@ import wx
 
 from dbtree import DatabaseTree
 from fstree import FilesystemTree
-from icons import IconError, IconMissing, IconNew, IconOk, IconUnknown, IconWarning
+import icons as Icons
 from instance import Instance
 from memtree import MemoryTree
 from misc import MyException
@@ -30,6 +30,36 @@ class UserConfig(object):
 ###########################################
 ################### GUI ###################
 ###########################################
+
+class ImageList(wx.ImageList):
+
+	def __init__(self):
+		# initialize base class
+		wx.ImageList.__init__(self, 16, 16)
+		# init mapping: node status -> icon list index
+		self.__statusToIndex = {}
+		# dir and file
+		self.__statusToIndex[NodeStatus.Undefined] = self.Add(Icons.Undefined.GetBitmap())
+		self.__statusToIndex[NodeStatus.New] = self.Add(Icons.New.GetBitmap())
+		self.__statusToIndex[NodeStatus.Missing] = self.Add(Icons.Missing.GetBitmap())
+		self.__statusToIndex[NodeStatus.Ok] = self.Add(Icons.Ok.GetBitmap())
+		# file only
+		self.__statusToIndex[NodeStatus.FileWarning] = self.Add(Icons.FileWarning.GetBitmap())
+		self.__statusToIndex[NodeStatus.FileError] = self.Add(Icons.FileError.GetBitmap())
+		# dir ony
+		self.__statusToIndex[NodeStatus.DirContainsNew] = self.Add(Icons.DirContainsNew.GetBitmap())
+		self.__statusToIndex[NodeStatus.DirContainsMissing] = self.Add(Icons.DirContainsMissing.GetBitmap())
+		self.__statusToIndex[NodeStatus.DirContainsWarning] = self.Add(Icons.DirContainsWarning.GetBitmap())
+		self.__statusToIndex[NodeStatus.DirContainsError] = self.Add(Icons.DirContainsError.GetBitmap())
+		self.__statusToIndex[NodeStatus.DirContainsMulti] = self.Add(Icons.DirContainsMulti.GetBitmap())
+
+	def GetIndexByStatus(self, status):
+		if not status in self.__statusToIndex:
+			raise MyException('Unknown node status {0:s}'.format(NodeStatus.toString(status), 3))
+		else:
+			return self.__statusToIndex[status]
+
+
 
 class ListControlPanel(wx.Panel):
 
@@ -67,33 +97,12 @@ class ListControlPanel(wx.Panel):
 		self.__dirMarkerString = '>'
 
 		# prepare image list
-		self.imagelist = wx.ImageList(16, 16)
-		self.iconError = self.imagelist.Add(IconError.GetBitmap())
-		self.iconMissing = self.imagelist.Add(IconMissing.GetBitmap())
-		self.iconNew = self.imagelist.Add(IconNew.GetBitmap())
-		self.iconOk = self.imagelist.Add(IconOk.GetBitmap())
-		self.iconUnknown = self.imagelist.Add(IconUnknown.GetBitmap())
-		self.iconWarning = self.imagelist.Add(IconWarning.GetBitmap())
-		self.list.SetImageList(self.imagelist, wx.IMAGE_LIST_SMALL)
+		self.__imagelist = ImageList()
+		self.list.SetImageList(self.__imagelist, wx.IMAGE_LIST_SMALL)
 
 	def AppendNode(self, node):
 		# insert new line with icon
-		if node.status is None or node.status == NodeStatus.Undefined:
-			index = self.list.InsertStringItem(sys.maxint, '')
-		elif node.status == NodeStatus.Unknown:
-			index = self.list.InsertImageItem(sys.maxint, self.iconUnknown)
-		elif node.status == NodeStatus.OK:
-			index = self.list.InsertImageItem(sys.maxint, self.iconOk)
-		elif node.status == NodeStatus.New:
-			index = self.list.InsertImageItem(sys.maxint, self.iconNew)
-		elif node.status == NodeStatus.Missing:
-			index = self.list.InsertImageItem(sys.maxint, self.iconMissing)
-		elif node.status == NodeStatus.Warn:
-			index = self.list.InsertImageItem(sys.maxint, self.iconWarning)
-		elif node.status == NodeStatus.Error:
-			index = self.list.InsertImageItem(sys.maxint, self.iconError)
-		else:
-			raise MyException('Unknown node status {0:d}'.format(node.status), 3)
+		index = self.list.InsertImageItem(sys.maxint, self.__imagelist.GetIndexByStatus(node.status))
 		# fill in rest of information
 		self.list.SetStringItem(index, 2, node.name)
 		if node.isDirectory():

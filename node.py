@@ -1,36 +1,54 @@
 import copy
-from misc import sizeToString, MyException
+from misc import MyException, sizeToString
 
 
 
 class NodeStatus:
 
+	# dir and file
 	Undefined = 0
-	Unknown = 1
-	OK = 2
-	New = 3
-	Missing = 4
-	Warn = 5
-	Error = 6
-
-	NumStatuses = 7
+	New = 1
+	Missing = 2
+	Ok = 3
+	# file only
+	FileWarning = 4
+	FileError = 5
+	# dir only
+	DirContainsNew = 6
+	DirContainsMissing = 7
+	DirContainsWarning = 8
+	DirContainsError = 9
+	DirContainsMulti = 10
+	# count
+	NumStatuses = 11
 
 	@staticmethod
 	def toString(status):
+		# dir and file
 		if status == NodeStatus.Undefined:
 			return "Undefined"
-		elif status == NodeStatus.Unknown:
-			return 'Unknown'
-		elif status == NodeStatus.OK:
-			return 'OK'
 		elif status == NodeStatus.New:
 			return 'New'
 		elif status == NodeStatus.Missing:
 			return 'Missing'
-		elif status == NodeStatus.Warn:
-			return 'Warning'
-		elif status == NodeStatus.Error:
-			return 'Error'
+		elif status == NodeStatus.Ok:
+			return 'Ok'
+		# file only
+		elif status == NodeStatus.FileWarning:
+			return 'FileWarning'
+		elif status == NodeStatus.FileError:
+			return 'FileError'
+		# dir only
+		elif status == NodeStatus.DirContainsNew:
+			return 'DirContainsNew'
+		elif status == NodeStatus.DirContainsMissing:
+			return 'DirContainsMissing'
+		elif status == NodeStatus.DirContainsWarning:
+			return 'DirContainsWarning'
+		elif status == NodeStatus.DirContainsError:
+			return 'DirContainsError'
+		elif status == NodeStatus.DirContainsMulti:
+			return 'DirContainsMulti'
 		else:
 			raise MyException('Not existing node status {0:d}'.format(status), 3)
 

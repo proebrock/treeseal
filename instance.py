@@ -51,8 +51,9 @@ class Instance(object):
 		node = self.__view.getNodeByNid(nid)
 		if node is None:
 			raise Exception('Tree inconsistency; that should never happen.', 3)
-		node.status = status
-		self.__view.update(node)
+		if not (node.status == NodeStatus.Missing or node.status == NodeStatus.New):
+			node.status = status
+			self.__view.update(node)
 
 	def down(self, node):
 		# descent in view tree
@@ -86,25 +87,21 @@ class Instance(object):
 			for n in self:
 				self.__fixFunc(n, updateOld)
 			self.up()
-		# post-order: fixing of node
-		if node.status == NodeStatus.OK:
-			pass # nothing to do
-		elif node.status == NodeStatus.New:
+		# post-order: fixing of node, just for all statuses that need fixing
+		if node.status == NodeStatus.New:
 			if updateOld:
 				self.__old.insert(node)
-			node.status = NodeStatus.OK
+			node.status = NodeStatus.Ok
 			self.__view.update(node)
 		elif node.status == NodeStatus.Missing:
 			if updateOld:
 				self.__old.delete(node.getNid())
 			self.__view.delete(node.getNid())
-		elif node.status == NodeStatus.Warn or node.status == NodeStatus.Error:
+		elif node.status == NodeStatus.FileWarning or node.status == NodeStatus.FileError:
 			if updateOld:
 				self.__old.update(node)
-			node.status = NodeStatus.OK
+			node.status = NodeStatus.Ok
 			self.__view.update(node)
-		else:
-			raise MyException('Cannot fix node \'{0:s}\'of status {1:d}'.format(node.name, node.status), 3)
 
 	def fix(self, nids, updateOld=False):
 		for nid in nids:

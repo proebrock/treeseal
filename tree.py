@@ -129,13 +129,45 @@ class Tree(object):
 
 	def getTotalNodeStatus(self):
 		totalstatus = NodeStatus.Undefined
+		isempty = True
 		for node in self:
+			isempty = False
 			if totalstatus == NodeStatus.Undefined:
-				totalstatus = node.status
-			elif not totalstatus == node.status:
-				totalstatus = NodeStatus.Unknown
-		if totalstatus == NodeStatus.Undefined:
-			return NodeStatus.OK
+				if node.status == NodeStatus.Undefined:
+					pass
+				elif node.status == NodeStatus.New or node.status == NodeStatus.DirContainsNew:
+					totalstatus = NodeStatus.DirContainsNew
+				elif node.status == NodeStatus.Missing or node.status == NodeStatus.DirContainsMissing:
+					totalstatus = NodeStatus.DirContainsMissing
+				elif node.status == NodeStatus.Ok:
+					totalstatus = NodeStatus.Ok
+				elif node.status == NodeStatus.FileWarning or node.status == NodeStatus.DirContainsWarning:
+					totalstatus = NodeStatus.DirContainsWarning
+				elif node.status == NodeStatus.FileError or node.status == NodeStatus.DirContainsError:
+					totalstatus = NodeStatus.DirContainsError
+				elif node.status == NodeStatus.DirContainsMulti:
+					return NodeStatus.DirContainsMulti
+				else:
+					raise MyException('Error in state machine.', 3)
+			elif totalstatus == NodeStatus.DirContainsNew:
+				if not (node.status == NodeStatus.New or node.status == NodeStatus.DirContainsNew):
+					return NodeStatus.DirContainsMulti
+			elif totalstatus == NodeStatus.DirContainsMissing:
+				if not (node.status == NodeStatus.Missing or node.status == NodeStatus.DirContainsMissing):
+					return NodeStatus.DirContainsMulti
+			elif totalstatus == NodeStatus.Ok:
+				if not node.status == NodeStatus.Ok:
+					return NodeStatus.DirContainsMulti
+			elif totalstatus == NodeStatus.DirContainsWarning:
+				if not (node.status == NodeStatus.FileWarning or node.status == NodeStatus.DirContainsWarning):
+					return NodeStatus.DirContainsMulti
+			elif totalstatus == NodeStatus.DirContainsError:
+				if not (node.status == NodeStatus.FileError or node.status == NodeStatus.DirContainsError):
+					return NodeStatus.DirContainsMulti
+			else:
+				raise MyException('Error in state machine.', 3)
+		if isempty:
+			return NodeStatus.Ok
 		else:
 			return totalstatus
 
@@ -193,14 +225,14 @@ class Tree(object):
 					# compare snode and onode and set status
 					if snode.info.checksum == onode.info.checksum:
 						# this program is about checksums, if the checksum is valid, the status is OK
-						rnode.status = NodeStatus.OK
+						rnode.status = NodeStatus.Ok
 					else:
 						# otherwise we check if someone has willingly (?) changed the file,
 						# if that is not the case, we have a serious error
 						if snode.info.mtime == onode.info.mtime:
-							rnode.status = NodeStatus.Error
+							rnode.status = NodeStatus.FileError
 						else:
-							rnode.status = NodeStatus.Warn
+							rnode.status = NodeStatus.FileWarning
 					# always keep the other node info (even for OK nodes)
 					rnode.otherinfo = onode.info
 				# process status of child node
