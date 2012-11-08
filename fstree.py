@@ -134,10 +134,10 @@ class FilesystemTree(Tree):
 			self.__checksumToPathsMap[csumstr].add(self.getPath(node.name))
 			# determine file timestamps AFTER calculating the checksum, otherwise opening
 			# the file might change the access time (OS dependent)
-			# this conversion from unix time stamp to local date/time might fail after year 2038...
-			node.info.ctime = datetime.datetime.fromtimestamp(os.path.getctime(fullpath))
-			node.info.atime = datetime.datetime.fromtimestamp(os.path.getatime(fullpath))
-			node.info.mtime = datetime.datetime.fromtimestamp(os.path.getmtime(fullpath))
+			stat = os.stat(fullpath)
+			node.info.ctime = datetime.datetime.fromtimestamp(stat.st_ctime)
+			node.info.atime = datetime.datetime.fromtimestamp(stat.st_atime)
+			node.info.mtime = datetime.datetime.fromtimestamp(stat.st_mtime)
 
 	def globalGetPathsByChecksum(self, checksumString):
 		if checksumString in self.__checksumToPathsMap:
