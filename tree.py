@@ -239,7 +239,7 @@ class Tree(object):
 					# always keep the other node info (even for OK nodes)
 					rnode.otherinfo = onode.info
 				# process status of child node
-				if removeOkNodes and rnode.status == NodeStatus.OK:
+				if removeOkNodes and rnode.status == NodeStatus.Ok:
 					result.delete(rnode.getNid())
 				else:
 					result.update(rnode)
