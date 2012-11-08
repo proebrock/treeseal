@@ -70,8 +70,8 @@ class TestDir(object):
 		self.up()
 
 		self.down('SpecialChars')
-		self.createDefaultSet('With   Space')
-		self.createDefaultSet('UmlauteÄÖÜäöü')
+		self.createDefaultSet(u'With   Space')
+		self.createDefaultSet(u'UmlauteÄÖÜäöü')
 		self.up()
 
 	def change(self):
@@ -92,8 +92,8 @@ class TestDir(object):
 		self.up()
 
 		self.down('SpecialChars')
-		self.changeDefaultSet('With   Space')
-		self.changeDefaultSet('UmlauteÄÖÜäöü')
+		self.changeDefaultSet(u'With   Space')
+		self.changeDefaultSet(u'UmlauteÄÖÜäöü')
 		self.up()
 
 	# directory
