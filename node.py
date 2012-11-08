@@ -283,28 +283,28 @@ class NodeStatistics:
 		self.reset()
 
 	def __str__(self):
-		result = '( '
-		for i in range(NodeStatus.NumStatuses):
-			result += '{0:s}=({1:d}/{2:s}) '.format( \
-				NodeStatus.toString(i), \
-				self.__filecount[i], sizeToString(self.__filesize[i]))
-		result += ')'
-		return result
+		return '(dircount={0:d}, filecount={1:d}, filesize={2:s})'.format( \
+			self.__dircount, self.__filecount, sizeToString(self.__filesize))
 
 	def reset(self):
-		self.__filecount = [ 0 for i in range(NodeStatus.NumStatuses) ]
-		self.__filesize = [ 0 for i in range(NodeStatus.NumStatuses) ]
 		self.__dircount = 0
+		self.__filecount = 0
+		self.__filesize = 0
 
 	def update(self, node):
 		if node.isDirectory():
 			self.__dircount += 1
 		else:
-			self.__filecount[node.status] += 1
-			self.__filesize[node.status] += node.info.size
+			self.__filecount += 1
+			self.__filesize += node.info.size
+
+	def add(self, other):
+		self.__dircount += other.__dircount
+		self.__filecount += other.__filecount
+		self.__filesize += other.__filesize
 
 	def getNodeCount(self):
-		return sum(self.__filecount) + self.__dircount
+		return self.__filecount + self.__dircount
 
 	def getNodeSize(self):
-		return sum(self.__filesize)
+		return self.__filesize
