@@ -254,11 +254,6 @@ class DatabaseTree(Tree):
 			# necessary for proper retrival of datetime objects from the database,
 			# otherwise the cursor will return string values with the timestamps
 			detect_types=sqlite3.PARSE_DECLTYPES)
-		# stores strings as ascii strings in the database, not as unicodes
-		# makes program easily compatible with python 2.X but introduces
-		# problems when file system supports unicode... :-(
-		if sys.version[0] == '2':
-			self.__dbcon.text_factory = str
 
 	def dbClose(self):
 		if self.__dbcon is not None:
