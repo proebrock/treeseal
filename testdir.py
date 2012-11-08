@@ -11,30 +11,51 @@ class TestDir(object):
 		self.__path = path
 		self.__testFileLength = 1024
 
+	def createDefaultSet(self, suffix=''):
+		if not suffix == '':
+			suffix = '_' + suffix
+		self.mkdir('DirMissing' + suffix)
+		self.mkfile('FileMissing' + suffix)
+		self.mkdir('DirOK' + suffix)
+		self.mkfile('FileOK' + suffix)
+		self.mkfile('FileWarning' + suffix)
+		self.mkfile('FileError' + suffix)
+		self.mkdir('DirContainsNewFile' + suffix)
+		self.mkdir('DirContainsNewDir' + suffix)
+		self.mkdir('DirContainsMissingFile' + suffix)
+		self.mkfile(os.path.join('DirContainsMissingFile' + suffix, 'FileMissing'))
+		self.mkdir('DirContainsMissingDir' + suffix)
+		self.mkdir(os.path.join('DirContainsMissingDir' + suffix, 'DirMissing'))
+		self.mkdir('DirContainsFileOK' + suffix)
+		self.mkfile(os.path.join('DirContainsFileOK' + suffix, 'FileOk'))
+		self.mkdir('DirContainsFileWarning' + suffix)
+		self.mkfile(os.path.join('DirContainsFileWarning' + suffix, 'FileWarning'))
+		self.mkdir('DirContainsFileError' + suffix)
+		self.mkfile(os.path.join('DirContainsFileError' + suffix, 'FileError'))
+		self.mkdir('DirContainsMultiple' + suffix)
+		self.mkfile(os.path.join('DirContainsMultiple' + suffix, 'FileMissing'))
+
+	def changeDefaultSet(self, suffix=''):
+		if not suffix == '':
+			suffix = '_' + suffix
+		self.mkdir('DirNew' + suffix)
+		self.mkfile('FileNew' + suffix)
+		self.rmdir('DirMissing' + suffix)
+		self.rmfile('FileMissing' + suffix)
+		self.changefile('FileWarning' + suffix)
+		self.changefile('FileError' + suffix, None, True)
+		self.mkfile(os.path.join('DirContainsNewFile' + suffix, 'FileNew'))
+		self.mkdir(os.path.join('DirContainsNewDir' + suffix, 'DirNew'))
+		self.rmfile(os.path.join('DirContainsMissingFile' + suffix, 'FileMissing'))
+		self.rmdir(os.path.join('DirContainsMissingDir' + suffix, 'DirMissing'))
+		self.changefile(os.path.join('DirContainsFileWarning' + suffix, 'FileWarning'))
+		self.changefile(os.path.join('DirContainsFileError' + suffix, 'FileError'), None, True)
+		self.mkfile(os.path.join('DirContainsMultiple' + suffix, 'FileNew'))
+		self.rmfile(os.path.join('DirContainsMultiple' + suffix, 'FileMissing'))
+
 	def create(self):
 		self.down('Status')
-		self.mkdir('DirMissing')
-		self.mkfile('FileOK')
-		self.mkfile('FileMissing')
-		self.mkfile('FileWarning')
-		self.mkfile('FileError')
-		self.up()
-
-		self.down('StatusChildren')
-		self.mkdir('EmptyDir')
-		self.mkdir('DirNew')
-		self.mkdir('DirMissing')
-		self.mkdir(os.path.join('DirMissing', 'DirMissing'))
-		self.mkdir('FileOK')
-		self.mkfile(os.path.join('FileOK', 'FileOK'))
-		self.mkdir('FileNew')
-		self.mkdir('FileMissing')
-		self.mkfile(os.path.join('FileMissing', 'FileMissing'))
-		self.mkdir('FileWarning')
-		self.mkfile(os.path.join('FileWarning', 'FileWarning'))
-		self.mkdir('FileError')
-		self.mkfile(os.path.join('FileError', 'FileError'))
-
+		self.createDefaultSet()
 		self.up()
 
 		self.down('FileDirChanges')
@@ -46,24 +67,16 @@ class TestDir(object):
 		self.mkfile('AlwaysZeroSize', '')
 		self.mkfile('HadZeroSize', '')
 		self.mkfile('HasZeroSize'	)
+		self.up()
+
+		self.down('SpecialChars')
+		self.createDefaultSet('With   Space')
+		self.createDefaultSet('UmlauteÄÖÜäöü')
+		self.up()
 
 	def change(self):
 		self.down('Status')
-		self.mkdir('DirNew')
-		self.rmdir('DirMissing')
-		self.mkfile('FileNew')
-		self.rmfile('FileMissing')
-		self.changefile('FileWarning')
-		self.changefile('FileError', None, True)
-		self.up()
-
-		self.down('StatusChildren')
-		self.mkdir(os.path.join('DirNew', 'DirNew'))
-		self.rmdir(os.path.join('DirMissing', 'DirMissing'))
-		self.mkfile(os.path.join('FileNew', 'FileNew'))
-		self.rmfile(os.path.join('FileMissing', 'FileMissing'))
-		self.changefile(os.path.join('FileWarning', 'FileWarning'))
-		self.changefile(os.path.join('FileError', 'FileError'), None, True)
+		self.changeDefaultSet()
 		self.up()
 
 		self.down('FileDirChanges')
@@ -76,6 +89,12 @@ class TestDir(object):
 		self.down('ZeroSize')
 		self.changefile('HadZeroSize')
 		self.changefile('HasZeroSize', '')
+		self.up()
+
+		self.down('SpecialChars')
+		self.changeDefaultSet('With   Space')
+		self.changeDefaultSet('UmlauteÄÖÜäöü')
+		self.up()
 
 	# directory
 
@@ -118,10 +137,6 @@ class TestDir(object):
 
 	def rmfile(self, path):
 		os.remove(os.path.join(self.__path, path))
-
-
-
-
 
 
 
