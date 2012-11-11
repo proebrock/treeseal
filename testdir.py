@@ -140,10 +140,10 @@ class TestDir(object):
 
 
 
-#path = 'D:\\Projects\\dtint-example'
-path = '/home/phil/Projects/dtint-example'
+#path = 'D:\\Projects\\treeseal-example'
+path = '/home/phil/Projects/treeseal-example'
 td = TestDir(path)
-if not os.path.exists(os.path.join(path, '.dtint')):
+if not os.path.exists(os.path.join(path, '.treeseal')):
 	print('creating initial version of testdir ...')
 	td.create()
 else:

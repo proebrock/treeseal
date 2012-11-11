@@ -16,7 +16,7 @@ from progressdialog import UserCancelledException, FileProcessingProgressDialog
 from comparisondialog import NodeComparisonDialog
 from simplelistctrl import SimpleListControl
 
-ProgramName = 'dtint'
+ProgramName = 'treeseal'
 ProgramVersion = '3.0'
 
 
@@ -298,8 +298,8 @@ class MainFrame(wx.Frame):
 		# get a valid path from user
 		dirDialog = wx.DirDialog(self, "Choose a directory for import:", \
 			style=wx.DD_DEFAULT_STYLE)
-		#dirDialog.SetPath('D:\\Projects\\dtint-example') # TESTING
-		dirDialog.SetPath('/home/phil/Projects/dtint-example') # TESTING
+		#dirDialog.SetPath('D:\\Projects\\treeseal-example') # TESTING
+		dirDialog.SetPath('/home/phil/Projects/treeseal-example') # TESTING
 		if dirDialog.ShowModal() == wx.ID_OK:
 			userPath = dirDialog.GetPath()
 		else:
@@ -352,8 +352,8 @@ class MainFrame(wx.Frame):
 		# get a valid path from user
 		dirDialog = wx.DirDialog(self, "Choose a directory for check:", \
 			style=wx.DD_DEFAULT_STYLE)
-		#dirDialog.SetPath('D:\\Projects\\dtint-example') # TESTING
-		dirDialog.SetPath('/home/phil/Projects/dtint-example') # TESTING
+		#dirDialog.SetPath('D:\\Projects\\treeseal-example') # TESTING
+		dirDialog.SetPath('/home/phil/Projects/treeseal-example') # TESTING
 		if dirDialog.ShowModal() == wx.ID_OK:
 			userPath = dirDialog.GetPath()
 		else:

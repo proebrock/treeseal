@@ -17,7 +17,7 @@ class FilesystemTree(Tree):
 	def __init__(self, path):
 		super(FilesystemTree, self).__init__()
 		self.__rootDir = path
-		self.__metaDir = os.path.join(self.__rootDir, '.dtint')
+		self.__metaDir = os.path.join(self.__rootDir, '.treeseal')
 
 		self.__winForbiddenDirs = [ \
 			re.compile('[a-zA-Z]:\\\\System Volume Information'), \

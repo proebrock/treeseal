@@ -3,7 +3,6 @@
 
 import os
 import sqlite3
-import sys
 
 from misc import MyException, Checksum
 from node import NodeInfo, Node
@@ -15,7 +14,7 @@ class DatabaseTree(Tree):
 
 	def __init__(self, path):
 		super(DatabaseTree, self).__init__()
-		metaDir = os.path.join(path, '.dtint')
+		metaDir = os.path.join(path, '.treeseal')
 		self.__databaseFile = os.path.join(metaDir, 'base.sqlite3')
 		self.__signatureFile = os.path.join(metaDir, 'base.signature')
 
