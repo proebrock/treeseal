@@ -224,7 +224,7 @@ class Node(object):
 
 	@staticmethod
 	def constructNid(name, isdir):
-		return '{0:b}{1:s}'.format(not isdir, name)
+		return u'{0:b}{1:s}'.format(not isdir, name)
 
 	@staticmethod
 	def nid2Name(nid):
