@@ -12,17 +12,17 @@ def sizeToString(size):
 	if size < 1000:
 		sizestr = '{0:d} '.format(size)
 	elif size < 1000**2:
-		sizestr = '{0:.1f} K'.format(size/1000)
+		sizestr = '{0:.1f} K'.format((1.0*size)/1000)
 	elif size < 1000**3:
-		sizestr = '{0:.1f} M'.format(size/1000**2)
+		sizestr = '{0:.1f} M'.format((1.0*size)/1000**2)
 	elif size < 1000**4:
-		sizestr = '{0:.1f} G'.format(size/1000**3)
+		sizestr = '{0:.1f} G'.format((1.0*size)/1000**3)
 	elif size < 1000**5:
-		sizestr = '{0:.1f} T'.format(size/1000**4)
+		sizestr = '{0:.1f} T'.format((1.0*size)/1000**4)
 	elif size < 1000**6:
-		sizestr = '{0:.1f} P'.format(size/1000**5)
+		sizestr = '{0:.1f} P'.format((1.0*size)/1000**5)
 	else:
-		sizestr = '{0:.1f} E'.format(size/1000**6)
+		sizestr = '{0:.1f} E'.format((1.0*size)/1000**6)
 	return sizestr + 'B'
 
 
