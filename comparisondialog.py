@@ -32,14 +32,15 @@ class NodeComparisonDialog(wx.Dialog):
 
 	def __init__(self, parent, node, instance):
 
-		if node.isDirectory():
-			height = 210
-		else:
-			if (node.otherinfo is not None) and \
-				(not node.info.checksum == node.otherinfo.checksum):
-				height = 800
-			else:
-				height = 600
+		height = 210
+		if not node.isDirectory():
+			height += 190
+			if instance.isQueryByChecksumPossible():
+				if (node.otherinfo is not None) and \
+					(not node.info.checksum == node.otherinfo.checksum):
+					height += 400
+				else:
+					height += 200
 
 		wx.Dialog.__init__(self, parent, title='Node information', size=(560,height), \
 			style=wx.CAPTION | wx.RESIZE_BORDER | wx.STAY_ON_TOP)
@@ -76,13 +77,14 @@ class NodeComparisonDialog(wx.Dialog):
 			diffBoxSizer = wx.StaticBoxSizer(diffBox, wx.VERTICAL)
 			diffBoxSizer.Add(diffGrid, 0, wx.ALL | wx.EXPAND, self.border)
 
-			if (node.otherinfo is not None) and \
-				(not node.info.checksum == node.otherinfo.checksum):
-				contentBoxSizerOther = self.ContentBox(node.otherinfo.checksum, instance, 'Old content')
-				contentBoxSizer = self.ContentBox(node.info.checksum, instance, 'New content')
-			else:
-				contentBoxSizerOther = None
-				contentBoxSizer = self.ContentBox(node.info.checksum, instance)
+			if instance.isQueryByChecksumPossible():
+				if (node.otherinfo is not None) and \
+					(not node.info.checksum == node.otherinfo.checksum):
+					contentBoxSizerOther = self.ContentBox(node.otherinfo.checksum, instance, 'Old content')
+					contentBoxSizer = self.ContentBox(node.info.checksum, instance, 'New content')
+				else:
+					contentBoxSizerOther = None
+					contentBoxSizer = self.ContentBox(node.info.checksum, instance)
 
 		# button
 		button = wx.Button(self, label='OK')
@@ -94,9 +96,13 @@ class NodeComparisonDialog(wx.Dialog):
 		sizer.Add(headerBoxSizer, 0, wx.ALL | wx.EXPAND, self.border)
 		if not node.isDirectory():
 			sizer.Add(diffBoxSizer, 0, wx.ALL | wx.EXPAND, self.border)
-			if not contentBoxSizerOther is None:
-				sizer.Add(contentBoxSizerOther, 1, wx.ALL | wx.EXPAND, self.border)
-			sizer.Add(contentBoxSizer, 1, wx.ALL | wx.EXPAND, self.border)
+			if instance.isQueryByChecksumPossible():
+				if (node.otherinfo is not None) and \
+					(not node.info.checksum == node.otherinfo.checksum):
+					sizer.Add(contentBoxSizerOther, 1, wx.ALL | wx.EXPAND, self.border)
+					sizer.Add(contentBoxSizer, 1, wx.ALL | wx.EXPAND, self.border)
+				else:
+					sizer.Add(contentBoxSizer, 1, wx.ALL | wx.EXPAND, self.border)
 		sizer.Add(button, 0, wx.ALL | wx.ALIGN_CENTER, self.border)
 		self.SetSizer(sizer)
 		self.CenterOnScreen()
@@ -131,6 +137,8 @@ class NodeComparisonDialog(wx.Dialog):
 	def ContentBox(self, checksum, instance, comment=None):
 		# showing number of instances
 		[ dbpaths, fspaths ] = instance.getPathsByChecksum(checksum.getString())
+		if dbpaths is None or fspaths is None:
+			return None
 		instancesGrid = SimpleGrid(self, \
 			[ ['{0:d}'.format(len(dbpaths)), '{0:d}'.format(len(fspaths))] ], \
 			['Number of occurrences'], ['Database', 'Filesystem'], \

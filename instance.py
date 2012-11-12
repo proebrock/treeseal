@@ -79,9 +79,17 @@ class Instance(object):
 		for node in self.__view:
 			yield node
 
+	def isQueryByChecksumPossible(self):
+		return not (self.__old is None or self.__new is None)
+
 	def getPathsByChecksum(self, csumstr):
-		return self.__old.globalGetPathsByChecksum(csumstr), \
-			self.__new.globalGetPathsByChecksum(csumstr)
+		if self.isQueryByChecksumPossible:
+			return [ \
+				self.__old.globalGetPathsByChecksum(csumstr),
+				self.__new.globalGetPathsByChecksum(csumstr)
+				]
+		else:
+			return [ None, None ]
 
 	def __fixFunc(self, node, updateOld=False):
 		# recurse

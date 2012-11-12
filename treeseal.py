@@ -346,7 +346,7 @@ class MainFrame(wx.Frame):
 		progressDialog.SignalFinished()
 
 		self.list.ClearInstance()
-		self.list.ShowNodeTree(Instance(self.config, dbtree, dbtree, fstree))
+		self.list.ShowNodeTree(Instance(self.config, dbtree, None, None))
 		self.list.readonly = True
 
 		self.statusbar.SetStatusText('Filesystem contains ' + str(stats))
