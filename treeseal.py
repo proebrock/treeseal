@@ -287,7 +287,8 @@ class MainFrame(wx.Frame):
 
 		self.config = UserConfig()
 
-		self.CreateStatusBar()
+		self.statusbar = self.CreateStatusBar()
+		self.statusbar.SetFieldsCount(1)
 
 		self.Show(True)
 
@@ -348,6 +349,8 @@ class MainFrame(wx.Frame):
 		self.list.ShowNodeTree(Instance(self.config, dbtree, dbtree, fstree))
 		self.list.readonly = True
 
+		self.statusbar.SetStatusText('Filesystem contains ' + str(stats))
+
 	def OnCheck(self, event):
 		# get a valid path from user
 		dirDialog = wx.DirDialog(self, "Choose a directory for check:", \
@@ -399,6 +402,8 @@ class MainFrame(wx.Frame):
 		self.list.ClearInstance()
 		self.list.ShowNodeTree(Instance(self.config, memtree, dbtree, fstree))
 		self.list.readonly = False
+
+		self.statusbar.SetStatusText('Filesystem contains ' + str(stats))
 
 	def OnExit(self, event):
 		self.Close(True)

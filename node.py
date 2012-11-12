@@ -283,8 +283,8 @@ class NodeStatistics:
 		self.reset()
 
 	def __str__(self):
-		return '(dircount={0:d}, filecount={1:d}, filesize={2:s})'.format( \
-			self.__dircount, self.__filecount, sizeToString(self.__filesize))
+		return '{0:d} directories and {1:s} in {2:d} files'.format( \
+			self.__dircount, sizeToString(self.__filesize), self.__filecount)
 
 	def reset(self):
 		self.__dircount = 0
