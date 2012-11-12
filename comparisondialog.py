@@ -32,15 +32,15 @@ class NodeComparisonDialog(wx.Dialog):
 
 	def __init__(self, parent, node, instance):
 
-		height = 210
+		height = 210 # node header
 		if not node.isDirectory():
-			height += 190
+			height += 190 # node info for files
 			if instance.isQueryByChecksumPossible():
 				if (node.otherinfo is not None) and \
 					(not node.info.checksum == node.otherinfo.checksum):
-					height += 400
+					height += 400 # diff content view
 				else:
-					height += 200
+					height += 200 # single content view
 
 		wx.Dialog.__init__(self, parent, title='Node information', size=(560,height), \
 			style=wx.CAPTION | wx.RESIZE_BORDER | wx.STAY_ON_TOP)
