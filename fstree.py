@@ -139,6 +139,9 @@ class FilesystemTree(Tree):
 			node.info.atime = datetime.datetime.fromtimestamp(stat.st_atime)
 			node.info.mtime = datetime.datetime.fromtimestamp(stat.st_mtime)
 
+	def globalChecksumExists(self, checksumString):
+		return checksumString in self.__checksumToPathsMap
+
 	def globalGetPathsByChecksum(self, checksumString):
 		if checksumString in self.__checksumToPathsMap:
 			return self.__checksumToPathsMap[checksumString]

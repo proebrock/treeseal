@@ -217,6 +217,13 @@ class DatabaseTree(Tree):
 			if self.signalBytesDone is not None:
 				self.signalBytesDone(node.info.size)
 
+	def globalChecksumExists(self, checksumString):
+		cursor = self.__dbcon.cursor()
+		cursor.execute('select count(nodekey) from nodes where checksum=X\'{0:s}\''.format(checksumString))
+		count = cursor.fetchone()[0]
+		cursor.close()
+		return count == 0
+
 	def globalGetPathsByChecksum(self, checksumString):
 		result = set()
 		cursor = self.__dbcon.cursor()

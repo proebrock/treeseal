@@ -167,6 +167,18 @@ Ok = PyEmbeddedImage(
     "c2u4VtuhqepOxRAmQLUsC57vn8gveidvvld4KOd/AYCuYU5d+dhHAAAAAElFTkSuQmCC")
 
 #----------------------------------------------------------------------
+Trash = PyEmbeddedImage(
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAY1J"
+    "REFUOI2VkzFrFUEQx39zT3g8IZXBELtnIorYRFSwEARBIzEpTGFlb2k6SWGhBMRGv4etnV9B"
+    "1MJGU4tIEC6Ru3e3M7tj8bj1qQc+B4bdhf/857ezrEgxoC8ePnris+eXzx5Lr1CKwV+5s7vn"
+    "ZWV+cNj4wWHjZWW+s7vnfVrpCP7s+K/IRF3H/4n3Hz9nomOdY1kZ38uStlVCCDShpWmVEJTJ"
+    "pKGeTKjqmrqqUdNMkg2ePn/Bg/vbvHv7AU2OxYgGo9VAG4ygRkqJlfGYT/v72aDo7uMpcmb1"
+    "NKvnznNve5OtzTsMjy+wsX6LS1eucmJxkYtraywtL6Ma8gwygYYpVrSIqWIWSSkRoxFjt4+4"
+    "e9ZmgmmhzTd+kd+02UAtzFcP2Iw2G9i8BIBqD4Gp9or7GMx6ZjA3gdA/g5TSdHXHAXcnpYQ7"
+    "gOOeuvqshZlnHBRTr2uXL9AmSIWyfvMG5dEPRqMR45WzpGgMh0NEfn1Mmf3O12/f9S9fv1EU"
+    "giCIgIjkdHdOLZ3kzetX2eEn6IoI1wsU3oEAAAAASUVORK5CYII=")
+
+#----------------------------------------------------------------------
 Undefined = PyEmbeddedImage(
     "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAr9J"
     "REFUOI1lk11I01EYxn/n7+a/zW05mx+l87OcbiAWUUYXQRd9aEYIdRcYdBF0UzfRF31IdFGE"

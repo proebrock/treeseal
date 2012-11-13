@@ -91,6 +91,19 @@ class Instance(object):
 		else:
 			return [ None, None ]
 
+	def hasDangerOfLoss(self, node):
+		if self.__new is None:
+			return None
+		if node.isDirectory():
+			return None
+		if node.status == NodeStatus.Missing:
+			csum = node.info.checksum
+		elif node.status == NodeStatus.FileWarning or node.status == NodeStatus.FileError:
+			csum = node.otherinfo.checksum
+		else:
+			return False
+		return not self.__new.globalChecksumExists(csum.getString())
+
 	def __fixFunc(self, node, updateOld=False):
 		# recurse
 		if node.isDirectory():

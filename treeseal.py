@@ -32,7 +32,7 @@ class UserConfig(object):
 ################### GUI ###################
 ###########################################
 
-class ImageList(wx.ImageList):
+class StatusImageList(wx.ImageList):
 
 	def __init__(self):
 		# initialize base class
@@ -72,15 +72,23 @@ class ListControlPanel(wx.Panel):
 		self.list.InitializeColumns([ \
 				('', 22), \
 				('', 22), \
+				('', 22), \
 				('Name', None), \
-				('Size', 150), \
+				('Size', 130), \
 				('Modfication Time', 142), \
 				('Checksum', 80), \
 			])
+		self.statusColumn = 0
+		self.trashColumn = 1
+		self.dirMarkerColumn = 2
+		self.nameColumn = 3
+		self.sizeColumn = 4
+		self.mtimeColumn = 5
+		self.csumColumn = 6
 
 		# one pseudo boxer with the listctrl filling the whole panel
 		sizer = wx.BoxSizer(wx.VERTICAL)
-		sizer.Add(self.list, 1, wx.EXPAND)
+		sizer.Add(self.list, self.nameColumn-1, wx.EXPAND)
 		self.SetSizer(sizer)
 
 		# bind controls
@@ -98,27 +106,31 @@ class ListControlPanel(wx.Panel):
 		self.__dirMarkerString = '>'
 
 		# prepare image list
-		self.__imagelist = ImageList()
+		self.__imagelist = StatusImageList()
+		self.trashIconIndex = self.__imagelist.Add(Icons.Trash.GetBitmap())
 		self.list.SetImageList(self.__imagelist, wx.IMAGE_LIST_SMALL)
 
 	def AppendNode(self, node):
 		# insert new line with icon
 		index = self.list.InsertImageItem(sys.maxint, self.__imagelist.GetIndexByStatus(node.status))
 		# fill in rest of information
-		self.list.SetStringItem(index, 2, node.name)
+		self.list.SetStringItem(index, self.nameColumn, node.name)
 		if node.isDirectory():
-			self.list.SetStringItem(index, 1, self.__dirMarkerString)
+			self.list.SetStringItem(index, self.dirMarkerColumn, self.__dirMarkerString)
 		else:
-			self.list.SetStringItem(index, 3, node.info.getSizeString())
-			self.list.SetStringItem(index, 4, node.info.getMTimeString())
-			self.list.SetStringItem(index, 5, node.info.getChecksumString())
+			dol = self.instance.hasDangerOfLoss(node)
+			if dol is not None and dol == True:
+				self.list.SetItemColumnImage(index, self.trashColumn, self.trashIconIndex)
+			self.list.SetStringItem(index, self.sizeColumn, node.info.getSizeString())
+			self.list.SetStringItem(index, self.mtimeColumn, node.info.getMTimeString())
+			self.list.SetStringItem(index, self.csumColumn, node.info.getChecksumString())
 
 	def IndexToName(self, index):
-		return self.list.GetItem(index, 2).GetText()
+		return self.list.GetItem(index, self.nameColumn).GetText()
 
 	def IndexToNid(self, index):
-		name = self.list.GetItem(index, 2).GetText()
-		isdir = self.list.GetItem(index, 1).GetText() == self.__dirMarkerString
+		name = self.list.GetItem(index, self.nameColumn).GetText()
+		isdir = self.list.GetItem(index, self.dirMarkerColumn).GetText() == self.__dirMarkerString
 		return Node.constructNid(name, isdir)
 
 	def getSelectedNodeNids(self):
@@ -139,13 +151,13 @@ class ListControlPanel(wx.Panel):
 		if not self.instance.isRoot():
 			# for directories other than root show entry to go back to parent
 			index = self.list.InsertStringItem(sys.maxint, '')
-			self.list.SetStringItem(index, 2, self.__parentNameString)
+			self.list.SetStringItem(index, self.nameColumn, self.__parentNameString)
 		for node in self.instance:
 			self.AppendNode(node)
 		if self.list.GetItemCount() == 0:
 			# for an empty list show a special string
 			index = self.list.InsertStringItem(sys.maxint, '')
-			self.list.SetStringItem(index, 2, self.__emptyNameString)
+			self.list.SetStringItem(index, self.nameColumn, self.__emptyNameString)
 		# set address line
 		self.GetParent().SetAddressLine(self.instance.getPath())
 

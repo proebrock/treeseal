@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import shutil
 
 
 
@@ -74,6 +75,13 @@ class TestDir(object):
 		self.createDefaultSet(u'UmlauteÄÖÜäöü')
 		self.up()
 
+		self.down('Content')
+		self.mkfile('Missing')
+		self.mkfile('Ok')
+		self.mkfile('Warning_NoBackup')
+		self.mkfile('Warning_WithBackup')
+		self.up()
+
 	def change(self):
 		self.down('Status')
 		self.changeDefaultSet()
@@ -94,6 +102,15 @@ class TestDir(object):
 		self.down('SpecialChars')
 		self.changeDefaultSet(u'With   Space')
 		self.changeDefaultSet(u'UmlauteÄÖÜäöü')
+		self.up()
+
+		self.down('Content')
+		self.mkfile('NewGenuine')
+		self.cpfile('Ok', 'NewExisting')
+		self.rmfile('Missing')
+		self.changefile('Warning_NoBackup')
+		self.cpfile('Warning_WithBackup', 'Warning_WithBackup.bak')
+		self.changefile('Warning_WithBackup')
 		self.up()
 
 	# directory
@@ -137,6 +154,11 @@ class TestDir(object):
 
 	def rmfile(self, path):
 		os.remove(os.path.join(self.__path, path))
+
+	def cpfile(self, src, dst):
+		srcpath = os.path.join(self.__path, src)
+		dstpath = os.path.join(self.__path, dst)
+		shutil.copy(srcpath, dstpath)
 
 
 

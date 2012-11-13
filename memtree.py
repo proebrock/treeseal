@@ -116,6 +116,9 @@ class MemoryTree(Tree):
 			if self.signalBytesDone is not None:
 				self.signalBytesDone(node.info.size)
 
+	def globalChecksumExists(self, checksumString):
+		return checksumString in self.__checksumToPathsMap
+
 	def globalGetPathsByChecksum(self, checksumString):
 		if checksumString in self.__checksumToPathsMap:
 			return self.__checksumToPathsMap[checksumString]
