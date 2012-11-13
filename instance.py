@@ -53,7 +53,7 @@ class Instance(object):
 		nid = Node.constructNid(name, True)
 		node = self.__view.getNodeByNid(nid)
 		if node is None:
-			raise Exception('Tree inconsistency; that should never happen.', 3)
+			raise MyException('Tree inconsistency; that should never happen.', 3)
 		if not (node.status == NodeStatus.Missing or node.status == NodeStatus.New):
 			node.status = status
 			self.__view.update(node)
@@ -118,7 +118,7 @@ class Instance(object):
 		for nid in nids:
 			vnode = self.__view.getNodeByNid(nid)
 			if vnode is None:
-				raise Exception('Tree inconsistency; that should never happen.', 3)
+				raise MyException('Tree inconsistency; that should never happen.', 3)
 			self.__fixFunc(vnode, updateOld)
 		if updateOld:
 			self.__old.commit()

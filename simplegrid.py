@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import wx
-
+from misc import MyException
 
 
 class SimpleGrid(wx.FlexGridSizer):
@@ -14,14 +14,14 @@ class SimpleGrid(wx.FlexGridSizer):
 		else:
 			haveRowLabels = 1
 			if not len(rowlabels) == numRows:
-				raise Exception('Number of row labels ({0:d}) must match number of rows ({1:d}).'.format(len(rowlabels), numRows))
+				raise MyException('Number of row labels ({0:d}) must match number of rows ({1:d}).'.format(len(rowlabels), numRows), 3)
 		numCols = len(entries[0])
 		if collabels is None:
 			haveColLabels = 0
 		else:
 			haveColLabels = 1
 			if not len(collabels) == numCols:
-				raise Exception('Number of column labels ({0:d}) must match number of columns ({1:d}).'.format(len(collabels), numCols))
+				raise MyException('Number of column labels ({0:d}) must match number of columns ({1:d}).'.format(len(collabels), numCols), 3)
 
 		self.border = 5
 
