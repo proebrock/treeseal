@@ -1,11 +1,14 @@
 Mid-term
 --------
-* Status bar with statistics of currently displayed dir or tree
-  (size/number of file/dir for each status, with 5 statuses we get 20 values!)
-* Before import, check if no upper or lower node has already .dtint
-* Right-Click menu
-  - Dependent on previous action, e.g. import, check, ...)
-  - Functions: Refresh (diff of sub-tree)
+* Before import, check if no upper or lower node has already .treeseal
+* More Right-Click menu functions:
+  - Refresh (diff of sub-tree)
+  - Dependent on status:
+    New -> Delete in fs (dir or file)
+    Missing -> Create (dir) or Restore (based on still existing content or user chooses file)
+    Warning/Error -> Restore (like above)
+    ### Not actions for DirContainsXXX
+    ### Careful with recusive behavior and mixed status trees!
 * Proper key navigation of listview (including CTRL-A, multiselect, background menu)
 * Program name and artwork (icon, splash screen)
 * Help: Github, in-program (HTML viewer) and About dialog
@@ -16,19 +19,23 @@ Mid-term
   (a new file can have no/one/multiple origins in terms of its checksum,
   each can still exist (cp) or no longer exist (mv) in current fs; dirs are
   handled by their contents)
-* Preferences menu and saving in rc file:
+* Preferences menu and saving in rc file in .treeseal
+  or somewhere else (local vs. global config):
   - Hide valid nodes in diff view: on/off
   - Default dir for opening directories: path
   - Black listed file patterns or paths
-  - gpg signature options
+  - GPG signature options
+  - Buffer size for checksum calculation
 * Unicode support for filenames (db stores just ansi strings?, check display of umlaute in win
 * Continuously check and keep portability (Linux, Win, Mac)
+* Elapsed, expected, remaining time in progress dialog
 
 Long-term
 ---------
 * make getPathsByChecksum and getNodesByChecksum compatible with short checksum strings
   (various length support, warning for non-unique user params, optimal data structure
   for this are the so-called "Suffix-Trees")
+* Console version for most important tasks, just requiring python (and not wxPython)
 * Copying from instance to instance
   - What can you trust, how paranoid do you have to be?
   - src checked, make dest the same VS. two or more defect copies, create one with max recovery
