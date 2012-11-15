@@ -14,13 +14,22 @@ class Tree(object):
 
 	### those basic methods should be implemented in derived classes
 
+	def open(self):
+		raise MyException('Not implemented.', 3)
+
+	def close(self):
+		raise MyException('Not implemented.', 3)
+
+	def isOpen(self):
+		raise MyException('Not implemented.', 3)
+
+	def clear(self):
+		raise MyException('Not implemented.', 3)
+
 	def getDepth(self):
 		raise MyException('Not implemented.', 3)
 
 	def getPath(self, filename=None):
-		raise MyException('Not implemented.', 3)
-
-	def reset():
 		raise MyException('Not implemented.', 3)
 
 	def gotoRoot(self):

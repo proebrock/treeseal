@@ -60,17 +60,28 @@ class DatabaseTree(Tree):
 
 	### implementation of base class methods, please keep order
 
-	def getDepth(self):
-		return len(self.__parentKeyStack) - 1
+	def open(self):
+		# if neither database file nor signature file exist, make a silent reset
+		if not (os.path.exists(self.__databaseFile) and os.path.exists(self.__signatureFile)):
+			self.clear()
+		cs = Checksum()
+		cs.calculateForFile(self.__databaseFile)
+		if not cs.isValidUsingSavedFile(self.__signatureFile):
+			raise MyException('The internal database has been corrupted.', 3)
+		self.dbOpen()
 
-	def getPath(self, filename=None):
-		path = reduce(lambda x, y: os.path.join(x, y), self.__parentNameStack)
-		if filename is None:
-			return path
-		else:
-			return os.path.join(path, filename)
+	def isOpen(self):
+		return not self.__dbcon is None
 
-	def reset(self):
+	def close(self):
+		if self.isOpen():
+			print('close')
+			self.dbClose()
+			cs = Checksum()
+			cs.calculateForFile(self.__databaseFile)
+			cs.saveToFile(self.__signatureFile)
+
+	def clear(self):
 		# close database
 		self.dbClose()
 		# delete files if existing
@@ -89,6 +100,16 @@ class DatabaseTree(Tree):
 		self.open()
 		# goto root dir
 		self.gotoRoot()
+
+	def getDepth(self):
+		return len(self.__parentKeyStack) - 1
+
+	def getPath(self, filename=None):
+		path = reduce(lambda x, y: os.path.join(x, y), self.__parentNameStack)
+		if filename is None:
+			return path
+		else:
+			return os.path.join(path, filename)
 
 	def gotoRoot(self):
 		self.__parentKeyStack = [ self.getRootId() ]
@@ -234,26 +255,6 @@ class DatabaseTree(Tree):
 		return result
 
 	### the following methods are not implementations of base class methods
-
-	def open(self):
-		# if neither database file nor signature file exist, make a silent reset
-		if not (os.path.exists(self.__databaseFile) and os.path.exists(self.__signatureFile)):
-			self.reset()
-		cs = Checksum()
-		cs.calculateForFile(self.__databaseFile)
-		if not cs.isValidUsingSavedFile(self.__signatureFile):
-			raise MyException('The internal database has been corrupted.', 3)
-		self.dbOpen()
-
-	def isOpen(self):
-		return not self.__dbcon is None
-
-	def close(self):
-		if self.isOpen():
-			self.dbClose()
-			cs = Checksum()
-			cs.calculateForFile(self.__databaseFile)
-			cs.saveToFile(self.__signatureFile)
 
 	def dbOpen(self):
 		self.__dbcon = sqlite3.connect(self.__databaseFile, \

@@ -26,6 +26,14 @@ class Instance(object):
 				.format(self.__new.getDepth(), self.__new.getPath())
 		return result + ')'
 
+	def close(self):
+		if self.__view is not None and self.__view.isOpen:
+			self.__view.close()
+		if self.__old is not None and self.__old.isOpen:
+			self.__old.close()
+		if self.__new is not None and self.__new.isOpen:
+			self.__new.close()
+
 	def isRoot(self):
 		return self.__view.isRoot()
 

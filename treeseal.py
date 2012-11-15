@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 
 import os
+import platform
+import shutil
 import sys
 import wx
 
@@ -165,7 +167,9 @@ class ListControlPanel(wx.Panel):
 		self.list.DeleteAllItems()
 
 	def ClearInstance(self):
-		self.instance = None
+		if self.instance is not None:
+			self.instance.close()
+			self.instance = None
 
 	def ShowNodeTree(self, instance):
 		self.list.SetFocus()
@@ -324,20 +328,34 @@ class MainFrame(wx.Frame):
 				return
 		self.Title = self.baseTitle + ' - ' + userPath
 
-		# create trees
-		fstree = FilesystemTree(userPath)
-		fstree.reset()
-		dbtree = DatabaseTree(userPath)
-		dbtree.reset()
+		self.list.ClearInstance()
 
-		# create progress dialog
-		progressDialog = FileProcessingProgressDialog(self, 'Importing ' + userPath)
-		progressDialog.Show()
-		stats = fstree.getNodeStatistics()
-		progressDialog.Init(stats.getNodeCount(), stats.getNodeSize())
+		# reset meta directory
+		metaDir = os.path.join(userPath, '.' + ProgramName)
+		if os.path.exists(metaDir):
+			shutil.rmtree(metaDir)
+		os.mkdir(metaDir)
+		if platform.system() == 'Windows':
+			# if on windows platform, hide directory
+			os.system('attrib +h "' + metaDir + '"')
 
-		# execute task
 		try:
+			fstree = FilesystemTree(userPath)
+			fstree.open()
+			dbtree = DatabaseTree(userPath)
+			dbtree.open()
+		except MyException as e:
+			e.showDialog('Importing ' + userPath)
+			return
+
+		try:
+			# create progress dialog
+			progressDialog = FileProcessingProgressDialog(self, 'Importing ' + userPath)
+			progressDialog.Show()
+			stats = fstree.getNodeStatistics()
+			progressDialog.Init(stats.getNodeCount(), stats.getNodeSize())
+
+			# execute task
 			fstree.registerHandlers(progressDialog.SignalNewFile, \
 				progressDialog.SignalBytesDone)
 			fstree.copyTo(dbtree)
@@ -357,8 +375,8 @@ class MainFrame(wx.Frame):
 		# user stopped the calcuation using the cancel button
 		progressDialog.SignalFinished()
 
-		self.list.ClearInstance()
 		self.list.ShowNodeTree(Instance(self.config, dbtree, None, None))
+		fstree.close()
 		self.list.readonly = True
 
 		self.statusbar.SetStatusText('Filesystem contains ' + str(stats))
@@ -379,19 +397,28 @@ class MainFrame(wx.Frame):
 			return
 		self.Title = self.baseTitle + ' - ' + userPath
 
-		# create trees
-		fstree = FilesystemTree(userPath)
-		dbtree = DatabaseTree(userPath)
-		memtree = MemoryTree()
+		self.list.ClearInstance()
 
-		# create progress dialog
-		progressDialog = FileProcessingProgressDialog(self, 'Checking ' + userPath)
-		progressDialog.Show()
-		stats = fstree.getNodeStatistics()
-		progressDialog.Init(stats.getNodeCount(), stats.getNodeSize())
-
-		# execute task
 		try:
+			# create trees
+			fstree = FilesystemTree(userPath)
+			fstree.open()
+			dbtree = DatabaseTree(userPath)
+			dbtree.open()
+			memtree = MemoryTree()
+			memtree.open()
+		except MyException as e:
+			e.showDialog('Checking ' + userPath)
+			return
+
+		try:
+			# create progress dialog
+			progressDialog = FileProcessingProgressDialog(self, 'Checking ' + userPath)
+			progressDialog.Show()
+			stats = fstree.getNodeStatistics()
+			progressDialog.Init(stats.getNodeCount(), stats.getNodeSize())
+
+			# execute task
 			fstree.registerHandlers(progressDialog.SignalNewFile, \
 				progressDialog.SignalBytesDone)
 			fstree.compare(dbtree, memtree, self.config.removeOkNodes)
@@ -411,7 +438,6 @@ class MainFrame(wx.Frame):
 		# user stopped the calcuation using the cancel button
 		progressDialog.SignalFinished()
 
-		self.list.ClearInstance()
 		self.list.ShowNodeTree(Instance(self.config, memtree, dbtree, fstree))
 		self.list.readonly = False
 

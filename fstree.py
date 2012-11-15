@@ -3,8 +3,9 @@
 
 import datetime
 import os
-import re
 import platform
+import re
+import shutil
 
 from misc import MyException, Checksum
 from node import NodeInfo, Node
@@ -37,6 +38,24 @@ class FilesystemTree(Tree):
 
 	### implementation of base class methods, please keep order
 
+	def open(self):
+		self.__isOpen = True
+
+	def close(self):
+		self.__isOpen = False
+
+	def isOpen(self):
+		return self.__isOpen
+
+	def clear(self):
+		for name in os.listdir(self.__rootDir):
+			fullpath = os.path.join(self.__rootDir, name)
+			if fullpath == self.__metaDir:
+				continue
+			shutil.rmtree()
+		self.__checksumToPathsMap = {}
+		self.gotoRoot()
+
 	def getDepth(self):
 		return len(self.__parentNameStack) - 1
 
@@ -46,16 +65,6 @@ class FilesystemTree(Tree):
 			return path
 		else:
 			return os.path.join(path, filename)
-
-	def reset(self):
-		if not os.path.exists(self.__metaDir):
-			# create directory
-			os.mkdir(self.__metaDir)
-			# if on windows platform, hide directory
-			if platform.system() == 'Windows':
-				os.system('attrib +h "' + self.__metaDir + '"')
-		self.__checksumToPathsMap = {}
-		self.gotoRoot()
 
 	def gotoRoot(self):
 		self.__parentNameStack = [ '' ]

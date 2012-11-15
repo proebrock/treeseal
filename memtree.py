@@ -22,7 +22,8 @@ class MemoryTree(Tree):
 
 	def __init__(self):
 		super(MemoryTree, self).__init__()
-		self.reset()
+		self.clear()
+		self.__isOpen = False
 
 	def __str__(self):
 		result = '('
@@ -32,6 +33,19 @@ class MemoryTree(Tree):
 		return result + ')'
 
 	### implementation of base class methods, please keep order
+
+	def open(self):
+		self.__isOpen = True
+
+	def close(self):
+		self.__isOpen = False
+
+	def isOpen(self):
+		return self.__isOpen
+
+	def clear(self):
+		self.__parentMTNStack = [ MemoryTreeNode(Node('')) ]
+		self.__checksumToPathsMap = {}
 
 	def getDepth(self):
 		return len(self.__parentMTNStack) - 1
@@ -44,10 +58,6 @@ class MemoryTree(Tree):
 			return path
 		else:
 			return os.path.join(path, filename)
-
-	def reset(self):
-		self.__parentMTNStack = [ MemoryTreeNode(Node('')) ]
-		self.__checksumToPathsMap = {}
 
 	def gotoRoot(self):
 		self.__parentMTNStack = [ self.__parentMTNStack[0] ]
