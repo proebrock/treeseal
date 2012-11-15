@@ -2,23 +2,28 @@ Mid-term
 --------
 * Before import, check if no upper or lower node has already .treeseal
 * More Right-Click menu functions:
+  - "Open" of file with system-defined program (Windows only (?))
   - Refresh (diff of sub-tree)
   - Dependent on status:
     New -> Delete in fs (dir or file)
-    Missing -> Create (dir) or Restore (based on still existing content or user chooses file)
+    Missing -> Create (dir) or Restore (based on still existing
+               content or user chooses file)
     Warning/Error -> Restore (like above)
     ### Not actions for DirContainsXXX
     ### Careful with recusive behavior and mixed status trees!
-* Proper key navigation of listview (including CTRL-A, multiselect, background menu)
+* Proper key navigation of listview (including CTRL-A,
+  multiselect, background menu)
 * Program name and artwork (icon, splash screen)
 * Help: Github, in-program (HTML viewer) and About dialog
-* Globally resolving issues via main menu (Accept all, accept all added, accept all deleted,
-  accept all renamed, accept all ops not leading to data loss (think of multiple copies of a file
+* Globally resolving issues via main menu (Accept all, accept
+  all added, accept all deleted,
+  accept all renamed, accept all ops not leading to data loss (think
+  of multiple copies of a file
   ... or  using radiobox)
 * Much more clever diffs using global checksum database (rm, mv, cp)
   (a new file can have no/one/multiple origins in terms of its checksum,
-  each can still exist (cp) or no longer exist (mv) in current fs; dirs are
-  handled by their contents)
+  each can still exist (cp) or no longer exist (mv) in current fs;
+  dirs are handled by their contents)
 * Preferences menu and saving in rc file in .treeseal
   or somewhere else (local vs. global config):
   - Hide valid nodes in diff view: on/off
@@ -26,19 +31,22 @@ Mid-term
   - Black listed file patterns or paths
   - GPG signature options
   - Buffer size for checksum calculation
-* Unicode support for filenames (db stores just ansi strings?, check display of umlaute in win
 * Continuously check and keep portability (Linux, Win, Mac)
+* Memory and performance profiling
 * Elapsed, expected, remaining time in progress dialog
 
 Long-term
 ---------
-* make getPathsByChecksum and getNodesByChecksum compatible with short checksum strings
-  (various length support, warning for non-unique user params, optimal data structure
-  for this are the so-called "Suffix-Trees")
-* Console version for most important tasks, just requiring python (and not wxPython)
+* Make getPathsByChecksum() and getNodesByChecksum() compatible with
+  shorter checksum strings (various length support, warning for
+  non-unique user params, optimal data structure for this are the
+  so-called "Suffix-Trees")
+* Console version for most important tasks, just requiring python
+  (and not wxPython) e.g. runnable on Synolog Diskstation
 * Copying from instance to instance
   - What can you trust, how paranoid do you have to be?
-  - src checked, make dest the same VS. two or more defect copies, create one with max recovery
+  - src checked, make dest the same VS. two or more defect copies,
+    create one with max recovery
 * Advertise program (Friends, Heise?, Linux-Magazine?)
 * Sign database contents using gpg instead of just using a checksum
 * Client-server architecture for copying, using rsync technology
