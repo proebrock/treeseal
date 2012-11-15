@@ -15,10 +15,10 @@ from tree import Tree
 
 class FilesystemTree(Tree):
 
-	def __init__(self, path):
+	def __init__(self, rootdir, metadir):
 		super(FilesystemTree, self).__init__()
-		self.__rootDir = path
-		self.__metaDir = os.path.join(self.__rootDir, '.treeseal')
+		self.__rootDir = rootdir
+		self.__metaDir = metadir
 
 		self.__winForbiddenDirs = [ \
 			re.compile('[a-zA-Z]:\\\\System Volume Information'), \

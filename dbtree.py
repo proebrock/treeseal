@@ -12,11 +12,10 @@ from tree import Tree
 
 class DatabaseTree(Tree):
 
-	def __init__(self, path):
+	def __init__(self, dbfile, sigfile):
 		super(DatabaseTree, self).__init__()
-		metaDir = os.path.join(path, '.treeseal')
-		self.__databaseFile = os.path.join(metaDir, 'base.sqlite3')
-		self.__signatureFile = os.path.join(metaDir, 'base.signature')
+		self.__databaseFile = dbfile
+		self.__signatureFile = sigfile
 
 		# Buffering of the contents of a directory speeds up some operations
 		# like exists() and getNodeByNid(), slows down some others like up()
@@ -62,12 +61,14 @@ class DatabaseTree(Tree):
 
 	def open(self):
 		# if neither database file nor signature file exist, make a silent reset
-		if not (os.path.exists(self.__databaseFile) and os.path.exists(self.__signatureFile)):
+		if not os.path.exists(self.__databaseFile):
 			self.clear()
-		cs = Checksum()
-		cs.calculateForFile(self.__databaseFile)
-		if not cs.isValidUsingSavedFile(self.__signatureFile):
-			raise MyException('The internal database has been corrupted.', 3)
+#		checking of signature is now done on higher level
+#		if os.path.exists(self.__signatureFile):
+#			cs = Checksum()
+#			cs.calculateForFile(self.__databaseFile)
+#			if not cs.isValidUsingSavedFile(self.__signatureFile):
+#				raise MyException('The internal database has been corrupted.', 3)
 		self.dbOpen()
 
 	def isOpen(self):
@@ -75,7 +76,6 @@ class DatabaseTree(Tree):
 
 	def close(self):
 		if self.isOpen():
-			print('close')
 			self.dbClose()
 			cs = Checksum()
 			cs.calculateForFile(self.__databaseFile)

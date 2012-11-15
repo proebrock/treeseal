@@ -3,7 +3,6 @@
 
 import os
 import platform
-import shutil
 import sys
 import wx
 
@@ -12,7 +11,7 @@ from fstree import FilesystemTree
 import icons as Icons
 from instance import Instance
 from memtree import MemoryTree
-from misc import MyException
+from misc import Checksum, MyException
 from node import Node, NodeStatus
 from progressdialog import UserCancelledException, FileProcessingProgressDialog
 from comparisondialog import NodeComparisonDialog
@@ -318,39 +317,47 @@ class MainFrame(wx.Frame):
 		#dirDialog.SetPath('D:\\Projects\\treeseal-example') # TESTING
 		dirDialog.SetPath('/home/phil/Projects/treeseal-example') # TESTING
 		if dirDialog.ShowModal() == wx.ID_OK:
-			userPath = dirDialog.GetPath()
+			rootdir = dirDialog.GetPath()
+			metadir = os.path.join(rootdir, '.' + ProgramName)
+			dbfile = os.path.join(metadir, 'base.sqlite3')
+			sigfile = os.path.join(metadir, 'base.signature')
 		else:
 			return
-		if os.path.exists(os.path.join(userPath, '.' + ProgramName)):
-			dial = wx.MessageBox('Path "' + userPath + '" is already a valid root dir.\n\nDo you still want to continue?', \
+		# check pre-conditions
+		if os.path.exists(metadir):
+			dial = wx.MessageBox('Path "' + rootdir + '" is already a valid root dir.\n\nDo you still want to continue?', \
 				'Warning', wx.YES_NO | wx.ICON_WARNING | wx.NO_DEFAULT)
 			if not dial == wx.YES:
 				return
-		self.Title = self.baseTitle + ' - ' + userPath
 
+		# close eventually existing previous instance
 		self.list.ClearInstance()
 
-		# reset meta directory
-		metaDir = os.path.join(userPath, '.' + ProgramName)
-		if os.path.exists(metaDir):
-			shutil.rmtree(metaDir)
-		os.mkdir(metaDir)
-		if platform.system() == 'Windows':
-			# if on windows platform, hide directory
-			os.system('attrib +h "' + metaDir + '"')
+		# do not care about previous content: reset meta directory and database files
+		if os.path.exists(metadir):
+			if os.path.exists(dbfile):
+				os.remove(dbfile)
+			if os.path.exists(sigfile):
+				os.remove(sigfile)
+		else:
+			os.mkdir(metadir)
+			if platform.system() == 'Windows':
+				# if on windows platform, hide directory
+				os.system('attrib +h "' + metadir + '"')
 
 		try:
-			fstree = FilesystemTree(userPath)
+			# create trees
+			fstree = FilesystemTree(rootdir, metadir)
 			fstree.open()
-			dbtree = DatabaseTree(userPath)
+			dbtree = DatabaseTree(dbfile, sigfile)
 			dbtree.open()
 		except MyException as e:
-			e.showDialog('Importing ' + userPath)
+			e.showDialog('Importing ' + rootdir)
 			return
 
 		try:
 			# create progress dialog
-			progressDialog = FileProcessingProgressDialog(self, 'Importing ' + userPath)
+			progressDialog = FileProcessingProgressDialog(self, 'Importing ' + rootdir)
 			progressDialog.Show()
 			stats = fstree.getNodeStatistics()
 			progressDialog.Init(stats.getNodeCount(), stats.getNodeSize())
@@ -367,7 +374,7 @@ class MainFrame(wx.Frame):
 			return
 		except MyException as e:
 			progressDialog.Destroy()
-			e.showDialog('Importing ' + userPath)
+			e.showDialog('Importing ' + rootdir)
 			return
 
 		# signal that we have returned from calculation, either
@@ -379,6 +386,7 @@ class MainFrame(wx.Frame):
 		fstree.close()
 		self.list.readonly = True
 
+		self.Title = self.baseTitle + ' - ' + rootdir
 		self.statusbar.SetStatusText('Filesystem contains ' + str(stats))
 
 	def OnCheck(self, event):
@@ -388,32 +396,59 @@ class MainFrame(wx.Frame):
 		#dirDialog.SetPath('D:\\Projects\\treeseal-example') # TESTING
 		dirDialog.SetPath('/home/phil/Projects/treeseal-example') # TESTING
 		if dirDialog.ShowModal() == wx.ID_OK:
-			userPath = dirDialog.GetPath()
+			rootdir = dirDialog.GetPath()
+			metadir = os.path.join(rootdir, '.' + ProgramName)
+			dbfile = os.path.join(metadir, 'base.sqlite3')
+			sigfile = os.path.join(metadir, 'base.signature')
 		else:
 			return
-		if not os.path.exists(os.path.join(userPath, '.' + ProgramName)):
-			wx.MessageBox('Path "' + userPath + '" is no valid root dir.', \
+		# check pre-conditions
+		if not os.path.exists(metadir):
+			wx.MessageBox('Path "' + rootdir + '" is no valid root dir.', \
 				'Error', wx.OK | wx.ICON_ERROR)
 			return
-		self.Title = self.baseTitle + ' - ' + userPath
 
+		# close eventually existing previous instance
 		self.list.ClearInstance()
+
+		# check more pre-conditions
+		if not os.path.exists(dbfile):
+			wx.MessageBox('Cannot find database file "' + dbfile + '".', \
+				'Error', wx.OK | wx.ICON_ERROR)
+			return
+		if not os.path.exists(dbfile):
+			wx.MessageBox('Cannot find database file "' + dbfile + '".', \
+				'Error', wx.OK | wx.ICON_ERROR)
+			return
+		if not os.path.exists(sigfile):
+			dial = wx.MessageBox('Cannot find database signature file "' + sigfile + '".\n\nUse database without verification?', \
+				'Warning', wx.YES_NO | wx.ICON_WARNING | wx.NO_DEFAULT)
+			if not dial == wx.YES:
+				return
+		else:
+			cs = Checksum()
+			cs.calculateForFile(dbfile)
+			if not cs.isValidUsingSavedFile(sigfile):
+				dial = wx.MessageBox('Database or database signature file have been corrupted.\n\nUse database without verification?', \
+					'Warning', wx.YES_NO | wx.ICON_WARNING | wx.NO_DEFAULT)
+				if not dial == wx.YES:
+					return
 
 		try:
 			# create trees
-			fstree = FilesystemTree(userPath)
+			fstree = FilesystemTree(rootdir, metadir)
 			fstree.open()
-			dbtree = DatabaseTree(userPath)
+			dbtree = DatabaseTree(dbfile, sigfile)
 			dbtree.open()
 			memtree = MemoryTree()
 			memtree.open()
 		except MyException as e:
-			e.showDialog('Checking ' + userPath)
+			e.showDialog('Checking ' + rootdir)
 			return
 
 		try:
 			# create progress dialog
-			progressDialog = FileProcessingProgressDialog(self, 'Checking ' + userPath)
+			progressDialog = FileProcessingProgressDialog(self, 'Checking ' + rootdir)
 			progressDialog.Show()
 			stats = fstree.getNodeStatistics()
 			progressDialog.Init(stats.getNodeCount(), stats.getNodeSize())
@@ -430,7 +465,7 @@ class MainFrame(wx.Frame):
 			return
 		except MyException as e:
 			progressDialog.Destroy()
-			e.showDialog('Checking ' + userPath)
+			e.showDialog('Checking ' + rootdir)
 			return
 
 		# signal that we have returned from calculation, either
@@ -441,6 +476,7 @@ class MainFrame(wx.Frame):
 		self.list.ShowNodeTree(Instance(self.config, memtree, dbtree, fstree))
 		self.list.readonly = False
 
+		self.Title = self.baseTitle + ' - ' + rootdir
 		self.statusbar.SetStatusText('Filesystem contains ' + str(stats))
 
 	def OnExit(self, event):

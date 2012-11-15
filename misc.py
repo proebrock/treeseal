@@ -140,7 +140,7 @@ class Checksum(object):
 
 	def isValidUsingSavedFile(self, path):
 		if not os.path.exists(path):
-			raise MyException('Unable to signature file \'' + path + '\'.', 3)
+			raise MyException('Unable to find signature file \'' + path + '\'.', 3)
 		f = open(path, 'r')
 		csum = f.read()
 		f.close()
