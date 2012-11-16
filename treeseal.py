@@ -170,7 +170,7 @@ class ListControlPanel(wx.Panel):
 			self.instance.close()
 			self.instance = None
 
-	def ShowNodeTree(self, instance):
+	def SetInstance(self, instance):
 		self.list.SetFocus()
 		self.instance = instance
 		self.RefreshTree()
@@ -270,8 +270,8 @@ class ListControlPanel(wx.Panel):
 
 class MainFrame(wx.Frame):
 	def __init__(self, parent):
-		self.baseTitle = ProgramName + ' ' + ProgramVersion
-		wx.Frame.__init__(self, parent, title=self.baseTitle, size=(800,300))
+		wx.Frame.__init__(self, parent, size=(800,300))
+		self.SetWindowTitle()
 
 		# main menue definition
 		fileMenu = wx.Menu()
@@ -307,8 +307,18 @@ class MainFrame(wx.Frame):
 
 		self.Show(True)
 
-	def SetAddressLine(self, path):
+	def SetWindowTitle(self, text=''):
+		baseTitle = ProgramName + ' ' + ProgramVersion
+		if text == '':
+			self.Title = baseTitle
+		else:
+			self.Title = baseTitle + ' - ' + text
+
+	def SetAddressLine(self, path=''):
 		self.address.SetValue(path)
+
+	def SetStatusBarText(self, text=''):
+		self.statusbar.SetStatusText(text)
 
 	def OnImport(self, event):
 		# get a valid path from user
@@ -332,6 +342,8 @@ class MainFrame(wx.Frame):
 
 		# close eventually existing previous instance
 		self.list.ClearInstance()
+		self.SetWindowTitle()
+		self.SetStatusBarText()
 
 		# do not care about previous content: reset meta directory and database files
 		if os.path.exists(metadir):
@@ -382,12 +394,12 @@ class MainFrame(wx.Frame):
 		# user stopped the calcuation using the cancel button
 		progressDialog.SignalFinished()
 
-		self.list.ShowNodeTree(Instance(self.config, dbtree, None, None))
+		self.list.SetInstance(Instance(self.config, dbtree, None, None))
 		fstree.close()
 		self.list.readonly = True
 
-		self.Title = self.baseTitle + ' - ' + rootdir
-		self.statusbar.SetStatusText('Filesystem contains ' + str(stats))
+		self.SetWindowTitle(rootdir)
+		self.SetStatusBarText('Filesystem contains ' + str(stats))
 
 	def OnCheck(self, event):
 		# get a valid path from user
@@ -410,6 +422,8 @@ class MainFrame(wx.Frame):
 
 		# close eventually existing previous instance
 		self.list.ClearInstance()
+		self.SetWindowTitle()
+		self.SetStatusBarText()
 
 		# check more pre-conditions
 		if not os.path.exists(dbfile):
@@ -473,11 +487,11 @@ class MainFrame(wx.Frame):
 		# user stopped the calcuation using the cancel button
 		progressDialog.SignalFinished()
 
-		self.list.ShowNodeTree(Instance(self.config, memtree, dbtree, fstree))
+		self.list.SetInstance(Instance(self.config, memtree, dbtree, fstree))
 		self.list.readonly = False
 
-		self.Title = self.baseTitle + ' - ' + rootdir
-		self.statusbar.SetStatusText('Filesystem contains ' + str(stats))
+		self.SetWindowTitle(rootdir)
+		self.SetStatusBarText('Filesystem contains ' + str(stats))
 
 	def OnExit(self, event):
 		self.Close(True)
