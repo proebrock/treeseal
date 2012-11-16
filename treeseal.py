@@ -382,7 +382,6 @@ class MainFrame(wx.Frame):
 			dbtree.commit()
 			fstree.unRegisterHandlers()
 		except UserCancelledException:
-			self.list.Clear()
 			progressDialog.SignalFinished()
 			return
 		except MyException as e:
@@ -475,7 +474,6 @@ class MainFrame(wx.Frame):
 			memtree.commit()
 			fstree.unRegisterHandlers()
 		except UserCancelledException:
-			self.list.Clear()
 			progressDialog.SignalFinished()
 			return
 		except MyException as e:
