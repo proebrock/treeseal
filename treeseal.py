@@ -230,9 +230,9 @@ class ListControlPanel(wx.Panel):
 				self.Bind(wx.EVT_MENU, self.OnPopupIgnore, id=self.popupIdIgnore)
 				menu.Append(self.popupIdIgnore, "Ignore")
 
-				self.popupIdUpdateDB = wx.NewId()
-				self.Bind(wx.EVT_MENU, self.OnPopupUpdateDB, id=self.popupIdUpdateDB)
-				menu.Append(self.popupIdUpdateDB, "Update database")
+				self.popupIdAccept = wx.NewId()
+				self.Bind(wx.EVT_MENU, self.OnPopupAccept, id=self.popupIdAccept)
+				menu.Append(self.popupIdAccept, "Accept")
 
 				self.popupIdDelete = wx.NewId()
 				self.Bind(wx.EVT_MENU, self.OnPopupDelete, id=self.popupIdDelete)
@@ -265,16 +265,19 @@ class ListControlPanel(wx.Panel):
 		nids = self.getSelectedNodeNids()
 		self.instance.fix(nids, False)
 		self.RefreshTree()
+		self.GetParent().SetStatusBarText('Ignored {0:d} entries'.format(len(nids)))
 
-	def OnPopupUpdateDB(self, event):
+	def OnPopupAccept(self, event):
 		nids = self.getSelectedNodeNids()
 		self.instance.fix(nids, True)
 		self.RefreshTree()
+		self.GetParent().SetStatusBarText('Accepted {0:d} entries'.format(len(nids)))
 
 	def OnPopupDelete(self, event):
 		nids = self.getSelectedNodeNids()
 		self.instance.delete(nids)
 		self.RefreshTree()
+		self.GetParent().SetStatusBarText('Deleted {0:d} entries'.format(len(nids)))
 
 
 
@@ -408,7 +411,7 @@ class MainFrame(wx.Frame):
 		self.list.readonly = True
 
 		self.SetWindowTitle(rootdir)
-		self.SetStatusBarText('Filesystem contains ' + str(stats))
+		self.SetStatusBarText('Imported ' + str(stats))
 
 	def OnCheck(self, event):
 		# get a valid path from user
@@ -499,7 +502,7 @@ class MainFrame(wx.Frame):
 		self.list.readonly = False
 
 		self.SetWindowTitle(rootdir)
-		self.SetStatusBarText('Filesystem contains ' + str(stats))
+		self.SetStatusBarText('Checked ' + str(stats))
 
 	def OnExit(self, event):
 		self.Close(True)
