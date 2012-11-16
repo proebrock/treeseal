@@ -142,3 +142,28 @@ class Instance(object):
 		if updateOld:
 			self.__old.commit()
 		self.__view.commit()
+
+	def __delete(self, node):
+		# recurse
+		if node.isDirectory():
+			self.down(node)
+			for n in self:
+				self.__delete(n)
+			self.up()
+		 # post-order: deletion of node
+		self.__view.delete(node)
+		if self.__old.getDepth() == self.__view.getDepth() and self.__old.exists(node.getNid()):
+			self.__old.delete(node)
+		if self.__new.getDepth() == self.__view.getDepth() and self.__new.exists(node.getNid()):
+			self.__new.delete(node)
+
+	def delete(self, nids):
+		for nid in nids:
+			# delete in view tree
+			vnode = self.__view.getNodeByNid(nid)
+			if vnode is None:
+				raise MyException('Tree inconsistency; that should never happen.', 3)
+			self.__delete(vnode)
+		self.__old.commit()
+		self.__new.commit()
+		self.__view.commit()

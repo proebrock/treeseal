@@ -234,6 +234,10 @@ class ListControlPanel(wx.Panel):
 				self.Bind(wx.EVT_MENU, self.OnPopupUpdateDB, id=self.popupIdUpdateDB)
 				menu.Append(self.popupIdUpdateDB, "Update database")
 
+				self.popupIdDelete = wx.NewId()
+				self.Bind(wx.EVT_MENU, self.OnPopupDelete, id=self.popupIdDelete)
+				menu.Append(self.popupIdDelete, "Delete")
+
 			# Popup the menu.  If an item is selected then its handler
 			# will be called before PopupMenu returns.
 			self.PopupMenu(menu)
@@ -265,6 +269,11 @@ class ListControlPanel(wx.Panel):
 	def OnPopupUpdateDB(self, event):
 		nids = self.getSelectedNodeNids()
 		self.instance.fix(nids, True)
+		self.RefreshTree()
+
+	def OnPopupDelete(self, event):
+		nids = self.getSelectedNodeNids()
+		self.instance.delete(nids)
 		self.RefreshTree()
 
 
