@@ -222,9 +222,10 @@ class ListControlPanel(wx.Panel):
 				self.Bind(wx.EVT_MENU, self.OnPopupInfo, id=self.popupIdInfo)
 				menu.Append(self.popupIdInfo, "Info")
 
-			if not self.readonly:
+			if len(nids) == 1 and not self.readonly:
 				menu.AppendSeparator()
 
+			if not self.readonly:
 				self.popupIdIgnore = wx.NewId()
 				self.Bind(wx.EVT_MENU, self.OnPopupIgnore, id=self.popupIdIgnore)
 				menu.Append(self.popupIdIgnore, "Ignore")
