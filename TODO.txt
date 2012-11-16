@@ -34,6 +34,17 @@ Mid-term
 * Continuously check and keep portability (Linux, Win, Mac)
 * Memory and performance profiling
 * Elapsed, expected, remaining time in progress dialog
+* When refreshing list stop scrolling to the begin of the list:
+  oldTopIndex = self.list.GetTopItem()
+  ...
+  <clear window>
+  <insert new items>
+  ...
+  if self.list.GetItemCount() > self.list.GetCountPerPage():
+    newTopIndex = max(oldTopIndex, self.list.GetItemCount() - self.list.GetCountPerPage())
+  else:
+    newTopIndex = 0
+  self.list.EnsureVisible(newTopIndex) # this does not work for unknown reasons!!??!!
 
 Long-term
 ---------
