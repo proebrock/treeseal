@@ -67,18 +67,16 @@ class Instance(object):
 			self.__view.update(node)
 
 	def down(self, node):
-		# descent in view tree
-		self.__view.down(node)
 		# descent in old tree if possible
 		if self.__old is not None:
-			n = self.__old.getNodeByNid(node.getNid())
-			if n is not None:
-				self.__old.down(n)
+			if self.__old.getDepth() == self.__view.getDepth() and self.__old.exists(node.getNid()):
+				self.__old.down(node)
 		# descent in new tree if possible
 		if self.__new is not None:
-			n = self.__new.getNodeByNid(node.getNid())
-			if n is not None:
-				self.__new.down(n)
+			if self.__new.getDepth() == self.__view.getDepth() and self.__new.exists(node.getNid()):
+				self.__new.down(node)
+		# descent in view tree
+		self.__view.down(node)
 
 	def getNodeByNid(self, nid):
 		return self.__view.getNodeByNid(nid)
