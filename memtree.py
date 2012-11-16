@@ -86,7 +86,8 @@ class MemoryTree(Tree):
 	def update(self, node):
 		self.__parentMTNStack[-1].children[node.getNid()].node = node
 
-	def delete(self, nid):
+	def delete(self, node):
+		nid = node.getNid()
 		if not self.exists(nid):
 			raise MyException('Node does not exist for deletion.', 1)
 		# remove node from checksum buffer

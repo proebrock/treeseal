@@ -47,7 +47,7 @@ class Tree(object):
 	def update(self, node):
 		raise MyException('Not implemented.', 3)
 
-	def delete(self, nid):
+	def delete(self, node):
 		raise MyException('Not implemented.', 3)
 
 	def commit(self):
@@ -187,7 +187,7 @@ class Tree(object):
 			return totalstatus
 
 	def __deleteNodeFunc(self, node, param):
-		self.delete(node.getNid())
+		self.delete(node)
 
 	def deleteNode(self, node=None, recurse=True):
 		self.postOrderApply(Tree.__deleteNodeFunc, node, None, recurse)
@@ -252,7 +252,7 @@ class Tree(object):
 					rnode.otherinfo = onode.info
 				# process status of child node
 				if removeOkNodes and rnode.status == NodeStatus.Ok:
-					result.delete(rnode.getNid())
+					result.delete(rnode)
 				else:
 					result.update(rnode)
 			else:

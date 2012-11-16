@@ -125,8 +125,8 @@ class Instance(object):
 			self.__view.update(node)
 		elif node.status == NodeStatus.Missing:
 			if updateOld:
-				self.__old.delete(node.getNid())
-			self.__view.delete(node.getNid())
+				self.__old.delete(node)
+			self.__view.delete(node)
 		elif node.status == NodeStatus.FileWarning or node.status == NodeStatus.FileError:
 			if updateOld:
 				self.__old.update(node)

@@ -175,12 +175,12 @@ class DatabaseTree(Tree):
 		if self.__useBuffer:
 			self.__buffer[node.getNid()] = node
 
-	def delete(self, nid):
+	def delete(self, node):
 		self.__dbcon.execute('delete from nodes where parentkey=? and name=? and isdir=?', \
-			(self.getCurrentParentId(), Node.nid2Name(nid), Node.nid2IsDirectory(nid)))
+			(self.getCurrentParentId(), node.name, node.isDirectory()))
 		# remove from buffer
 		if self.__useBuffer:
-			del self.__buffer[nid]
+			del self.__buffer[node.getNid()]
 
 	def commit(self):
 		self.__dbcon.commit()

@@ -89,18 +89,25 @@ class FilesystemTree(Tree):
 	def update(self, node):
 		pass
 
-	def delete(self, nid):
+	def delete(self, node):
+		nid = node.getNid()
 		if not self.exists(nid):
 			raise MyException('Node does not exist for deletion.', 1)
 		# remove on disk
-		fullpath = self.getFullPath(Node.nid2Name(nid))
+		fullpath = self.getFullPath(node.name)
 		if os.path.isdir(fullpath):
 			os.rmdir(fullpath)
 		else:
 			os.remove(fullpath)
 		# remove node from checksum buffer
-		node = self.__buffer[nid]
 		if not node.isDirectory():
+			if node.info.checksum is None:
+				# this is a problem: for deletion we have to be able to update
+				# the checksum buffer; if the caller provides us with a node
+				# object, that contains no checksum, we are lost because
+				# checksums are very expensive to calculate in the Filesystem
+				# implementation so we cannot do that here
+				raise MyException('Node that should be deleted has no checksum.', 3)
 			csumstr = node.info.checksum.getString()
 			self.__checksumToPathsMap[csumstr].remove(self.getPath(node.name))
 			if len(self.__checksumToPathsMap[csumstr]) == 0:
