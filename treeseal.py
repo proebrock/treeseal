@@ -275,6 +275,10 @@ class ListControlPanel(wx.Panel):
 
 	def OnPopupDelete(self, event):
 		nids = self.getSelectedNodeNids()
+		dial = wx.MessageBox('You are about to recursively delete {0:d} entries from this directory.\n\nDo you still want to continue?'.format(len(nids)), \
+			'Warning', wx.YES_NO | wx.ICON_WARNING | wx.NO_DEFAULT)
+		if not dial == wx.YES:
+			return
 		self.instance.delete(nids)
 		self.RefreshTree()
 		self.GetParent().SetStatusBarText('Deleted {0:d} entries'.format(len(nids)))
