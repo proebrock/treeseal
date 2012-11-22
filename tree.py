@@ -192,34 +192,36 @@ class Tree(object):
 	def deleteNode(self, node=None, recurse=True):
 		self.postOrderApply(Tree.__deleteNodeFunc, node, None, recurse)
 
-	def copyTo(self, dest):
+	def __copyTo(self, dest, recurse=True):
 		for node in self:
 			self.calculate(node)
 			dest.insert(node)
-			if node.isDirectory():
+			if recurse and node.isDirectory():
 				self.down(node)
 				dest.down(dest.getNodeByNid(node.getNid()))
-				self.copyTo(dest)
+				self.__copyTo(dest, recurse)
 				dest.up()
 				self.up()
 
-	def copyNodeTo(self, dest, snode):
-		# snode must be current node of self!
-		dest.calculate(snode)
-		dest.insert(snode)
-		if snode.isDirectory():
-			self.down(snode)
-			dest.down(dest.getNodeByNid(snode.getNid()))
-			self.copyTo(dest)
-			dest.up()
-			self.up()
+	def copyTo(self, dest, node=None, recurse=True):
+		if node is None:
+			self.__copyTo(dest, recurse)
+		else:
+			self.calculate(node)
+			dest.insert(node)
+			if recurse and node.isDirectory():
+				self.down(node)
+				dest.down(dest.getNodeByNid(node.getNid()))
+				self.__copyTo(dest, recurse)
+				dest.up()
+				self.up()
 
 	def compare(self, other, result, removeOkNodes=False):
 		snames = {}
 		for snode in self:
-			self.calculate(snode)
 			onode = other.getNodeByNid(snode.getNid())
 			if onode is not None:
+				self.calculate(snode)
 				# nodes existing in self and other: already known nodes
 				other.calculate(onode)
 				rnode = snode
@@ -257,7 +259,7 @@ class Tree(object):
 					result.update(rnode)
 			else:
 				# nodes existing in self but not in other: new nodes
-				self.copyNodeTo(result, snode)
+				self.copyTo(result, snode)
 				result.setNodeStatus(NodeStatus.New, snode)
 			# buffer that info for later determining new nodes
 			snames[snode.name] = snode.isDirectory()
@@ -267,9 +269,6 @@ class Tree(object):
 					continue
 			# nodes existing in other but not in self: missing nodes
 			other.calculate(onode)
-			other.copyNodeTo(result, onode)
+			other.copyTo(result, onode)
 			result.setNodeStatus(NodeStatus.Missing, onode)
 		return result.getTotalNodeStatus()
-
-
-
