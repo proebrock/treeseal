@@ -216,27 +216,26 @@ class Tree(object):
 				dest.up()
 				self.up()
 
-	def compare(self, other, result, removeOkNodes=False):
-		snames = {}
+	def diff(self, old, result, removeOkNodes=False):
 		for snode in self:
-			onode = other.getNodeByNid(snode.getNid())
+			onode = old.getNodeByNid(snode.getNid())
 			if onode is not None:
 				self.calculate(snode)
-				# nodes existing in self and other: already known nodes
-				other.calculate(onode)
+				# nodes existing in self and old: already known nodes
+				old.calculate(onode)
 				rnode = snode
 				rnode.dbkey = onode.dbkey
 				result.insert(rnode)
 				if snode.isDirectory():
 					# tree descent
 					self.down(snode)
-					other.down(onode)
+					old.down(onode)
 					result.down(rnode)
 					# recurse
-					rnode.status = self.compare(other, result, removeOkNodes)
+					rnode.status = self.diff(old, result, removeOkNodes)
 					# tree ascent
 					result.up()
-					other.up()
+					old.up()
 					self.up()
 				else:
 					# compare snode and onode and set status
@@ -250,7 +249,7 @@ class Tree(object):
 							rnode.status = NodeStatus.FileError
 						else:
 							rnode.status = NodeStatus.FileWarning
-					# always keep the other node info (even for OK nodes)
+					# always keep the old node info (even for OK nodes)
 					rnode.otherinfo = onode.info
 				# process status of child node
 				if removeOkNodes and rnode.status == NodeStatus.Ok:
@@ -258,17 +257,14 @@ class Tree(object):
 				else:
 					result.update(rnode)
 			else:
-				# nodes existing in self but not in other: new nodes
+				# nodes existing in self but not in old: new nodes
 				self.copyTo(result, snode)
 				result.setNodeStatus(NodeStatus.New, snode)
-			# buffer that info for later determining new nodes
-			snames[snode.name] = snode.isDirectory()
-		for onode in other:
-			if onode.name in snames:
-				if snames[onode.name] == onode.isDirectory():
-					continue
-			# nodes existing in other but not in self: missing nodes
-			other.calculate(onode)
-			other.copyTo(result, onode)
+		for onode in old:
+			if self.exists(onode.getNid()):
+				continue
+			# nodes existing in old but not in self: missing nodes
+			old.calculate(onode)
+			old.copyTo(result, onode)
 			result.setNodeStatus(NodeStatus.Missing, onode)
 		return result.getTotalNodeStatus()

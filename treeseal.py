@@ -486,7 +486,7 @@ class MainFrame(wx.Frame):
 			# execute task
 			fstree.registerHandlers(progressDialog.SignalNewFile, \
 				progressDialog.SignalBytesDone)
-			fstree.compare(dbtree, memtree, self.config.removeOkNodes)
+			fstree.diff(dbtree, memtree, self.config.removeOkNodes)
 			memtree.commit()
 			fstree.unRegisterHandlers()
 		except UserCancelledException:
