@@ -106,7 +106,7 @@ class Tree(object):
 		for node in self:
 			if recurse and node.isDirectory():
 				self.down(node)
-				self.__preOrderApply(func, param, recurse)
+				self.__postOrderApply(func, param, recurse)
 				self.up()
 			func(self, node, param)
 
