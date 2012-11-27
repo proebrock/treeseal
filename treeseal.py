@@ -263,13 +263,13 @@ class ListControlPanel(wx.Panel):
 
 	def OnPopupIgnore(self, event):
 		nids = self.getSelectedNodeNids()
-		self.instance.fix(nids, False)
+		self.instance.ignore(nids)
 		self.RefreshTree()
 		self.GetParent().SetStatusBarText('Ignored {0:d} entries'.format(len(nids)))
 
 	def OnPopupAccept(self, event):
 		nids = self.getSelectedNodeNids()
-		self.instance.fix(nids, True)
+		self.instance.fix(nids)
 		self.RefreshTree()
 		self.GetParent().SetStatusBarText('Accepted {0:d} entries'.format(len(nids)))
 

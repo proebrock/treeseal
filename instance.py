@@ -110,37 +110,22 @@ class Instance(object):
 			return False
 		return not self.__new.globalChecksumExists(csum.getString())
 
-	def __fixFunc(self, node, updateOld=False):
-		# recurse
-		if node.isDirectory():
-			self.down(node)
-			for n in self:
-				self.__fixFunc(n, updateOld)
-			self.up()
-		# post-order: fixing of node, just for all statuses that need fixing
-		if node.status == NodeStatus.New:
-			if updateOld:
-				self.__old.insert(node)
-			node.status = NodeStatus.Ok
-			self.__view.update(node)
-		elif node.status == NodeStatus.Missing:
-			if updateOld:
-				self.__old.delete(node)
-			self.__view.delete(node)
-		elif node.status == NodeStatus.FileWarning or node.status == NodeStatus.FileError:
-			if updateOld:
-				self.__old.update(node)
-			node.status = NodeStatus.Ok
-			self.__view.update(node)
-
-	def fix(self, nids, updateOld=False):
+	def ignore(self, nids):
 		for nid in nids:
 			vnode = self.__view.getNodeByNid(nid)
 			if vnode is None:
 				raise MyException('Tree inconsistency; that should never happen.', 3)
-			self.__fixFunc(vnode, updateOld)
-		if updateOld:
-			self.__old.commit()
+			self.__view.deleteNode(vnode)
+		self.__view.commit()
+
+	def fix(self, nids):
+		for nid in nids:
+			vnode = self.__view.getNodeByNid(nid)
+			if vnode is None:
+				raise MyException('Tree inconsistency; that should never happen.', 3)
+			self.__view.patch(self.__old, vnode)
+			self.__view.deleteNode(vnode)
+		self.__old.commit()
 		self.__view.commit()
 
 	def __delete(self, node):

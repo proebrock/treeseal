@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from misc import MyException
-from node import NodeStatistics, NodeStatus
+from node import Node, NodeStatistics, NodeStatus
 
 
 
@@ -192,36 +192,30 @@ class Tree(object):
 	def deleteNode(self, node=None, recurse=True):
 		self.postOrderApply(Tree.__deleteNodeFunc, node, None, recurse)
 
-	def __copyTo(self, dest, recurse=True):
-		for node in self:
-			self.calculate(node)
-			dest.insert(node)
-			if recurse and node.isDirectory():
-				self.down(node)
-				dest.down(dest.getNodeByNid(node.getNid()))
-				self.__copyTo(dest, recurse)
-				dest.up()
-				self.up()
+	def __copyTo(self, dest, node, recurse=True):
+		self.calculate(node)
+		dest.insert(node)
+		if recurse and node.isDirectory():
+			self.down(node)
+			dest.down(dest.getNodeByNid(node.getNid()))
+			for snode in self:
+				self.__copyTo(dest, snode, recurse)
+			dest.up()
+			self.up()
 
 	def copyTo(self, dest, node=None, recurse=True):
 		if node is None:
-			self.__copyTo(dest, recurse)
+			for snode in self:
+				self.__copyTo(dest, snode, recurse)
 		else:
-			self.calculate(node)
-			dest.insert(node)
-			if recurse and node.isDirectory():
-				self.down(node)
-				dest.down(dest.getNodeByNid(node.getNid()))
-				self.__copyTo(dest, recurse)
-				dest.up()
-				self.up()
+			self.__copyTo(dest, node, recurse)
 
 	def diff(self, old, result, removeOkNodes=False):
 		for snode in self:
 			onode = old.getNodeByNid(snode.getNid())
 			if onode is not None:
 				self.calculate(snode)
-				# nodes existing in self and old: already known nodes
+				# nodes existing in self (new) and old: already known nodes
 				old.calculate(onode)
 				rnode = snode
 				rnode.dbkey = onode.dbkey
@@ -257,14 +251,57 @@ class Tree(object):
 				else:
 					result.update(rnode)
 			else:
-				# nodes existing in self but not in old: new nodes
+				# nodes existing in self (new) but not in old: new nodes
 				self.copyTo(result, snode)
 				result.setNodeStatus(NodeStatus.New, snode)
 		for onode in old:
 			if self.exists(onode.getNid()):
+				# existing in both: we already took care of this in the first loop
 				continue
-			# nodes existing in old but not in self: missing nodes
-			old.calculate(onode)
-			old.copyTo(result, onode)
-			result.setNodeStatus(NodeStatus.Missing, onode)
+			else:
+				# nodes existing in old but not in self (new): missing nodes
+				old.calculate(onode)
+				old.copyTo(result, onode)
+				result.setNodeStatus(NodeStatus.Missing, onode)
 		return result.getTotalNodeStatus()
+
+	def __patch(self, old, node, recurse=True):
+		# loop over the nodes in the patch tree
+		onode = old.getNodeByNid(node.getNid())
+		# dir and file
+		if node.status == NodeStatus.Ok:
+			return
+		elif node.status == NodeStatus.New:
+			self.copyTo(old, node, recurse)
+		elif node.status == NodeStatus.Missing:
+			old.deleteNode(onode, recurse)
+		# file only
+		elif node.status == NodeStatus.FileWarning or \
+			node.status == NodeStatus.FileError:
+			old.update(node)
+		# dir only
+		elif recurse and ( \
+			node.status == NodeStatus.DirContainsNew or \
+			node.status == NodeStatus.DirContainsMissing or \
+			node.status == NodeStatus.DirContainsWarning or \
+			node.status == NodeStatus.DirContainsError or \
+			node.status == NodeStatus.DirContainsMulti):
+			# tree descent
+			self.down(node)
+			old.down(onode)
+			# recurse
+			for snode in self:
+				self.__patch(old, snode, recurse)
+			# tree ascent
+			old.up()
+			self.up()
+		else:
+			raise MyException('Cannot apply diff node of status {0:d}'.format(node.status), 3)
+
+	def patch(self, old, node=None, recurse=True):
+		if node is None:
+			for snode in self:
+				self.__patch(old, snode, recurse)
+		else:
+			self.__patch(old, node, recurse)
+
