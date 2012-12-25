@@ -1,8 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import os
+import shlex
+import subprocess
+
 from misc import MyException
-from node import Node, NodeStatistics, NodeStatus
+from node import NodeStatistics, NodeStatus
 
 
 
@@ -84,22 +88,22 @@ class Tree(object):
 		self.signalNewFile = None
 		self.signalBytesDone = None
 
-	def __preOrderApply(self, func, param=None, recurse=True):
+	def __preOrderApply(self, func, param=None, ret=None, recurse=True):
 		for node in self:
-			func(self, node, param)
+			nret = func(self, node, param, ret)
 			if recurse and node.isDirectory():
 				self.down(node)
-				self.__preOrderApply(func, param, recurse)
+				self.__preOrderApply(func, param, nret, recurse)
 				self.up()
 
 	def preOrderApply(self, func, node=None, param=None, recurse=True):
 		if node is None:
-			self.__preOrderApply(func, param, recurse)
+			nret = self.__preOrderApply(func, param, None, recurse)
 		else:
-			func(self, node, param)
+			nret = func(self, node, param, None)
 			if recurse and node.isDirectory():
 				self.down(node)
-				self.__preOrderApply(func, param, recurse)
+				self.__preOrderApply(func, param, nret, recurse)
 				self.up()
 
 	def __postOrderApply(self, func, param=None, recurse=True):
@@ -120,24 +124,50 @@ class Tree(object):
 				self.up()
 			func(self, node, param)
 
-	def __prettyPrintFunc(self, node, param):
-		node.prettyPrint(self.getDepth() * '    ')
+	def __prettyPrintFunc(self, node, param, ret):
+		depth = self.getDepth() - param[0]
+		node.prettyPrint(depth * '    ')
 		print('')
+		return None
 
 	def prettyPrint(self, node=None, recurse=True):
-		self.preOrderApply(Tree.__prettyPrintFunc, node, None, recurse)
+		rootdepth = self.getDepth()
+		self.preOrderApply(Tree.__prettyPrintFunc, node, rootdepth, recurse)
 
-	def __getNodeStatisticsFunc(self, node, param):
+	def __graphvizExportFunc(self, node, param, ret):
+		return node.graphvizExport(param[0], self.getDepth()-param[1], param[2], ret)
+
+	def graphvizExport(self, filename='export', basic=True, node=None, recurse=True):
+		# write temporary graphviz dot file
+		filehandle = open(filename + '.dot', 'w')
+		filehandle.write('digraph "treeseal schema"\n{\n')
+		self.preOrderApply(Tree.__graphvizExportFunc, node, \
+			[ filehandle, self.getDepth(), basic ], recurse)
+		filehandle.write('}\n')
+		filehandle.close()
+		# process file with graphviz dot
+		cmdline = 'dot -Tsvg -o' + filename + '.svg ' + filename + '.dot'
+		args = shlex.split(cmdline)
+		fnull = open(os.devnull, 'w')
+		proc = subprocess.Popen(args, stdin=fnull, stdout=fnull, stderr=fnull)
+		fnull.close()
+		proc.communicate()
+		# clean up and exit
+		os.remove(filename + '.dot')
+
+	def __getNodeStatisticsFunc(self, node, param, ret):
 		param.update(node)
+		return None
 
 	def getNodeStatistics(self, node=None, recurse=True):
 		stats = NodeStatistics()
 		self.preOrderApply(Tree.__getNodeStatisticsFunc, node, stats, recurse)
 		return stats
 
-	def __setNodeStatusFunc(self, node, param):
+	def __setNodeStatusFunc(self, node, param, ret):
 		node.status = param
 		self.update(node)
+		return None
 
 	def setNodeStatus(self, status, node=None, recurse=True):
 		self.preOrderApply(Tree.__setNodeStatusFunc, node, status, recurse)

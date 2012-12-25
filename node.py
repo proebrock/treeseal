@@ -275,6 +275,47 @@ class Node(object):
 		if self.info is not None:
 			self.info.prettyPrint(prefix)
 
+	def graphvizExport(self, filehandle, depth=0, basic=True, parentid=None):
+		# prepare export
+		vertexid = id(self)
+		label = self.name.replace('\\', '\\\\')
+		if not basic:
+			label += '\\n' + self.getDbKeyString()
+			if not self.isDirectory():
+				label += '\\n0x' + self.info.getChecksumString(True)
+		indent = (depth + 1) * '\t'
+		if self.isDirectory():
+			if self.status == NodeStatus.DirContainsNew or \
+				self.status == NodeStatus.DirContainsMissing or \
+				self.status == NodeStatus.DirContainsWarning or \
+				self.status == NodeStatus.DirContainsError or \
+				self.status == NodeStatus.DirContainsMulti:
+				attrs = 'shape=plaintext'
+			else:
+				attrs = 'shape=box'
+		else:
+			if self.status == NodeStatus.FileWarning:
+				attrs = 'shape=doubleoctagon'
+			elif self.status == NodeStatus.FileError:
+				attrs = 'shape=tripleoctagon'
+			else:
+				attrs = 'shape=octagon'
+		if self.status == NodeStatus.Undefined:
+			attrs += ', style=dotted'
+		elif self.status == NodeStatus.New:
+			attrs += ', style=bold'
+		elif self.status == NodeStatus.Missing:
+			attrs += ', style=dashed'
+		elif self.status == NodeStatus.Ok:
+			attrs += ', style=solid'
+		# export node
+		filehandle.write(indent + '{0:d} [ {1:s}, label="{2:s}" ];\n' \
+			.format(vertexid, attrs, label))
+		# connect node with parent
+		if parentid is not None:
+			filehandle.write(indent + '{0:d} -> {1:d};\n'.format(parentid, vertexid))
+		return vertexid
+
 
 
 class NodeStatistics:
