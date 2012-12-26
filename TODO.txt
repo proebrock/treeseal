@@ -1,6 +1,6 @@
 Mid-term
 --------
-* Before import, check if no upper or lower node has already .treeseal
+* Save database content in XML file or export as graph using Graphviz
 * More Right-Click menu functions:
   - "Open" of file with system-defined program (Windows only (?))
   - Refresh (diff of sub-tree)
@@ -16,9 +16,8 @@ Mid-term
 * Program name and artwork (icon, splash screen)
 * Help: Github, in-program (HTML viewer) and About dialog
 * Globally resolving issues via main menu (Accept all, accept
-  all added, accept all deleted,
-  accept all renamed, accept all ops not leading to data loss (think
-  of multiple copies of a file
+  all added, accept all deleted,  accept all renamed, accept all
+  ops not leading to data loss (think of multiple copies of a file
   ... or  using radiobox)
 * Much more clever diffs using global checksum database (rm, mv, cp)
   (a new file can have no/one/multiple origins in terms of its checksum,
