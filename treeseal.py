@@ -25,7 +25,7 @@ ProgramVersion = '3.0'
 class UserConfig(object):
 
 	def __init__(self):
-		self.removeOkNodes = False
+		self.removeOkNodes = True
 
 
 
@@ -287,7 +287,7 @@ class ListControlPanel(wx.Panel):
 
 class MainFrame(wx.Frame):
 	def __init__(self, parent):
-		wx.Frame.__init__(self, parent, size=(800,300))
+		wx.Frame.__init__(self, parent, size=(800,600))
 		self.SetWindowTitle()
 
 		# main menue definition
