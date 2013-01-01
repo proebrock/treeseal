@@ -45,7 +45,10 @@ suitable on your platform, you have to look for something else.
 
 Collection of links to similar tools or techniques:
 
-* Maybe use a distributed version control system, e.g. [Git](http://git-scm.com/) or its extension [git-annex](http://git-annex.branchable.com/)
+* Maybe use a distributed version control system, e.g. [Git](http://git-scm.com/)
+  with an extension like [git-annex](http://git-annex.branchable.com/) or 
+  [Mercurial](http://mercurial.selenic.com/) with an extension like
+  [Largefiles](http://mercurial.selenic.com/wiki/LargefilesExtension)
 * [shatag](https://bitbucket.org/maugier/shatag)
 * [fswatch](http://fswatch.sourceforge.net/)
 * [Enhancing File System Integrity Through Checksums](http://www.filesystems.org/docs/nc-checksum-tr/nc-checksum.html)
