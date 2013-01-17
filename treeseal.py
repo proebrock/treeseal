@@ -6,6 +6,7 @@ import platform
 import sys
 import wx
 
+from comparisondialog import NodeComparisonDialog
 from dbtree import DatabaseTree
 from fstree import FilesystemTree
 import icons as Icons
@@ -14,7 +15,6 @@ from memtree import MemoryTree
 from misc import Checksum, MyException
 from node import Node, NodeStatus
 from progressdialog import UserCancelledException, FileProcessingProgressDialog
-from comparisondialog import NodeComparisonDialog
 from simplelistctrl import SimpleListControl
 
 ProgramName = 'treeseal'
@@ -25,8 +25,7 @@ ProgramVersion = '3.0'
 class UserConfig(object):
 
 	def __init__(self):
-		self.removeOkNodes = True
-
+		pass
 
 
 ###########################################
@@ -486,7 +485,7 @@ class MainFrame(wx.Frame):
 			# execute task
 			fstree.registerHandlers(progressDialog.SignalNewFile, \
 				progressDialog.SignalBytesDone)
-			fstree.diff(dbtree, memtree, self.config.removeOkNodes)
+			fstree.diff(dbtree, memtree)
 			memtree.commit()
 			fstree.unRegisterHandlers()
 		except UserCancelledException:

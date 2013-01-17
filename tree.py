@@ -240,7 +240,7 @@ class Tree(object):
 		else:
 			self.__copyTo(dest, node, recurse)
 
-	def diff(self, old, result, removeOkNodes=False):
+	def diff(self, old, result, removeOkNodes=True):
 		for snode in self:
 			onode = old.getNodeByNid(snode.getNid())
 			if onode is not None:
