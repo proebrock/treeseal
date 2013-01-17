@@ -1,6 +1,6 @@
 Mid-term
 --------
-* Save database content in XML file or export as graph using Graphviz
+* Save database content in XML file or SHASUMS file
 * More Right-Click menu functions:
   - "Open" of file with system-defined program (Windows only (?))
   - Refresh (diff of sub-tree)
@@ -14,7 +14,7 @@ Mid-term
 * Proper key navigation of listview (including CTRL-A,
   multiselect, background menu)
 * Program name and artwork (icon, splash screen)
-* Help: Github, in-program (HTML viewer) and About dialog
+* Help: Github, in-program (HTML viewer) and About dialog with version info
 * Globally resolving issues via main menu (Accept all, accept
   all added, accept all deleted,  accept all renamed, accept all
   ops not leading to data loss (think of multiple copies of a file
@@ -47,6 +47,7 @@ Mid-term
 
 Long-term
 ---------
+* Managing of duplicates
 * Make getPathsByChecksum() and getNodesByChecksum() compatible with
   shorter checksum strings (various length support, warning for
   non-unique user params, optimal data structure for this are the
