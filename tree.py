@@ -72,6 +72,9 @@ class Tree(object):
 	def globalChecksumExists(self, checksumString):
 		raise MyException('Not implemented.', 3)
 
+	def globalChecksumNumberOfOccurrences(self, checksumString):
+		raise MyException('Not implemented.', 3)
+
 	def globalGetPathsByChecksum(self, checksumString):
 		raise MyException('Not implemented.', 3)
 

@@ -158,6 +158,9 @@ class FilesystemTree(Tree):
 	def globalChecksumExists(self, checksumString):
 		return checksumString in self.__checksumToPathsMap
 
+	def globalChecksumNumberOfOccurrences(self, checksumString):
+		return len(self.globalGetPathsByChecksum(checksumString))
+
 	def globalGetPathsByChecksum(self, checksumString):
 		if checksumString in self.__checksumToPathsMap:
 			return self.__checksumToPathsMap[checksumString]
