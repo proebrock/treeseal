@@ -49,11 +49,11 @@ class Instance(object):
 	def up(self):
 		# ascent in old tree
 		if self.__old is not None:
-			if self.__old.getDepth() == self.__view.getDepth():
+			if self.__old.sameDepth(self.__view):
 				self.__old.up()
 		# ascent in new tree
 		if self.__new is not None:
-			if self.__new.getDepth() == self.__view.getDepth():
+			if self.__new.sameDepth(self.__view):
 				self.__new.up()
 		# ascent in view tree, update status of parent directory we are returning from in view tree
 		status = self.__view.getTotalNodeStatus()
@@ -69,11 +69,11 @@ class Instance(object):
 	def down(self, node):
 		# descent in old tree if possible
 		if self.__old is not None:
-			if self.__old.getDepth() == self.__view.getDepth() and self.__old.exists(node.getNid()):
+			if self.__old.sameDepth(self.__view) and self.__old.exists(node.getNid()):
 				self.__old.down(node)
 		# descent in new tree if possible
 		if self.__new is not None:
-			if self.__new.getDepth() == self.__view.getDepth() and self.__new.exists(node.getNid()):
+			if self.__new.sameDepth(self.__view) and self.__new.exists(node.getNid()):
 				self.__new.down(node)
 		# descent in view tree
 		self.__view.down(node)
@@ -137,9 +137,9 @@ class Instance(object):
 			self.up()
 		 # post-order: deletion of node
 		self.__view.delete(node)
-		if self.__old.getDepth() == self.__view.getDepth() and self.__old.exists(node.getNid()):
+		if self.__old.sameDepth(self.__view) and self.__old.exists(node.getNid()):
 			self.__old.delete(node)
-		if self.__new.getDepth() == self.__view.getDepth() and self.__new.exists(node.getNid()):
+		if self.__new.sameDepth(self.__view) and self.__new.exists(node.getNid()):
 			self.__new.delete(node)
 
 	def delete(self, nids):

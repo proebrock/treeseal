@@ -83,6 +83,9 @@ class Tree(object):
 	def isRoot(self):
 		return self.getDepth() == 0
 
+	def sameDepth(self, other):
+		return self.getDepth() == other.getDepth()
+
 	def registerHandlers(self, signalNewFile, signalBytesDone):
 		self.signalNewFile = signalNewFile
 		self.signalBytesDone = signalBytesDone
