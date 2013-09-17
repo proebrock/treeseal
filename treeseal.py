@@ -268,7 +268,7 @@ class ListControlPanel(wx.Panel):
 
 	def OnPopupAccept(self, event):
 		nids = self.getSelectedNodeNids()
-		self.instance.fix(nids)
+		self.instance.patch(nids)
 		self.RefreshTree()
 		self.GetParent().SetStatusBarText('Accepted {0:d} entries'.format(len(nids)))
 

@@ -118,13 +118,30 @@ class Instance(object):
 			self.__view.deleteNode(vnode)
 		self.__view.commit()
 
-	def fix(self, nids):
+	def __patch(self, node):
+		# handle new nodes first (create BEFORE descend into tree)
+		if node.status == NodeStatus.New:
+			self.__new.copyTo(self.__old, node, False)
+		elif node.status == NodeStatus.FileWarning or node.status == NodeStatus.FileError:
+			self.__old.update(node)
+		# tree descend
+		if node.isDirectory():
+			self.down(node)
+			for n in self:
+				self.__patch(n)
+			self.up()
+		# handle missing nodes last (deconstruct AFTER descending into tree)
+		if node.status == NodeStatus.Missing:
+			self.__old.delete(node)
+		# remove handled nodes from diff tree
+		self.__view.delete(node)
+
+	def patch(self, nids):
 		for nid in nids:
 			vnode = self.__view.getNodeByNid(nid)
 			if vnode is None:
 				raise MyException('Tree inconsistency; that should never happen.', 3)
-			self.__view.patch(self.__old, vnode)
-			self.__view.deleteNode(vnode)
+			self.__patch(vnode)
 		self.__old.commit()
 		self.__view.commit()
 
