@@ -118,9 +118,9 @@ class ListControlPanel(wx.Panel):
 		if node.isDirectory():
 			self.list.SetStringItem(index, self.dirMarkerColumn, self.__dirMarkerString)
 		else:
-			dol = self.instance.hasDangerOfLoss(node)
-			if dol is not None and dol == True:
-				self.list.SetItemColumnImage(index, self.trashColumn, self.trashIconIndex)
+			if not self.readonly:
+				if self.instance.hasRiskOfLoss(node):
+					self.list.SetItemColumnImage(index, self.trashColumn, self.trashIconIndex)
 			self.list.SetStringItem(index, self.sizeColumn, node.info.getSizeString())
 			self.list.SetStringItem(index, self.mtimeColumn, node.info.getMTimeString())
 			self.list.SetStringItem(index, self.csumColumn, node.info.getChecksumString())
@@ -233,6 +233,10 @@ class ListControlPanel(wx.Panel):
 				self.Bind(wx.EVT_MENU, self.OnPopupAccept, id=self.popupIdAccept)
 				menu.Append(self.popupIdAccept, "Accept")
 
+				self.popupIdAcceptNonDestructive = wx.NewId()
+				self.Bind(wx.EVT_MENU, self.OnPopupAcceptNonDestructive, id=self.popupIdAcceptNonDestructive)
+				menu.Append(self.popupIdAcceptNonDestructive, "Accept Non-Destructive")
+
 				self.popupIdDelete = wx.NewId()
 				self.Bind(wx.EVT_MENU, self.OnPopupDelete, id=self.popupIdDelete)
 				menu.Append(self.popupIdDelete, "Delete")
@@ -269,6 +273,12 @@ class ListControlPanel(wx.Panel):
 	def OnPopupAccept(self, event):
 		nids = self.getSelectedNodeNids()
 		self.instance.patch(nids)
+		self.RefreshTree()
+		self.GetParent().SetStatusBarText('Accepted {0:d} entries'.format(len(nids)))
+
+	def OnPopupAcceptNonDestructive(self, event):
+		nids = self.getSelectedNodeNids()
+		self.instance.patch(nids, self.instance.hasNoRiskOfLoss)
 		self.RefreshTree()
 		self.GetParent().SetStatusBarText('Accepted {0:d} entries'.format(len(nids)))
 
