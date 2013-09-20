@@ -251,7 +251,7 @@ class ListControlPanel(wx.Panel):
 		if len(nids) != 1:
 			raise MyException('Operation only possible for single selection.', 3)
 		node = self.instance.getNodeByNid(nids[0])
-		if not node.isDirectory():
+		if node.isFile():
 			raise MyException('Cannot change to file.', 3)
 		self.instance.down(node)
 		self.RefreshTree()

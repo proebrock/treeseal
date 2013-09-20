@@ -71,13 +71,13 @@ class MemoryTree(Tree):
 		if node.getNid() not in self.__parentMTNStack[-1].children:
 			raise MyException('No node \'' + node.name + '\' in current dir.', 3)
 		mtn = self.__parentMTNStack[-1].children[node.getNid()]
-		if not mtn.node.isDirectory():
+		if mtn.node.isFile():
 			raise MyException('\'down\' on file \'' + node.name + '\' is not possible.', 3)
 		self.__parentMTNStack.append(mtn)
 
 	def insert(self, node):
 		self.__parentMTNStack[-1].children[node.getNid()] = MemoryTreeNode(node)
-		if not node.isDirectory():
+		if node.isFile():
 			csumstr = node.info.checksum.getString()
 			if not csumstr in self.__checksumToPathsMap:
 				self.__checksumToPathsMap[csumstr] = set()
@@ -92,7 +92,7 @@ class MemoryTree(Tree):
 			raise MyException('Node does not exist for deletion.', 1)
 		# remove node from checksum buffer
 		node = self.__parentMTNStack[-1].children[nid].node
-		if not node.isDirectory():
+		if node.isFile():
 			csumstr = node.info.checksum.getString()
 			self.__checksumToPathsMap[csumstr].remove(self.getPath(node.name))
 			if len(self.__checksumToPathsMap[csumstr]) == 0:

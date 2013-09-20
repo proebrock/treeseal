@@ -234,6 +234,9 @@ class Node(object):
 	def nid2IsDirectory(nid):
 		return nid[0] == '0'
 
+	def isFile(self):
+		return self.info is not None
+
 	def isDirectory(self):
 		return self.info is None
 
@@ -281,7 +284,7 @@ class Node(object):
 		label = self.name.replace('\\', '\\\\')
 		if not basic:
 			label += '\\n' + self.getDbKeyString()
-			if not self.isDirectory():
+			if self.isFile():
 				label += '\\n0x' + self.info.getChecksumString(True)
 		indent = (depth + 1) * '\t'
 		if self.isDirectory():

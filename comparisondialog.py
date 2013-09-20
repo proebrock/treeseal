@@ -33,7 +33,7 @@ class NodeComparisonDialog(wx.Dialog):
 	def __init__(self, parent, node, instance):
 
 		height = 210 # node header
-		if not node.isDirectory():
+		if node.isFile():
 			height += 190 # node info for files
 			if instance.isQueryByChecksumPossible():
 				if (node.otherinfo is not None) and \
@@ -66,7 +66,7 @@ class NodeComparisonDialog(wx.Dialog):
 		headerBoxSizer = wx.StaticBoxSizer(headerBox, wx.VERTICAL)
 		headerBoxSizer.Add(headerGrid, 1, wx.ALL | wx.EXPAND, self.border)
 
-		if not node.isDirectory():
+		if node.isFile():
 			# static box with contents
 			if node.otherinfo is not None:
 				diffGrid = self.GetDiffGrid([node.otherinfo, node.info])
@@ -94,7 +94,7 @@ class NodeComparisonDialog(wx.Dialog):
 		# create and fill global sizer
 		sizer = wx.BoxSizer(wx.VERTICAL)
 		sizer.Add(headerBoxSizer, 0, wx.ALL | wx.EXPAND, self.border)
-		if not node.isDirectory():
+		if node.isFile():
 			sizer.Add(diffBoxSizer, 0, wx.ALL | wx.EXPAND, self.border)
 			if instance.isQueryByChecksumPossible():
 				if (node.otherinfo is not None) and \

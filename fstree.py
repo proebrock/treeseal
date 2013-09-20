@@ -78,7 +78,7 @@ class FilesystemTree(Tree):
 		return name
 
 	def down(self, node):
-		if not node.isDirectory():
+		if node.isFile():
 			raise MyException('\'down\' on file \'' + node.name + '\' is not possible.', 3)
 		self.__parentNameStack.append(node.name)
 		self.readCurrentDir()
@@ -100,7 +100,7 @@ class FilesystemTree(Tree):
 		else:
 			os.remove(fullpath)
 		# remove node from checksum buffer
-		if not node.isDirectory():
+		if node.isFile():
 			if node.info.checksum is None:
 				# this is a problem: for deletion we have to be able to update
 				# the checksum buffer; if the caller provides us with a node

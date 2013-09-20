@@ -127,7 +127,7 @@ class DatabaseTree(Tree):
 		return name
 
 	def down(self, node):
-		if not node.isDirectory():
+		if node.isFile():
 			raise MyException('\'down\' on file \'' + node.name + '\' is not possible.', 3)
 		self.__parentKeyStack.append(node.dbkey)
 		self.__parentNameStack.append(node.name)
