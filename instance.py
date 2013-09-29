@@ -98,6 +98,8 @@ class Instance(object):
 			return [ None, None ]
 
 	def hasRiskOfLoss(self, node):
+		if node.isDirectory():
+			raise MyException('Cannot determine risk of loss for directories.', 3)
 		if node.status == NodeStatus.Missing:
 			csum = node.info.checksum
 		elif node.status == NodeStatus.FileWarning or node.status == NodeStatus.FileError:
@@ -105,9 +107,6 @@ class Instance(object):
 		else:
 			return False
 		return not self.__new.globalChecksumExists(csum.getString())
-
-	def hasNoRiskOfLoss(self, node):
-		return not self.hasRiskOfLoss(node)
 
 	def ignore(self, nids):
 		for nid in nids:
@@ -117,40 +116,47 @@ class Instance(object):
 			self.__view.deleteNode(vnode)
 		self.__view.commit()
 
-	def __patch(self, node, fileFilterFunc):
-		if fileFilterFunc == None or node.isDirectory():
-			doPatch = True
-		else:
-			doPatch = fileFilterFunc(node)
-		patchingDone = False
-		# handle new nodes first (create BEFORE descend into tree)
-		if doPatch:
+	def __patch(self, node, safeOnly):
+		exists = 1
+		if node.isDirectory():
+			# before descent: create if necessary
 			if node.status == NodeStatus.New:
 				self.__new.copyTo(self.__old, node, False)
-				patchingDone = True
-			elif node.status == NodeStatus.FileWarning or node.status == NodeStatus.FileError:
-				self.__old.update(node)
-				patchingDone = True
-		# tree descend
-		if node.isDirectory():
+				exists = 0
+			# tree descend
 			self.down(node)
+			numexists = 0
 			for n in self:
-				self.__patch(n, fileFilterFunc)
+				numexists += self.__patch(n, safeOnly)
 			self.up()
-		# handle missing nodes last (delete AFTER descending into tree)
-		if doPatch:
-			if node.status == NodeStatus.Missing:
-				self.__old.delete(node)
-				patchingDone = True
-		if patchingDone or node.status == NodeStatus.Ok:
+			# after descent: delete if necessary (status missing and empty)
+			if node.status == NodeStatus.Ok:
+				exists = 0
+			elif not safeOnly or (numexists == 0):
+				if node.status == NodeStatus.Missing:
+					self.__old.delete(node)
+					exists = 0
+		else:
+			if node.status == NodeStatus.New:
+				self.__new.copyTo(self.__old, node, False)
+				exists = 0
+			elif not safeOnly or not self.hasRiskOfLoss(node):
+				if node.status == NodeStatus.FileWarning or node.status == NodeStatus.FileError:
+					self.__old.update(node)
+					exists = 0
+				elif node.status == NodeStatus.Missing:
+					self.__old.delete(node)
+					exists = 0
+		if exists == 0:
 			self.__view.delete(node)
+		return exists
 
-	def patch(self, nids, fileFilterFunc=None):
+	def patch(self, nids, safeOnly=False):
 		for nid in nids:
 			vnode = self.__view.getNodeByNid(nid)
 			if vnode is None:
 				raise MyException('Tree inconsistency; that should never happen.', 3)
-			self.__patch(vnode, fileFilterFunc)
+			self.__patch(vnode, safeOnly)
 		self.__old.commit()
 		self.__view.commit()
 

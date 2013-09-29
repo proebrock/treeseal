@@ -272,13 +272,13 @@ class ListControlPanel(wx.Panel):
 
 	def OnPopupAccept(self, event):
 		nids = self.getSelectedNodeNids()
-		self.instance.patch(nids)
+		self.instance.patch(nids, safeOnly=False)
 		self.RefreshTree()
 		self.GetParent().SetStatusBarText('Accepted {0:d} entries'.format(len(nids)))
 
 	def OnPopupAcceptNonDestructive(self, event):
 		nids = self.getSelectedNodeNids()
-		self.instance.patch(nids, self.instance.hasNoRiskOfLoss)
+		self.instance.patch(nids, safeOnly=True)
 		self.RefreshTree()
 		self.GetParent().SetStatusBarText('Accepted {0:d} entries'.format(len(nids)))
 
