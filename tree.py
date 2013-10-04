@@ -33,7 +33,7 @@ class Tree(object):
 	def getDepth(self):
 		raise MyException('Not implemented.', 3)
 
-	def getPath(self, filename=None):
+	def getPath(self, node=None):
 		raise MyException('Not implemented.', 3)
 
 	def gotoRoot(self):

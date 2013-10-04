@@ -104,12 +104,12 @@ class DatabaseTree(Tree):
 	def getDepth(self):
 		return len(self.__parentKeyStack) - 1
 
-	def getPath(self, filename=None):
+	def getPath(self, node=None):
 		path = reduce(lambda x, y: os.path.join(x, y), self.__parentNameStack)
-		if filename is None:
+		if node is None:
 			return path
 		else:
-			return os.path.join(path, filename)
+			return os.path.join(path, node.name)
 
 	def gotoRoot(self):
 		self.__parentKeyStack = [ self.getRootId() ]
@@ -231,10 +231,10 @@ class DatabaseTree(Tree):
 		# nothing to do, just signal that the job is done if necessary
 		if node.isDirectory():
 			if self.signalNewFile is not None:
-				self.signalNewFile(self.getPath(node.name), 0)
+				self.signalNewFile(self.getPath(node), 0)
 		else:
 			if self.signalNewFile is not None:
-				self.signalNewFile(self.getPath(node.name), node.info.size)
+				self.signalNewFile(self.getPath(node), node.info.size)
 			if self.signalBytesDone is not None:
 				self.signalBytesDone(node.info.size)
 

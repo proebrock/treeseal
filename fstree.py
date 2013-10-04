@@ -59,12 +59,12 @@ class FilesystemTree(Tree):
 	def getDepth(self):
 		return len(self.__parentNameStack) - 1
 
-	def getPath(self, filename=None):
+	def getPath(self, node=None):
 		path = reduce(lambda x, y: os.path.join(x, y), self.__parentNameStack)
-		if filename is None:
+		if node is None:
 			return path
 		else:
-			return os.path.join(path, filename)
+			return os.path.join(path, node.name)
 
 	def gotoRoot(self):
 		self.__parentNameStack = [ '' ]
@@ -109,7 +109,7 @@ class FilesystemTree(Tree):
 				# implementation so we cannot do that here
 				raise MyException('Node that should be deleted has no checksum.', 3)
 			csumstr = node.info.checksum.getString()
-			self.__checksumToPathsMap[csumstr].remove(self.getPath(node.name))
+			self.__checksumToPathsMap[csumstr].remove(self.getPath(node))
 			if len(self.__checksumToPathsMap[csumstr]) == 0:
 				del self.__checksumToPathsMap[csumstr]
 		# remove node from buffer
@@ -134,20 +134,20 @@ class FilesystemTree(Tree):
 	def calculate(self, node):
 		if node.isDirectory():
 			if self.signalNewFile is not None:
-				self.signalNewFile(self.getPath(node.name), 0)
+				self.signalNewFile(self.getPath(node), 0)
 		else:
 			if self.signalNewFile is not None:
-				self.signalNewFile(self.getPath(node.name), node.info.size)
+				self.signalNewFile(self.getPath(node), node.info.size)
 			fullpath = self.getFullPath(node.name)
 			# calculate checksum
 			node.info.checksum = Checksum()
-			#print('### expensive calculation for node \'' + self.getPath(node.name) + '\' ...')
+			#print('### expensive calculation for node \'' + self.getPath(node) + '\' ...')
 			node.info.checksum.calculateForFile(fullpath, self.signalBytesDone)
 			# buffering of checksums
 			csumstr = node.info.checksum.getString()
 			if not csumstr in self.__checksumToPathsMap:
 				self.__checksumToPathsMap[csumstr] = set()
-			self.__checksumToPathsMap[csumstr].add(self.getPath(node.name))
+			self.__checksumToPathsMap[csumstr].add(self.getPath(node))
 			# determine file timestamps AFTER calculating the checksum, otherwise opening
 			# the file might change the access time (OS dependent)
 			stat = os.stat(fullpath)

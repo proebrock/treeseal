@@ -50,14 +50,14 @@ class MemoryTree(Tree):
 	def getDepth(self):
 		return len(self.__parentMTNStack) - 1
 
-	def getPath(self, filename=None):
+	def getPath(self, node=None):
 		path = ''
 		for n in self.__parentMTNStack:
 			path = os.path.join(path, n.node.name)
-		if filename is None:
+		if node is None:
 			return path
 		else:
-			return os.path.join(path, filename)
+			return os.path.join(path, node.name)
 
 	def gotoRoot(self):
 		self.__parentMTNStack = [ self.__parentMTNStack[0] ]
@@ -81,7 +81,7 @@ class MemoryTree(Tree):
 			csumstr = node.info.checksum.getString()
 			if not csumstr in self.__checksumToPathsMap:
 				self.__checksumToPathsMap[csumstr] = set()
-			self.__checksumToPathsMap[csumstr].add(self.getPath(node.name))
+			self.__checksumToPathsMap[csumstr].add(self.getPath(node))
 
 	def update(self, node):
 		self.__parentMTNStack[-1].children[node.getNid()].node = node
@@ -94,7 +94,7 @@ class MemoryTree(Tree):
 		node = self.__parentMTNStack[-1].children[nid].node
 		if node.isFile():
 			csumstr = node.info.checksum.getString()
-			self.__checksumToPathsMap[csumstr].remove(self.getPath(node.name))
+			self.__checksumToPathsMap[csumstr].remove(self.getPath(node))
 			if len(self.__checksumToPathsMap[csumstr]) == 0:
 				del self.__checksumToPathsMap[csumstr]
 		# remove node from buffer
@@ -120,10 +120,10 @@ class MemoryTree(Tree):
 		# nothing to do, just signal that the job is done if necessary
 		if node.isDirectory():
 			if self.signalNewFile is not None:
-				self.signalNewFile(self.getPath(node.name), 0)
+				self.signalNewFile(self.getPath(node), 0)
 		else:
 			if self.signalNewFile is not None:
-				self.signalNewFile(self.getPath(node.name), node.info.size)
+				self.signalNewFile(self.getPath(node), node.info.size)
 			if self.signalBytesDone is not None:
 				self.signalBytesDone(node.info.size)
 
