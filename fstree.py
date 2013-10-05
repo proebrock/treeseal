@@ -83,6 +83,17 @@ class FilesystemTree(Tree):
 		self.__parentNameStack.append(node.name)
 		self.readCurrentDir()
 
+	def numChildren(self, node):
+		if node.isFile():
+			return 0
+		else:
+			count = 0
+			for name in os.listdir(self.getFullPath()):
+				node = self.__fetch(name)
+				if node is not None:
+					count += 1
+			return count
+
 	def insert(self, node):
 		pass
 
@@ -90,6 +101,8 @@ class FilesystemTree(Tree):
 		pass
 
 	def delete(self, node):
+		if not self.isChildless(node):
+			raise MyException('Deleting the non-empty directory \'' + node.name + '\'.', 1)
 		nid = node.getNid()
 		if not self.exists(nid):
 			raise MyException('Node does not exist for deletion.', 1)

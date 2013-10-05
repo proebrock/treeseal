@@ -75,6 +75,12 @@ class MemoryTree(Tree):
 			raise MyException('\'down\' on file \'' + node.name + '\' is not possible.', 3)
 		self.__parentMTNStack.append(mtn)
 
+	def numChildren(self, node):
+		if node.isFile():
+			return 0
+		else:
+			return len(self.__parentMTNStack[-1].children[node.getNid()].children)
+
 	def insert(self, node):
 		self.__parentMTNStack[-1].children[node.getNid()] = MemoryTreeNode(node)
 		if node.isFile():
@@ -87,6 +93,8 @@ class MemoryTree(Tree):
 		self.__parentMTNStack[-1].children[node.getNid()].node = node
 
 	def delete(self, node):
+		if not self.isChildless(node):
+			raise MyException('Deleting the non-empty directory \'' + node.name + '\'.', 1)
 		nid = node.getNid()
 		if not self.exists(nid):
 			raise MyException('Node does not exist for deletion.', 1)

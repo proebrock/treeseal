@@ -45,6 +45,9 @@ class Tree(object):
 	def down(self, node):
 		raise MyException('Not implemented.', 3)
 
+	def numChildren(self, node):
+		raise MyException('Not implemented.', 3)
+
 	def insert(self, node):
 		raise MyException('Not implemented.', 3)
 
@@ -85,6 +88,9 @@ class Tree(object):
 
 	def sameDepth(self, other):
 		return self.getDepth() == other.getDepth()
+
+	def isChildless(self, node):
+		return self.numChildren(node) == 0
 
 	def registerHandlers(self, signalNewFile, signalBytesDone):
 		self.signalNewFile = signalNewFile

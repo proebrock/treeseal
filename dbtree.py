@@ -134,6 +134,16 @@ class DatabaseTree(Tree):
 		if self.__useBuffer:
 			self.readCurrentDir()
 
+	def numChildren(self, node):
+		if node.isFile():
+			return 0
+		else:
+			cursor = self.__dbcon.cursor()
+			cursor.execute('select count(nodekey) from nodes where parentkey=?', (node.dbkey,))
+			count = cursor.fetchone()[0]
+			cursor.close()
+			return count
+
 	def insert(self, node):
 		if not node.dbkey is None:
 			raise MyException('Node already contains a valid node id, ' + \
@@ -176,6 +186,8 @@ class DatabaseTree(Tree):
 			self.__buffer[node.getNid()] = node
 
 	def delete(self, node):
+		if not self.isChildless(node):
+			raise MyException('Deleting the non-empty directory \'' + node.name + '\'.', 1)
 		self.__dbcon.execute('delete from nodes where parentkey=? and name=? and isdir=?', \
 			(self.getCurrentParentId(), node.name, node.isDirectory()))
 		# remove from buffer
