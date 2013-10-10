@@ -22,12 +22,6 @@ ProgramVersion = '3.0'
 
 
 
-class UserConfig(object):
-
-	def __init__(self):
-		pass
-
-
 ###########################################
 ################### GUI ###################
 ###########################################
@@ -301,19 +295,26 @@ class MainFrame(wx.Frame):
 
 		# main menue definition
 		fileMenu = wx.Menu()
-		menuImport = fileMenu.Append(wx.ID_FILE1, 'Import', 'Import Directory')
-		self.Bind(wx.EVT_MENU, self.OnImport, menuImport)
-		menuCheck = fileMenu.Append(wx.ID_FILE2, 'Check', 'Check Directory')
-		self.Bind(wx.EVT_MENU, self.OnCheck, menuCheck)
+		menuNew = fileMenu.Append(wx.ID_NEW, 'New', 'Put directory under control of ' + ProgramName)
+		self.Bind(wx.EVT_MENU, self.OnNew, menuNew)
+		menuOpen = fileMenu.Append(wx.ID_OPEN, 'Open', 'Open directory controlled by ' + ProgramName)
+		self.Bind(wx.EVT_MENU, self.OnOpen, menuOpen)
+		fileMenu.AppendSeparator()
+		menuPreferences = fileMenu.Append(wx.ID_PREFERENCES, 'Preferences', 'Show program\'s preferences')
+		self.Bind(wx.EVT_MENU, self.OnPreferences, menuPreferences)
 		fileMenu.AppendSeparator()
 		menuExit = fileMenu.Append(wx.ID_EXIT, 'E&xit', 'Terminate Program')
 		self.Bind(wx.EVT_MENU, self.OnExit, menuExit)
+		actionMenu = wx.Menu()
+		menuCheck = actionMenu.Append(wx.ID_FILE, 'Check', 'Check')
+		self.Bind(wx.EVT_MENU, self.OnCheck, menuCheck)
 		helpMenu = wx.Menu()
 		menuAbout = helpMenu.Append(wx.ID_ABOUT, 'About', 'Information about this program')
 		self.Bind(wx.EVT_MENU, self.OnAbout, menuAbout)
 		# assemble menu
 		menuBar = wx.MenuBar()
 		menuBar.Append(fileMenu, '&File')
+		menuBar.Append(actionMenu, 'Action')
 		menuBar.Append(helpMenu, 'Help')
 		self.SetMenuBar(menuBar)
 
@@ -325,8 +326,6 @@ class MainFrame(wx.Frame):
 		sizer.Add(self.address, 0, wx.ALL | wx.EXPAND, 5)
 		sizer.Add(self.list, 1, wx.ALL | wx.EXPAND, 5)
 		self.SetSizer(sizer)
-
-		self.config = UserConfig()
 
 		self.statusbar = self.CreateStatusBar()
 		self.statusbar.SetFieldsCount(1)
@@ -346,7 +345,25 @@ class MainFrame(wx.Frame):
 	def SetStatusBarText(self, text=''):
 		self.statusbar.SetStatusText(text)
 
-	def OnImport(self, event):
+	def OnNew(self, event):
+		pass
+
+	def OnOpen(self, event):
+		pass
+
+	def OnPreferences(self, event):
+		pass
+
+	def OnExit(self, event):
+		self.Close(True)
+
+	def OnCheck(self, event):
+		pass
+
+	def OnAbout(self, event):
+		pass
+
+	def old_OnImport(self, event):
 		# get a valid path from user
 		dirDialog = wx.DirDialog(self, "Choose a directory for import:", \
 			style=wx.DD_DEFAULT_STYLE)
@@ -426,7 +443,7 @@ class MainFrame(wx.Frame):
 		self.SetWindowTitle(rootdir)
 		self.SetStatusBarText('Imported ' + str(stats))
 
-	def OnCheck(self, event):
+	def old_OnCheck(self, event):
 		# get a valid path from user
 		dirDialog = wx.DirDialog(self, "Choose a directory for check:", \
 			style=wx.DD_DEFAULT_STYLE)
@@ -516,12 +533,6 @@ class MainFrame(wx.Frame):
 
 		self.SetWindowTitle(rootdir)
 		self.SetStatusBarText('Checked ' + str(stats))
-
-	def OnExit(self, event):
-		self.Close(True)
-
-	def OnAbout(self, event):
-		pass
 
 
 
