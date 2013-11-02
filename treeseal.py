@@ -16,6 +16,9 @@ from misc import Checksum, MyException
 from node import Node, NodeStatus
 from progressdialog import UserCancelledException, FileProcessingProgressDialog
 from simplelistctrl import SimpleListControl
+from preferences import Preferences
+
+
 
 ProgramName = 'treeseal'
 ProgramVersion = '3.0'
@@ -291,13 +294,12 @@ class ListControlPanel(wx.Panel):
 class MainFrame(wx.Frame):
 	def __init__(self, parent):
 		wx.Frame.__init__(self, parent, size=(800,600))
-		self.SetWindowTitle()
 
 		# main menue definition
 		fileMenu = wx.Menu()
-		menuNew = fileMenu.Append(wx.ID_NEW, 'New', 'Put directory under control of ' + ProgramName)
+		menuNew = fileMenu.Append(wx.ID_NEW, 'Import', 'Put directory under checksum control')
 		self.Bind(wx.EVT_MENU, self.OnNew, menuNew)
-		menuOpen = fileMenu.Append(wx.ID_OPEN, 'Open', 'Open directory controlled by ' + ProgramName)
+		menuOpen = fileMenu.Append(wx.ID_OPEN, 'Open', 'Open directory under checksum control')
 		self.Bind(wx.EVT_MENU, self.OnOpen, menuOpen)
 		fileMenu.AppendSeparator()
 		menuPreferences = fileMenu.Append(wx.ID_PREFERENCES, 'Preferences', 'Show program\'s preferences')
@@ -318,6 +320,9 @@ class MainFrame(wx.Frame):
 		menuBar.Append(helpMenu, 'Help')
 		self.SetMenuBar(menuBar)
 
+		# current directories and files
+		self.UpdateRootDir(None)
+
 		# main window consists of address line and directory listing
 		self.address = wx.TextCtrl(self, -1, style=wx.TE_READONLY)
 		self.list = ListControlPanel(self)
@@ -332,24 +337,103 @@ class MainFrame(wx.Frame):
 
 		self.Show(True)
 
-	def SetWindowTitle(self, text=''):
-		baseTitle = ProgramName + ' ' + ProgramVersion
-		if text == '':
-			self.Title = baseTitle
-		else:
-			self.Title = baseTitle + ' - ' + text
-
 	def SetAddressLine(self, path=''):
 		self.address.SetValue(path)
 
 	def SetStatusBarText(self, text=''):
 		self.statusbar.SetStatusText(text)
 
+	def UpdateRootDir(self, rootDir):
+		if rootDir is None:
+			self.rootDir = None
+			self.metaDir = None
+			self.dbFile = None
+			self.sigFile = None
+			self.preferencesFile = None
+			self.Title = ProgramName + ' ' + ProgramVersion
+		else:
+			self.rootDir = rootDir
+			self.metaDir = os.path.join(self.rootDir, '.' + ProgramName)
+			self.dbFile = os.path.join(self.metaDir, 'base.sqlite3')
+			self.sigFile = os.path.join(self.metaDir, 'base.signature')
+			self.preferencesFile = os.path.join(self.metaDir, 'preferences.json')
+			self.Title = ProgramName + ' ' + ProgramVersion + ' - ' + self.rootDir
+
 	def OnNew(self, event):
-		pass
+		# get a valid path from user
+		dirDialog = wx.DirDialog(self, "Choose a directory for import:", \
+			style=wx.DD_DEFAULT_STYLE)
+		dirDialog.SetPath('D:\\Projects\\treeseal-example') # TESTING
+		#dirDialog.SetPath('/home/phil/Projects/treeseal-example') # TESTING
+		if dirDialog.ShowModal() == wx.ID_OK:
+			self.UpdateRootDir(dirDialog.GetPath())
+		else:
+			self.UpdateRootDir(None)
+			return
+		# check pre-conditions
+		if os.path.exists(self.metaDir):
+			dial = wx.MessageBox('Path "' + self.rootDir + '" already seems to be under checksum control.\n\nDo you still want to continue?', \
+				'Warning', wx.YES_NO | wx.ICON_WARNING | wx.NO_DEFAULT)
+			if not dial == wx.YES:
+				self.UpdateRootDir(None)
+				return
+
+		# close eventually existing previous instance
+		self.list.ClearInstance()
+		self.SetStatusBarText()
+
+		self.Import()
 
 	def OnOpen(self, event):
-		pass
+		# get a valid path from user
+		dirDialog = wx.DirDialog(self, "Choose a directory for open:", \
+			style=wx.DD_DEFAULT_STYLE)
+		dirDialog.SetPath('D:\\Projects\\treeseal-example') # TESTING
+		#dirDialog.SetPath('/home/phil/Projects/treeseal-example') # TESTING
+		if dirDialog.ShowModal() == wx.ID_OK:
+			self.UpdateRootDir(dirDialog.GetPath())
+		else:
+			self.UpdateRootDir(None)
+			return
+
+		# check pre-conditions
+		if not os.path.exists(self.metaDir):
+			wx.MessageBox('Path "' + self.rootDir + '" is no valid root dir.', \
+				'Error', wx.OK | wx.ICON_ERROR)
+			self.UpdateRootDir(None)
+			return
+		if not os.path.exists(self.dbFile):
+			wx.MessageBox('Cannot find database file "' + self.dbFile + '".', \
+				'Error', wx.OK | wx.ICON_ERROR)
+			self.UpdateRootDir(None)
+			return
+		if not os.path.exists(self.sigFile):
+			dial = wx.MessageBox('Cannot find database signature file "' + self.sigFile + '".\n\nUse database without verification?', \
+				'Warning', wx.YES_NO | wx.ICON_WARNING | wx.NO_DEFAULT)
+			if not dial == wx.YES:
+				self.UpdateRootDir(None)
+				return
+		else:
+			cs = Checksum()
+			cs.calculateForFile(self.dbFile)
+			if not cs.isValidUsingSavedFile(self.sigFile):
+				dial = wx.MessageBox('Database or database signature file have been corrupted.\n\nUse database without verification?', \
+					'Warning', wx.YES_NO | wx.ICON_WARNING | wx.NO_DEFAULT)
+				if not dial == wx.YES:
+					self.UpdateRootDir(None)
+					return
+
+		# close eventually existing previous instance
+		self.list.ClearInstance()
+		self.SetStatusBarText()
+
+		# load preferences
+		self.preference = Preferences()
+		if os.path.exists(self.preferencesFile):
+			self.preferences.save(self.preferencesFile)
+		else:
+			self.preferences.save(self.preferencesFile)
+
 
 	def OnPreferences(self, event):
 		pass
@@ -357,62 +441,37 @@ class MainFrame(wx.Frame):
 	def OnExit(self, event):
 		self.Close(True)
 
-	def OnCheck(self, event):
-		pass
-
-	def OnAbout(self, event):
-		pass
-
-	def old_OnImport(self, event):
-		# get a valid path from user
-		dirDialog = wx.DirDialog(self, "Choose a directory for import:", \
-			style=wx.DD_DEFAULT_STYLE)
-		#dirDialog.SetPath('D:\\Projects\\treeseal-example') # TESTING
-		dirDialog.SetPath('/home/phil/Projects/treeseal-example') # TESTING
-		if dirDialog.ShowModal() == wx.ID_OK:
-			rootdir = dirDialog.GetPath()
-			metadir = os.path.join(rootdir, '.' + ProgramName)
-			dbfile = os.path.join(metadir, 'base.sqlite3')
-			sigfile = os.path.join(metadir, 'base.signature')
-		else:
-			return
-		# check pre-conditions
-		if os.path.exists(metadir):
-			dial = wx.MessageBox('Path "' + rootdir + '" is already a valid root dir.\n\nDo you still want to continue?', \
-				'Warning', wx.YES_NO | wx.ICON_WARNING | wx.NO_DEFAULT)
-			if not dial == wx.YES:
-				return
-
-		# close eventually existing previous instance
-		self.list.ClearInstance()
-		self.SetWindowTitle()
-		self.SetStatusBarText()
-
+	def Import(self):
 		# do not care about previous content: reset meta directory and database files
-		if os.path.exists(metadir):
-			if os.path.exists(dbfile):
-				os.remove(dbfile)
-			if os.path.exists(sigfile):
-				os.remove(sigfile)
-		else:
-			os.mkdir(metadir)
-			if platform.system() == 'Windows':
-				# if on windows platform, hide directory
-				os.system('attrib +h "' + metadir + '"')
+		if os.path.exists(self.metaDir):
+			if os.path.exists(self.dbFile):
+				os.remove(self.dbFile)
+			if os.path.exists(self.sigFile):
+				os.remove(self.sigFile)
+			if os.path.exists(self.preferencesFile):
+				os.remove(self.preferencesFile)
+
+		# create default structure
+		os.mkdir(self.metaDir)
+		if platform.system() == 'Windows':
+			# if on windows platform, hide directory
+			os.system('attrib +h "' + self.metaDir + '"')
+		self.preference = Preferences()
+		self.preferences.save(self.preferencesFile)
 
 		try:
 			# create trees
-			fstree = FilesystemTree(rootdir, metadir)
+			fstree = FilesystemTree(self.rootDir, self.metaDir)
 			fstree.open()
-			dbtree = DatabaseTree(dbfile, sigfile)
+			dbtree = DatabaseTree(self.dbFile, self.sigFile)
 			dbtree.open()
 		except MyException as e:
-			e.showDialog('Importing ' + rootdir)
+			e.showDialog('Importing ' + self.rootDir)
 			return
 
 		try:
 			# create progress dialog
-			progressDialog = FileProcessingProgressDialog(self, 'Importing ' + rootdir)
+			progressDialog = FileProcessingProgressDialog(self, 'Importing ' + self.rootDir)
 			progressDialog.Show()
 			stats = fstree.getNodeStatistics()
 			progressDialog.Init(stats.getNodeCount(), stats.getNodeSize())
@@ -428,83 +487,36 @@ class MainFrame(wx.Frame):
 			return
 		except MyException as e:
 			progressDialog.Destroy()
-			e.showDialog('Importing ' + rootdir)
+			e.showDialog('Importing ' + self.rootDir)
 			return
 
 		# signal that we have returned from calculation, either
 		# after it is done or after progressDialog signalled that the
-		# user stopped the calcuation using the cancel button
+		# user stopped the calculation using the cancel button
 		progressDialog.SignalFinished()
 
-		self.list.SetInstance(Instance(self.config, dbtree, None, None))
+		self.list.SetInstance(Instance(self.preferences, dbtree, None, None))
 		fstree.close()
 		self.list.readonly = True
 
-		self.SetWindowTitle(rootdir)
 		self.SetStatusBarText('Imported ' + str(stats))
 
-	def old_OnCheck(self, event):
-		# get a valid path from user
-		dirDialog = wx.DirDialog(self, "Choose a directory for check:", \
-			style=wx.DD_DEFAULT_STYLE)
-		#dirDialog.SetPath('D:\\Projects\\treeseal-example') # TESTING
-		dirDialog.SetPath('/home/phil/Projects/treeseal-example') # TESTING
-		if dirDialog.ShowModal() == wx.ID_OK:
-			rootdir = dirDialog.GetPath()
-			metadir = os.path.join(rootdir, '.' + ProgramName)
-			dbfile = os.path.join(metadir, 'base.sqlite3')
-			sigfile = os.path.join(metadir, 'base.signature')
-		else:
-			return
-		# check pre-conditions
-		if not os.path.exists(metadir):
-			wx.MessageBox('Path "' + rootdir + '" is no valid root dir.', \
-				'Error', wx.OK | wx.ICON_ERROR)
-			return
-
-		# close eventually existing previous instance
-		self.list.ClearInstance()
-		self.SetWindowTitle()
-		self.SetStatusBarText()
-
-		# check more pre-conditions
-		if not os.path.exists(dbfile):
-			wx.MessageBox('Cannot find database file "' + dbfile + '".', \
-				'Error', wx.OK | wx.ICON_ERROR)
-			return
-		if not os.path.exists(dbfile):
-			wx.MessageBox('Cannot find database file "' + dbfile + '".', \
-				'Error', wx.OK | wx.ICON_ERROR)
-			return
-		if not os.path.exists(sigfile):
-			dial = wx.MessageBox('Cannot find database signature file "' + sigfile + '".\n\nUse database without verification?', \
-				'Warning', wx.YES_NO | wx.ICON_WARNING | wx.NO_DEFAULT)
-			if not dial == wx.YES:
-				return
-		else:
-			cs = Checksum()
-			cs.calculateForFile(dbfile)
-			if not cs.isValidUsingSavedFile(sigfile):
-				dial = wx.MessageBox('Database or database signature file have been corrupted.\n\nUse database without verification?', \
-					'Warning', wx.YES_NO | wx.ICON_WARNING | wx.NO_DEFAULT)
-				if not dial == wx.YES:
-					return
-
+	def OnCheck(self, event):
 		try:
 			# create trees
-			fstree = FilesystemTree(rootdir, metadir)
+			fstree = FilesystemTree(self.rootDir, self.metaDir)
 			fstree.open()
-			dbtree = DatabaseTree(dbfile, sigfile)
+			dbtree = DatabaseTree(self.dbFile, self.sigFile)
 			dbtree.open()
 			memtree = MemoryTree()
 			memtree.open()
 		except MyException as e:
-			e.showDialog('Checking ' + rootdir)
+			e.showDialog('Checking ' + self.rootDir)
 			return
 
 		try:
 			# create progress dialog
-			progressDialog = FileProcessingProgressDialog(self, 'Checking ' + rootdir)
+			progressDialog = FileProcessingProgressDialog(self, 'Checking ' + self.rootDir)
 			progressDialog.Show()
 			stats = fstree.getNodeStatistics()
 			progressDialog.Init(stats.getNodeCount(), stats.getNodeSize())
@@ -520,7 +532,7 @@ class MainFrame(wx.Frame):
 			return
 		except MyException as e:
 			progressDialog.Destroy()
-			e.showDialog('Checking ' + rootdir)
+			e.showDialog('Checking ' + self.rootDir)
 			return
 
 		# signal that we have returned from calculation, either
@@ -531,8 +543,11 @@ class MainFrame(wx.Frame):
 		self.list.SetInstance(Instance(self.config, memtree, dbtree, fstree))
 		self.list.readonly = False
 
-		self.SetWindowTitle(rootdir)
+		self.SetWindowTitle(self.rootDir)
 		self.SetStatusBarText('Checked ' + str(stats))
+
+	def OnAbout(self, event):
+		pass
 
 
 
