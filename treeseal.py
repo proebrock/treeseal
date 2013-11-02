@@ -547,7 +547,19 @@ class MainFrame(wx.Frame):
 		self.SetStatusBarText('Checked ' + str(stats))
 
 	def OnAbout(self, event):
-		pass
+		info = wx.AboutDialogInfo()
+		#info.SetIcon(wx.Icon('hunter.png', wx.BITMAP_TYPE_PNG))
+		info.SetName('treeseal')
+		info.SetVersion('3.0')
+		info.SetDescription('TreeSeal is a tool for checking the integrity ' + \
+			'of a directory structure by keeping checksums and meta ' + \
+			'information for each file in a separate database.')
+		info.SetCopyright('(C) 2010 - 2013 Philipp Roebrock')
+		info.SetWebSite('https://github.com/proebrock/treeseal')
+		#info.SetLicence(licence)
+		info.AddDeveloper('Philipp Roebrock')
+		info.AddDocWriter('Philipp Roebrock')
+		wx.AboutBox(info)
 
 
 
