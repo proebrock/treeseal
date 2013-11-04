@@ -16,6 +16,7 @@ class Preferences:
 
 	def __str__(self):
 		return json.dumps({ \
+			'includes' : self.includes, \
 			'excludes' : self.excludes, \
 			}, indent='\t')
 
@@ -23,29 +24,33 @@ class Preferences:
 		if other is None:
 			return False
 		else:
-			return self.excludes == other.excludes
+			return self.includes == other.includes and \
+				self.excludes == other.excludes
 
 	def __ne__(self, other):
 		return not self.__eq__(other)
 
 	def __copy__(self):
 		result = Preferences()
+		result.includes = self.includes
 		result.excludes = self.excludes
 		return result
 
 	def __deepcopy__(self, memo):
 		result = Preferences()
+		result.includes = copy.deepcopy(self.includes, memo)
 		result.excludes = copy.deepcopy(self.excludes, memo)
 		return result
 
 	def setDefaults(self):
+		self.includes = None
 		self.excludes = [
 			'Thumbs.db', \
 			]
 		if platform.system() == 'Windows':
 			self.excludes.extend([\
-				'[a-zA-Z]:\\\\System Volume Information', \
-				'[a-zA-Z]:\\\\\$RECYCLE.BIN', \
+				'\\System Volume Information', \
+				'\\$RECYCLE.BIN', \
 				])
 
 	def save(self, filename):
@@ -61,5 +66,7 @@ class Preferences:
 		# set default values
 		self.setDefaults()
 		# assign values specified in preferences file
+		if 'includes' in pdict:
+			self.includes = pdict['includes']
 		if 'excludes' in pdict:
 			self.excludes = pdict['excludes']

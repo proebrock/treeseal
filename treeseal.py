@@ -17,6 +17,7 @@ from node import Node, NodeStatus
 from progressdialog import UserCancelledException, FileProcessingProgressDialog
 from simplelistctrl import SimpleListControl
 from preferences import Preferences
+from preferencesdialog import PreferencesDialog
 
 
 
@@ -297,31 +298,32 @@ class MainFrame(wx.Frame):
 
 		# main menue definition
 		fileMenu = wx.Menu()
-		menuNew = fileMenu.Append(wx.ID_NEW, 'Import', 'Put directory under checksum control')
+		menuNew = fileMenu.Append(wx.ID_NEW, '&Import', 'Put directory under checksum control')
 		self.Bind(wx.EVT_MENU, self.OnNew, menuNew)
-		menuOpen = fileMenu.Append(wx.ID_OPEN, 'Open', 'Open directory under checksum control')
+		menuOpen = fileMenu.Append(wx.ID_OPEN, '&Open', 'Open directory under checksum control')
 		self.Bind(wx.EVT_MENU, self.OnOpen, menuOpen)
 		fileMenu.AppendSeparator()
-		menuPreferences = fileMenu.Append(wx.ID_PREFERENCES, 'Preferences', 'Show program\'s preferences')
+		menuPreferences = fileMenu.Append(wx.ID_PREFERENCES, '&Preferences\tCtrl+P', 'Show program\'s preferences')
 		self.Bind(wx.EVT_MENU, self.OnPreferences, menuPreferences)
 		fileMenu.AppendSeparator()
 		menuExit = fileMenu.Append(wx.ID_EXIT, 'E&xit', 'Terminate Program')
 		self.Bind(wx.EVT_MENU, self.OnExit, menuExit)
 		actionMenu = wx.Menu()
-		menuCheck = actionMenu.Append(wx.ID_FILE, 'Check', 'Check')
+		menuCheck = actionMenu.Append(wx.ID_FILE, '&Check\tCtrl+K', 'Check')
 		self.Bind(wx.EVT_MENU, self.OnCheck, menuCheck)
 		helpMenu = wx.Menu()
-		menuAbout = helpMenu.Append(wx.ID_ABOUT, 'About', 'Information about this program')
+		menuAbout = helpMenu.Append(wx.ID_ABOUT, '&About', 'Information about this program')
 		self.Bind(wx.EVT_MENU, self.OnAbout, menuAbout)
 		# assemble menu
 		menuBar = wx.MenuBar()
 		menuBar.Append(fileMenu, '&File')
-		menuBar.Append(actionMenu, 'Action')
-		menuBar.Append(helpMenu, 'Help')
+		menuBar.Append(actionMenu, '&Action')
+		menuBar.Append(helpMenu, '&Help')
 		self.SetMenuBar(menuBar)
 
 		# current directories and files
 		self.UpdateRootDir(None)
+		self.preferences = None
 
 		# main window consists of address line and directory listing
 		self.address = wx.TextCtrl(self, -1, style=wx.TE_READONLY)
@@ -357,14 +359,18 @@ class MainFrame(wx.Frame):
 			self.dbFile = os.path.join(self.metaDir, 'base.sqlite3')
 			self.sigFile = os.path.join(self.metaDir, 'base.signature')
 			self.preferencesFile = os.path.join(self.metaDir, 'preferences.json')
-			self.Title = ProgramName + ' ' + ProgramVersion + ' - ' + self.rootDir
+			self.Title = ProgramName + ' ' + ProgramVersion + \
+				' - ' + self.rootDir
 
 	def OnNew(self, event):
 		# get a valid path from user
 		dirDialog = wx.DirDialog(self, "Choose a directory for import:", \
 			style=wx.DD_DEFAULT_STYLE)
-		dirDialog.SetPath('D:\\Projects\\treeseal-example') # TESTING
-		#dirDialog.SetPath('/home/phil/Projects/treeseal-example') # TESTING
+		if platform.system() == 'Windows':
+			dirDialog.SetPath('D:\\Projects\\treeseal-example') # TESTING
+		else:
+			dirDialog.SetPath('/home/phil/Projects/treeseal-example') # TESTING
+
 		if dirDialog.ShowModal() == wx.ID_OK:
 			self.UpdateRootDir(dirDialog.GetPath())
 		else:
@@ -388,8 +394,11 @@ class MainFrame(wx.Frame):
 		# get a valid path from user
 		dirDialog = wx.DirDialog(self, "Choose a directory for open:", \
 			style=wx.DD_DEFAULT_STYLE)
-		dirDialog.SetPath('D:\\Projects\\treeseal-example') # TESTING
-		#dirDialog.SetPath('/home/phil/Projects/treeseal-example') # TESTING
+		if platform.system() == 'Windows':
+			dirDialog.SetPath('D:\\Projects\\treeseal-example') # TESTING
+		else:
+			dirDialog.SetPath('/home/phil/Projects/treeseal-example') # TESTING
+
 		if dirDialog.ShowModal() == wx.ID_OK:
 			self.UpdateRootDir(dirDialog.GetPath())
 		else:
@@ -427,16 +436,21 @@ class MainFrame(wx.Frame):
 		self.list.ClearInstance()
 		self.SetStatusBarText()
 
-		# load preferences
-		self.preference = Preferences()
+		# load preferences or create default ones
+		self.preferences = Preferences()
 		if os.path.exists(self.preferencesFile):
-			self.preferences.save(self.preferencesFile)
+			self.preferences.load(self.preferencesFile)
 		else:
 			self.preferences.save(self.preferencesFile)
 
 
 	def OnPreferences(self, event):
-		pass
+		if self.preferences is None:
+			wx.MessageBox('Import or Open directory before you can access its preferences.', \
+				'Error', wx.OK | wx.ICON_ERROR)
+			return
+		preferencesDialog = PreferencesDialog(self, self.preferences)
+		preferencesDialog.Show()
 
 	def OnExit(self, event):
 		self.Close(True)
@@ -450,13 +464,13 @@ class MainFrame(wx.Frame):
 				os.remove(self.sigFile)
 			if os.path.exists(self.preferencesFile):
 				os.remove(self.preferencesFile)
-
-		# create default structure
-		os.mkdir(self.metaDir)
+		else:
+			os.mkdir(self.metaDir)
+		# if on windows platform, hide directory
 		if platform.system() == 'Windows':
-			# if on windows platform, hide directory
 			os.system('attrib +h "' + self.metaDir + '"')
-		self.preference = Preferences()
+		self.preferences = Preferences()
+		# TODO: Show preferences dialog to allow user to change before import!
 		self.preferences.save(self.preferencesFile)
 
 		try:
@@ -502,6 +516,10 @@ class MainFrame(wx.Frame):
 		self.SetStatusBarText('Imported ' + str(stats))
 
 	def OnCheck(self, event):
+		# close eventually existing previous instance
+		self.list.ClearInstance()
+		self.SetStatusBarText()
+
 		try:
 			# create trees
 			fstree = FilesystemTree(self.rootDir, self.metaDir)
@@ -540,10 +558,9 @@ class MainFrame(wx.Frame):
 		# user stopped the calcuation using the cancel button
 		progressDialog.SignalFinished()
 
-		self.list.SetInstance(Instance(self.config, memtree, dbtree, fstree))
+		self.list.SetInstance(Instance(self.preferences, memtree, dbtree, fstree))
 		self.list.readonly = False
 
-		self.SetWindowTitle(self.rootDir)
 		self.SetStatusBarText('Checked ' + str(stats))
 
 	def OnAbout(self, event):
