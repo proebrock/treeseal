@@ -4,8 +4,6 @@
 import wx
 import  wx.gizmos as gizmos
 
-from preferences import Preferences
-
 
 
 class PreferencesDialog(wx.Dialog):
@@ -31,10 +29,10 @@ class PreferencesDialog(wx.Dialog):
 
 		# buttons
 		okButton = wx.Button(self, label='OK')
+		okButton.SetFocus()
 		self.Bind(wx.EVT_BUTTON, self.OkClick, okButton)
 		cancelButton = wx.Button(self, label='Cancel')
 		self.Bind(wx.EVT_BUTTON, self.CancelClick, cancelButton)
-		cancelButton.SetFocus()
 		buttonsSizer = wx.BoxSizer(wx.HORIZONTAL)
 		buttonsSizer.Add(okButton, 0, wx.ALL | wx.ALIGN_CENTRE, border)
 		buttonsSizer.Add(cancelButton, 0, wx.ALL | wx.ALIGN_CENTRE, border)
@@ -50,13 +48,15 @@ class PreferencesDialog(wx.Dialog):
 		self.SetPreferences()
 
 	def SetPreferences(self):
-		if self.preferences is not None:
-			if self.preferences.includes is not None:
-				self.excludeElb.SetStrings(self.preferences.includes)
-			if self.preferences.excludes is not None:
-				self.excludeElb.SetStrings(self.preferences.excludes)
+		self.includeElb.SetStrings(self.preferences.includes)
+		self.excludeElb.SetStrings(self.preferences.excludes)
+
+	def GetPreferences(self):
+		self.preferences.includes = self.includeElb.GetStrings()
+		self.preferences.excludes = self.excludeElb.GetStrings()
 
 	def OkClick(self, event):
+		self.GetPreferences()
 		self.Destroy()
 
 	def CancelClick(self, event):

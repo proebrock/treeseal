@@ -21,8 +21,8 @@ from preferencesdialog import PreferencesDialog
 
 
 
-ProgramName = 'treeseal'
-ProgramVersion = '3.0'
+ProgramName = u'treeseal'
+ProgramVersion = u'3.0'
 
 
 
@@ -355,10 +355,11 @@ class MainFrame(wx.Frame):
 			self.Title = ProgramName + ' ' + ProgramVersion
 		else:
 			self.rootDir = rootDir
-			self.metaDir = os.path.join(self.rootDir, '.' + ProgramName)
-			self.dbFile = os.path.join(self.metaDir, 'base.sqlite3')
-			self.sigFile = os.path.join(self.metaDir, 'base.signature')
-			self.preferencesFile = os.path.join(self.metaDir, 'preferences.json')
+			self.metaName = '.' + ProgramName
+			self.metaDir = os.path.join(self.rootDir, self.metaName)
+			self.dbFile = os.path.join(self.metaDir, u'base.sqlite3')
+			self.sigFile = os.path.join(self.metaDir, u'base.signature')
+			self.preferencesFile = os.path.join(self.metaDir, u'preferences.json')
 			self.Title = ProgramName + ' ' + ProgramVersion + \
 				' - ' + self.rootDir
 
@@ -450,7 +451,8 @@ class MainFrame(wx.Frame):
 				'Error', wx.OK | wx.ICON_ERROR)
 			return
 		preferencesDialog = PreferencesDialog(self, self.preferences)
-		preferencesDialog.Show()
+		preferencesDialog.ShowModal()
+		self.preferences.save(self.preferencesFile)
 
 	def OnExit(self, event):
 		self.Close(True)
@@ -470,12 +472,14 @@ class MainFrame(wx.Frame):
 		if platform.system() == 'Windows':
 			os.system('attrib +h "' + self.metaDir + '"')
 		self.preferences = Preferences()
-		# TODO: Show preferences dialog to allow user to change before import!
+		preferencesDialog = PreferencesDialog(self, self.preferences)
+		preferencesDialog.ShowModal()
 		self.preferences.save(self.preferencesFile)
 
 		try:
 			# create trees
-			fstree = FilesystemTree(self.rootDir, self.metaDir)
+			fstree = FilesystemTree(self.rootDir, self.preferences.includes, \
+				[ os.path.sep + self.metaName ] + self.preferences.excludes)
 			fstree.open()
 			dbtree = DatabaseTree(self.dbFile, self.sigFile)
 			dbtree.open()
@@ -522,7 +526,8 @@ class MainFrame(wx.Frame):
 
 		try:
 			# create trees
-			fstree = FilesystemTree(self.rootDir, self.metaDir)
+			fstree = FilesystemTree(self.rootDir, self.preferences.includes, \
+				[ os.path.sep + self.metaName ] + self.preferences.excludes)
 			fstree.open()
 			dbtree = DatabaseTree(self.dbFile, self.sigFile)
 			dbtree.open()

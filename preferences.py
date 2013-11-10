@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-
-
 import copy
 import platform
 import simplejson as json
@@ -43,14 +41,14 @@ class Preferences:
 		return result
 
 	def setDefaults(self):
-		self.includes = None
+		self.includes = []
 		self.excludes = [
-			'Thumbs.db', \
+			u'Thumbs.db', \
 			]
 		if platform.system() == 'Windows':
 			self.excludes.extend([\
-				'\\System Volume Information', \
-				'\\$RECYCLE.BIN', \
+				u'\\System Volume Information', \
+				u'\\$RECYCLE.BIN', \
 				])
 
 	def save(self, filename):

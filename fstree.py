@@ -3,27 +3,22 @@
 
 import datetime
 import os
-import platform
-import re
 import shutil
 
 from misc import MyException, Checksum
 from node import NodeInfo, Node
 from tree import Tree
+from filefilter import FileFilter
 
 
 
 class FilesystemTree(Tree):
 
-	def __init__(self, rootdir, metadir):
+	def __init__(self, rootdir, includes, excludes):
 		super(FilesystemTree, self).__init__()
 		self.__rootDir = rootdir
-		self.__metaDir = metadir
 
-		self.__winForbiddenDirs = [ \
-			re.compile('[a-zA-Z]:\\\\System Volume Information'), \
-			re.compile('[a-zA-Z]:\\\\\$RECYCLE.BIN'), \
-			]
+		self.__filter = FileFilter(includes, excludes)
 
 		self.__checksumToPathsMap = {}
 
@@ -49,10 +44,8 @@ class FilesystemTree(Tree):
 
 	def clear(self):
 		for name in os.listdir(self.__rootDir):
-			fullpath = os.path.join(self.__rootDir, name)
-			if fullpath == self.__metaDir:
-				continue
-			shutil.rmtree()
+			if self.__filter.EntryAccepted(self.__rootDir, self.getPath(), name):
+				shutil.rmtree()
 		self.__checksumToPathsMap = {}
 		self.gotoRoot()
 
@@ -193,16 +186,11 @@ class FilesystemTree(Tree):
 		return os.path.join(self.__rootDir, self.getPath(), name)
 
 	def __fetch(self, name):
-		fullpath = self.getFullPath(name)
-		# check blacklists
-		if fullpath == self.__metaDir:
+		# filter files
+		if not self.__filter.EntryAccepted(self.__rootDir, self.getPath(), name):
 			return None
-		if platform.system() == 'Windows':
-			apath = os.path.abspath(fullpath)
-			for regex in self.__winForbiddenDirs:
-				if regex.match(apath):
-					return None
 		# fetch node information
+		fullpath = self.getFullPath(name)
 		node = Node(name)
 		if not os.path.isdir(fullpath):
 			node.info = NodeInfo()
