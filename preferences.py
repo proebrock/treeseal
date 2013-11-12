@@ -45,10 +45,16 @@ class Preferences:
 		self.excludes = [
 			u'Thumbs.db', \
 			]
-		if platform.system() == 'Windows':
+		sysstr = platform.system()
+		if sysstr == 'Windows':
 			self.excludes.extend([\
 				u'\\System Volume Information', \
 				u'\\$RECYCLE.BIN', \
+				])
+		elif sysstr == 'Linux':
+			self.excludes.extend([\
+				u'/lost+found', \
+				u'@eaDir/', \
 				])
 
 	def save(self, filename):
