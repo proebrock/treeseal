@@ -70,31 +70,3 @@ class FileFilter(object):
 				return False
 		return True
 
-
-
-###########################################
-
-def doWalk(ff, rootDir, currentDir):
-	fullCurrentPath = os.path.join(rootDir, currentDir)
-	for name in sorted(os.listdir(fullCurrentPath)):
-		if not ff.EntryAccepted(rootDir, currentDir, name):
-			continue
-		fullName = os.path.join(fullCurrentPath, name)
-		localName = os.path.join(currentDir, name)
-		if (os.path.isdir(fullName)):
-			print('>' + localName)
-			doWalk(ff, rootDir, localName)
-		else:
-			print(localName)
-
-
-
-ff = FileFilter()
-ff.SetIncludes()
-ff.SetIncludes([ '*.txt' ])
-ff.SetExcludes([ 'a/', 'asdf.*' ])
-#ff.SetExcludes([ '*.txt', 'gh*.doc', '/a', 'b/' ])
-#rootDir = 'D:\\Projects\\treeseal-example'
-rootDir = '/home/phil/Projects/treeseal-example'
-print(ff)
-doWalk(ff, rootDir, '')
